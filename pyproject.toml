@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "surfh"
+version = "0.1.0"
+description = "SUper Resolution and Fusion for Hyperspectral images"
+authors = ["François Orieux <orieux@l2s.centralesupelec.fr>"]
+
+[tool.poetry.dependencies]
+python = ">=3.8,<3.10"
+numpy = "^1.22.2"
+scipy = "^1.8.0"
+qmm = "^0.11.0"
+udft = "^3.4.0"
+astropy = "^5.0.1"
+
+[tool.poetry.dev-dependencies]
+ipython = "^8.0.1"
+mypy = "^0.931"
+icecream = "^2.1.1"
+black = "^22.1.0"
+bump2version = "^1.0.1"
+pylint = "^2.12.2"
+flake8 = "^4.0.1"
+pytype = "^2022.2.8"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
