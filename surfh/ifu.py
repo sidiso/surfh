@@ -1,3 +1,6 @@
+# Copyright (C) 2021 François Orieux <francois.orieux@universite-paris-saclay.fr>
+# Copyright (C) 2018-2021 Ralph Abirizk <ralph.abirizk@universite-paris-saclay.fr>
+
 import sys
 from typing import List, Sequence, Tuple
 
@@ -12,8 +15,8 @@ class Channel:
 
     def __init__(
         self,
-        beta_width: float,
-        alpha_width: float,
+        beta_fov: float,
+        alpha_fov: float,
         n_slit: int,
         w_blur: SpectralBlur,
         pce: array,
@@ -25,8 +28,8 @@ class Channel:
         wavel_axis is a regularly sampled wavelength axis
         """
 
-        self.beta_width = beta_width
-        self.alpha_width = alpha_width
+        self.beta_fov = beta_fov
+        self.alpha_fov = alpha_fov
         self.n_slit = n_slit
 
         self.w_blur = w_blur
@@ -51,9 +54,9 @@ class Channel:
         return len(self.wavel_axis)
 
     @property
-    def slit_width(self):
+    def slit_beta_fov(self):
         """The width of slit"""
-        return self.beta_width / self.n_slit
+        return self.beta_fov / self.n_slit
 
     @property
     def wavel_axis(self):
@@ -65,7 +68,7 @@ class Channel:
         """The detector wavelength sampling step"""
         return self.wavel_axis[1] - self.wavel_axis[0]
 
-    def spectral_slice(self, wavel_input_axis):
+    def wslice(self, wavel_input_axis):
         """Return the measured wavelength within a selected channel"""
         return slice(
             np.where(wavel_input_axis <= self.wavel_min)[0][-1],
@@ -84,7 +87,7 @@ class Channel:
 
         """
         beta_step = beta_axis[1] - beta_axis[0]
-        beta_of_slits = np.arange(0, self.slit_width, beta_step)
+        beta_of_slits = np.arange(0, self.slit_beta_fov, beta_step)
         beta_of_slits -= np.mean(beta_of_slits)
         arcsec2micron = self.delta_wavel / beta_step
         if len(beta_axis) > 1:
@@ -99,12 +102,12 @@ class Channel:
 
         return psfs
 
-    # def spectral_slice_psf(self, beta_axis: array, wavel_input_axis: array):
+    # def wslice_psf(self, beta_axis: array, wavel_input_axis: array):
     #     """Returns the index and the spectral PSF for the corresponding
     #     wavelength axis and beta_axis"""
 
-    def slit_width_in_pixel(self, beta_axis: array):
-        return int(np.round(self.slit_width / (beta_axis[1] - beta_axis[0])))
+    def slit_beta_fov_in_pixel(self, beta_axis: array):
+        return int(np.round(self.slit_beta_fov / (beta_axis[1] - beta_axis[0])))
 
     def spatial_slice(
         self, alpha_axis: array, beta_axis: array, point: Sequence[int, int]
@@ -115,17 +118,13 @@ class Channel:
         beta_step = beta_axis[2] - beta_axis[1]
 
         s_a = int(
-            np.round((-self.alpha_width / 2 + point[0] + alpha_axis[0]) / alpha_step)
+            np.round((-self.alpha_fov / 2 + point[0] + alpha_axis[0]) / alpha_step)
         )
         e_a = int(
-            np.round((+self.alpha_width / 2 + point[0] + alpha_axis[0]) / alpha_step)
+            np.round((+self.alpha_fov / 2 + point[0] + alpha_axis[0]) / alpha_step)
         )
-        s_b = int(
-            np.round((-self.beta_width / 2 + point[1] + beta_axis[0]) / beta_step)
-        )
-        e_b = int(
-            np.round((+self.beta_width / 2 + point[1] + beta_axis[0]) / beta_step)
-        )
+        s_b = int(np.round((-self.beta_fov / 2 + point[1] + beta_axis[0]) / beta_step))
+        e_b = int(np.round((+self.beta_fov / 2 + point[1] + beta_axis[0]) / beta_step))
 
         if s_b == e_b:
             raise ValueError("Null flux inside the slice with start_beta == end_beta")
