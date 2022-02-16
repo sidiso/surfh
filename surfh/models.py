@@ -152,7 +152,8 @@ class LMMDataModel:
             )
         )
 
-        out_channel = np.zeros(
+        # out in [pointage, λ, alpha, n_slit]
+        out = np.zeros(
             (
                 len(self.spatial_indexs[idx]),
                 self.channels[idx].n_wavel,
@@ -161,24 +162,28 @@ class LMMDataModel:
             )
         )
 
-        for slit in range(self.slit_len[idx]):
-            otf_out = np.zeros_like(psf_cube[0][0], dtype=complex)
+        # Σ_β
+        for beta_idx in range(self.slit_len[idx]):
+            blurred = np.zeros_like(psf_cube[0][0], dtype=complex)
+            # Σ_tpl
             for comp in range(self.n_components):
-                otf_out += (
+                blurred += (
                     abundance[comp, np.newaxis, :, :]
-                    * psf_cube[comp][slit]
+                    * psf_cube[comp, beta_idx]
                     * self._otf_sr[idx]
                 )
-            out = np.fft.irfftn(otf_out, axes=(1, 2), s=shape, norm="ortho")
-            out_channel += spatial_indexing(
-                out,
-                slit,
+            blurred = np.fft.irfftn(blurred, axes=(1, 2), s=shape, norm="ortho")
+            # spatial_indexing returns a cube with all slit for a specific beta
+            # idx inside all slit (that should have the same number of beta)
+            out += spatial_indexing(
+                blurred,
+                beta_idx,
                 self.slit_len[idx],
                 self.spatial_indexs[idx],
                 n_slit,
                 self.srf[idx],
             )
-        return out_channel
+        return out
 
     #%%
     def backward(self, psf_cube, shape, data):
@@ -190,7 +195,7 @@ class LMMDataModel:
         shape = (self.ishape.alpha, self.ishape.beta)
         back_otf_out = np.zeros(
             (self.n_components, psf_cube[0][0][0].shape[1], psf_cube[0][0][0].shape[2]),
-            dtype=complex,
+            dtype=np.complex,
         )
         for idx, chan in enumerate(self.channels):
             for slit in range(self.slit_len[idx]):
@@ -316,22 +321,22 @@ class LMMDataModel:
         return out_coadd_chan
 
 
-class NewLMMDataModel:
-    def __init__(self, channels: List[Channel]):
-        self.channels = channels
+# class NewLMMDataModel:
+#     def __init__(self, channels: List[Channel]):
+#         self.channels = channels
 
-    def forward(self, inarray):
-        """Compute the forward and returns data for each channel"""
-        if not np.iscomplexobj(inarray):
-            # The input is in the spatial domain, so we calculate its FFT
-            inarray = np.fft.rfftn(inarray, axes=(1, 2), norm="ortho")
+#     def forward(self, inarray):
+#         """Compute the forward and returns data for each channel"""
+#         if not np.iscomplexobj(inarray):
+#             # The input is in the spatial domain, so we calculate its FFT
+#             inarray = np.fft.rfftn(inarray, axes=(1, 2), norm="ortho")
 
-        return [
-            self.forward_channel(inarray, chan) for chan in enumerate(self.channels)
-        ]
+#         return [
+#             self.forward_channel(inarray, chan) for chan in enumerate(self.channels)
+#         ]
 
-    def forward_channel(self, inarray, channel):
-        pass
+#     def forward_channel(self, inarray, channel):
+#         pass
 
 
 #%%\
@@ -359,7 +364,7 @@ def diffracted_psfcube(component, spsf, wslice, wpsf, shape) -> List[array]:
             # psf in [λ, 1, α, β]
             psf.reshape((psf.shape[0], 1, psf.shape[1], psf.shape[2]))
             # wpsf_i in [λ, λ', 1, 1]
-            * wpsf_i.reshape((i_wpsf.shape[0], i_wpsf.shape[1], 1, 1)),
+            * wpsf_i.reshape((wpsf_i.shape[0], wpsf_i.shape[1], 1, 1)),
             axis=0,
         )
 
@@ -372,11 +377,11 @@ def spectral_diffraction(cube, wpsf):
     return np.dot(cube, wpsf)
 
 
-def spectral_diffraction_coadd(components, wslice, psfs, slit_len):
+def spectral_diffraction_coadd(component, wslice, psfs, slit_len):
     out_spectrum = []
     for idx in range(slit_len):
         blurred_spectrum = sum(
-            np.dot(filtered_comp[wslice][np.newaxis, :], psfs[idx, :, :])
+            np.dot(component[wslice][np.newaxis, :], psfs[idx, :, :])
         )
         out_spectrum.append(blurred_spectrum)
     return out_spectrum
@@ -391,14 +396,19 @@ def spectral_diffraction_coadd(components, wslice, psfs, slit_len):
 
 
 #%%
-def spatial_indexing(array, slit, slit_len, spatial_index, len_beta, srf):
-    """Select the observed FOV within a pointing and selects the right spatial position
-    inside a slice"""
-    out_indexed = []
+def spatial_indexing(inarray, beta_idx, slit_len, spatial_index, n_slit, srf):
+    """Select the observed FOV within a pointing and selects the right spatial
+    position inside a slice
+
+    """
+    out = []
+    # loop on pointing, 'si' is in [slice_alpha, slice_beta] for all the FOV of
+    # the channel (all slit)
     for si in spatial_index:
-        indexed_out = array[:, si[0], si[1]][:, ::srf, slit::slit_len]
-        out_indexed.append(indexed_out[:, :, :len_beta])
-    return np.asarray(out_indexed)
+        indexed_out = inarray[:, si[0], si[1]][:, ::srf, beta_idx::slit_len]
+        out.append(indexed_out[:, :, :n_slit])
+    # out is in [pointing, ]
+    return np.asarray(out)
 
 
 def backward_spatial_indexing(data, spatial_index, slit_len, slit, srf, shape):
