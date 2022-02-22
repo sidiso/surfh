@@ -7,6 +7,7 @@ from typing import List, Tuple
 import numpy as np
 import scipy.interpolate as sc
 import udft
+from loguru import logger
 from mrs_functions import IFU_LMM
 from sklearn import preprocessing
 from sklearn.decomposition import PCA
@@ -27,98 +28,63 @@ def idft(in_array, shape):
 InputShape = namedtuple("InputShape", ["alpha", "beta", "wavel"])
 
 
-class LMMDataModel:
-    """Model a complete IFU"""
+class LMMChannel:
+    """Forward model for a channel"""
 
     def __init__(
         self,
-        channels: List[ifu.Channel],
+        channel: ifu.Channel,
+        components: array,
         alpha_axis: array,
         beta_axis: array,
         wavel_axis: array,
         pointings: List[Tuple[int, int]],
-        n_components: int,
-        sr_factors: List[int],
+        sr_factors: int,
+        psf: array,
     ):
-        self.channels = channels
+        self.channel = channel
+        self.components = components
         self.alpha_axis = alpha_axis
         self.beta_axis = beta_axis
         self.wavel_axis = wavel_axis
         self.pointings = pointings
-        self.n_components = n_components
         self.srf = sr_factors
 
         self.ishape = InputShape(len(alpha_axis), len(beta_axis), len(wavel_axis))
 
-        self.wpsf = [chan.spectral_psf(beta_axis, wavel_axis) for chan in channels]
-        self.wslices = [chan.wslice(wavel_axis) for chan in channels]
-        self.spatial_indexs = [
-            chan.all_spatial_index(alpha_axis, beta_axis, pointings)
-            for chan in channels
-        ]
-        self.slit_len = [chan.slit_width_in_pixel(beta_axis) for chan in channels]
+        self.wslice = channel.wslice(wavel_axis)
+        self.spatial_indexs = channel.all_spatial_index(
+            alpha_axis, beta_axis, pointings
+        )
+        self.slit_len = channel.slit_width_in_pixel(beta_axis)
 
-        self.pce = [chan.pce for chan in channels]
-
-        self._otf_sr = [
-            udft.ir2fr(np.ones((srf, 1)), self.ishape[:2])[np.newaxis, ...]
-            for srf in self.srf
+        self._otf_sr = udft.ir2fr(np.ones((sr_factors, 1)), self.ishape[:1])[
+            np.newaxis, ...
         ]
 
-    def alpha_step(self):
-        return self.alpha_axis[1] - self.alpha_axis[0]
-
-    def beta_step(self):
-        return self.beta_axis[1] - self.beta_axis[0]
-
-    def precalc_spectral_output(
-        self, components: array, spsf: List[array]
-    ) -> List[List[array]]:
-        """For each spectral component, and each channel (with its slit width, say N
-        pixels), this function precalculates N PSF cube.
-
-        components : array-like
-          shape (n_components, wavel_axis)
-
-        spfs: array
-          shape
-        """
-
-        if len(components) != self.n_components:
-            raise ValueError()
-
-        spectral_output = []
-
-        for idx in range(len(self.channels)):
-            spectral_output_chan = [
-                diffracted_psfcube(
-                    comp,
-                    spsf[idx],
-                    self.wslices[idx],
-                    self.wpsf[idx],
-                    self.slit_len[idx],
-                    self.ishape,
-                )
-                for comp in components
-            ]
-
-            spectral_output.append(spectral_output_chan)
-
-        return spectral_output
-
-    #%% \
-    def forward(self, psf_cube, inarray):
-        """Compute the forward and returns data for each channel"""
-        if not np.iscomplexobj(inarray):
-            # The input is in the spatial domain, so we calculate its FFT
-            inarray = np.fft.rfftn(inarray, axes=(1, 2), norm="ortho")
-
-        return [
-            self.forward_channel(inarray, psf_cube[idx], idx)
-            for idx, chan in enumerate(self.channels)
+        logger.info(f"precompute lmm otf for channel {channel.name}")
+        # all_otf is a list_comp[list_beta_idx]
+        wpsf_list = channel.spectral_psf(beta_axis, wavel_axis)
+        self.otf = [
+            udft.ir2fr(
+                ifu.diffracted_psf(comp, psf, self.wslice, wpsf_list), self.ishape[1:]
+            )
+            for comp in components
         ]
 
-    def forward_channel(self, abundance, psf_cube, idx):
+    @property
+    def pce(self):
+        return self.channel.pce
+
+    @property
+    def n_comp(self):
+        return self.components.shape[0]
+
+    @property
+    def n_slit(self):
+        return self.channel.n_slit
+
+    def forward(self, inarray):
         """Retruns 4D array representing the data for a selected channel
 
          4D : (pointings, diffracted wavelength_detector, spatial_axis_detector, slit)
@@ -140,7 +106,7 @@ class LMMDataModel:
 
         shape = (self.ishape.alpha, self.ishape.beta)
 
-        n_slit = self.channels[idx].n_slit
+        n_slit = self.n_slit
 
         n_alpha = int(
             np.round(
@@ -184,6 +150,55 @@ class LMMDataModel:
                 self.srf[idx],
             )
         return out
+
+
+class LMMDataModel:
+    """Model a complete IFU"""
+
+    def __init__(
+        self,
+        components: array,
+        channels: List[ifu.Channel],
+        alpha_axis: array,
+        beta_axis: array,
+        wavel_axis: array,
+        pointings: List[Tuple[int, int]],
+        sr_factors: List[int],
+        psf: array,
+    ):
+        self.channels = channels
+        self.alpha_axis = alpha_axis
+        self.beta_axis = beta_axis
+        self.wavel_axis = wavel_axis
+        self.pointings = pointings
+        self.components = components
+        self.srf = sr_factors
+        self.ishape = InputShape(len(alpha_axis), len(beta_axis), len(wavel_axis))
+
+        self.lmm_chan = [
+            LMMChannel(
+                chan, components, alpha_axis, beta_axis, wavel_axis, pointings, srf, psf
+            )
+            for chan, srf in zip(channels, sr_factors)
+        ]
+
+    def alpha_step(self):
+        return self.alpha_axis[1] - self.alpha_axis[0]
+
+    def beta_step(self):
+        return self.beta_axis[1] - self.beta_axis[0]
+
+    #%% \
+    def forward(self, inarray):
+        """Compute the forward and returns data for each channel"""
+        if not np.iscomplexobj(inarray):
+            # The input is in the spatial domain, so we calculate its FFT
+            inarray = np.fft.rfftn(inarray, axes=(1, 2), norm="ortho")
+
+        return [
+            self.forward_channel(inarray, self.all_otf[idx], idx)
+            for idx, chan in enumerate(self.channels)
+        ]
 
     #%%
     def backward(self, psf_cube, shape, data):
@@ -340,43 +355,6 @@ class LMMDataModel:
 
 
 #%%\
-def diffracted_psfcube(component, spsf, wslice, wpsf, shape) -> List[array]:
-    """
-    Parameters
-    ----------
-    component: array in [λ]
-
-    spsf: array of psf in [λ, α, β]
-
-    wslice: a Slice in λ for a channel
-
-    wpsf : array of psf in [β_idx, λ, λ']
-
-    shape : the spatial shape of input sky
-
-    """
-    diff_otf = []
-    for wpsf_i in wpsf:
-        # psf in [λ, α, β]
-        psf = spsf[wslice, ...] * component[wslice].reshape((-1, 1, 1))
-        # channel_beta_psf in [λ', α, β]
-        channel_beta_psf = np.sum(
-            # psf in [λ, 1, α, β]
-            psf.reshape((psf.shape[0], 1, psf.shape[1], psf.shape[2]))
-            # wpsf_i in [λ, λ', 1, 1]
-            * wpsf_i.reshape((wpsf_i.shape[0], wpsf_i.shape[1], 1, 1)),
-            axis=0,
-        )
-
-        diff_otf.append(udft.ir2fr(channel_beta_psf, shape[:2]))
-
-    return diff_otf
-
-
-def spectral_diffraction(cube, wpsf):
-    return np.dot(cube, wpsf)
-
-
 def spectral_diffraction_coadd(component, wslice, psfs, slit_len):
     out_spectrum = []
     for idx in range(slit_len):
