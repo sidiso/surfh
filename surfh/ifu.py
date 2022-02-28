@@ -56,6 +56,7 @@ class Coord:
         return self
 
     def rotate(self, degree: float) -> "Coord":
+        """Rotate the coordinate"""
         tmp = rotmatrix(degree) @ self
         self.alpha = tmp[0]
         self.beta = tmp[1]
@@ -64,8 +65,8 @@ class Coord:
     def __array__(self, dtype=None):
         """Behave as an numpy array"""
         if dtype is None:
-            return np.array([self.alpha, self.beta], dtype=np.float)
-        return np.array([self.alpha, self.beta]).astype(dtype)
+            dtype = np.float
+        return np.array([self.alpha, self.beta]).astype(dtype).reshape((2, 1))
 
 
 @dataclass
@@ -77,12 +78,14 @@ class FOV:
     center: Coord = Coord(0, 0)
     angle: float = 0
 
-    def coords(self, step: float, margin: float = 0) -> (array, array):
-        """Returns cartesian coordinate inside the FOV in canonical reference"""
+    def coords_self_ref(self, step: float, margin: float = 0) -> (array, array):
+        """Returns cartesian coordinates inside the FOV in self referential"""
 
         def axis(start, length, step):
-            num = int(round(length / step)) + 1
-            return np.arange(num) * step + start
+            round_start = int(floor(start / step)) * step
+            num = int(ceil((length + (start - round_start)) / step))
+            # num = int(ceil(length / step))
+            return np.arange(num + 1) * step + round_start
 
         alpha_axis = np.reshape(
             axis(-self.alpha_width / 2 - margin, self.alpha_width + 2 * margin, step),
@@ -95,10 +98,19 @@ class FOV:
         n_alpha = alpha_axis.shape[0]
         n_beta = beta_axis.shape[1]
 
-        alpha_axis = np.tile(alpha_axis, [1, n_beta]).reshape((1, -1))
-        beta_axis = np.tile(beta_axis, [n_alpha, 1]).reshape((1, -1))
+        return (np.tile(alpha_axis, [1, n_beta]), np.tile(beta_axis, [n_alpha, 1]))
 
-        coords = rotmatrix(self.angle) @ np.vstack((alpha_axis, beta_axis))
+    def coords(self, step: float, margin: float = 0) -> (array, array):
+        """Returns cartesian coordinates inside the FOV in canonical referential"""
+
+        alpha_coords, beta_coords = self.coords_self_ref(step, margin)
+
+        n_alpha = alpha_coords.shape[0]
+        n_beta = beta_coords.shape[1]
+
+        coords = rotmatrix(self.angle) @ np.vstack(
+            (alpha_coords.reshape((1, -1)), beta_coords.reshape((1, -1)))
+        )
 
         return (
             coords[0].reshape((n_alpha, n_beta)) + self.center.alpha,
@@ -107,10 +119,10 @@ class FOV:
 
     @property
     def bbox(self):
-        """The bounding box"""
+        """The bounding box defined by the lower left un upper right point as `Coord`"""
         return (
             Coord(
-                min(map(op.attrgetter("alpha"), path := self.path)),
+                min(map(op.attrgetter("alpha"), path := self.vertices)),
                 min(map(op.attrgetter("beta"), path)),
             ),
             Coord(
@@ -120,17 +132,21 @@ class FOV:
         )
 
     @property
-    def path(self):
+    def vertices(self):
+        """The vertices as `Coord` from lower left, in counter clockwise"""
         return (self.lower_left, self.lower_right, self.upper_right, self.upper_left)
 
     def rotate(self, degree: float) -> None:
+        """Rotation with respect to the `center`."""
         self.angle += degree
 
     def shift(self, coord: Coord) -> None:
+        """Shift the `center`. Equivalent to `self ± Coord`."""
         self.center += coord
 
     @property
     def lower_left(self) -> Coord:
+        """The lower left vertex"""
         return (
             Coord(-self.alpha_width / 2, -self.beta_width / 2).rotate(self.angle)
             + self.center
@@ -138,6 +154,7 @@ class FOV:
 
     @property
     def lower_right(self) -> Coord:
+        """The lower right vertex"""
         return (
             Coord(self.alpha_width / 2, -self.beta_width / 2).rotate(self.angle)
             + self.center
@@ -145,6 +162,7 @@ class FOV:
 
     @property
     def upper_left(self) -> Coord:
+        """The upper left vertex"""
         return (
             Coord(-self.alpha_width / 2, self.beta_width / 2).rotate(self.angle)
             + self.center
@@ -152,6 +170,7 @@ class FOV:
 
     @property
     def upper_right(self) -> Coord:
+        """The upper right vertex"""
         return (
             Coord(self.alpha_width / 2, self.beta_width / 2).rotate(self.angle)
             + self.center
