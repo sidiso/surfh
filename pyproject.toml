@@ -12,6 +12,8 @@ qmm = "^0.11.0"
 udft = "^3.4.0"
 astropy = "^5.0.1"
 loguru = "^0.6.0"
+ipdb = "^0.13.9"
+matplotlib = "^3.5.1"
 
 [tool.poetry.dev-dependencies]
 ipython = "^8.0.1"

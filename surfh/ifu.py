@@ -1,15 +1,169 @@
 # Copyright (C) 2021 François Orieux <francois.orieux@universite-paris-saclay.fr>
 # Copyright (C) 2018-2021 Ralph Abirizk <ralph.abirizk@universite-paris-saclay.fr>
 
-from collections import namedtuple
+"""IFU
+
+IFU instrument modeling
+
+"""
+
+import operator as op
 from dataclasses import dataclass
+from math import ceil, floor
 from typing import List, Tuple
 
 import numpy as np
-import operators as op
 import udft
 
 array = np.ndarray
+
+
+def rotmatrix(degree: float) -> array:
+    """Angle in degree"""
+    theta = np.radians(degree)
+    return np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
+
+
+@dataclass
+class Coord:
+    """A coordinate in (α, β)"""
+
+    alpha: float
+    beta: float
+
+    def __add__(self, coord: "Coord") -> "Coord":
+        if not isinstance(coord, Coord):
+            raise ValueError("`coord` must be a `Coord`")
+        return Coord(self.alpha + coord.alpha, self.beta + coord.beta)
+
+    def __sub__(self, coord: "Coord") -> "Coord":
+        if not isinstance(coord, Coord):
+            raise ValueError("`coord` must be a `Coord`")
+        return Coord(self.alpha - coord.alpha, self.beta - coord.beta)
+
+    def __iadd__(self, coord: "Coord") -> "Coord":
+        if not isinstance(coord, Coord):
+            raise ValueError("`coord` must be a `Coord`")
+        self.alpha += coord.alpha
+        self.beta += coord.beta
+        return self
+
+    def __sub__(self, coord: "Coord") -> "Coord":
+        if not isinstance(coord, Coord):
+            raise ValueError("`coord` must be a `Coord`")
+        self.alpha -= coord.alpha
+        self.beta -= coord.beta
+        return self
+
+    def rotate(self, degree: float) -> "Coord":
+        tmp = rotmatrix(degree) @ self
+        self.alpha = tmp[0]
+        self.beta = tmp[1]
+        return self
+
+    def __array__(self, dtype=None):
+        """Behave as an numpy array"""
+        if dtype is None:
+            return np.array([self.alpha, self.beta], dtype=np.float)
+        return np.array([self.alpha, self.beta]).astype(dtype)
+
+
+@dataclass
+class FOV:
+    """A Field Of View. Angle in degree"""
+
+    alpha_width: float
+    beta_width: float
+    center: Coord = Coord(0, 0)
+    angle: float = 0
+
+    def coords(self, step: float, margin: float = 0) -> (array, array):
+        """Returns cartesian coordinate inside the FOV in canonical reference"""
+
+        def axis(start, length, step):
+            num = int(round(length / step)) + 1
+            return np.arange(num) * step + start
+
+        alpha_axis = np.reshape(
+            axis(-self.alpha_width / 2 - margin, self.alpha_width + 2 * margin, step),
+            (-1, 1),
+        )
+        beta_axis = np.reshape(
+            axis(-self.beta_width / 2 - margin, self.beta_width + 2 * margin, step),
+            (1, -1),
+        )
+        n_alpha = alpha_axis.shape[0]
+        n_beta = beta_axis.shape[1]
+
+        alpha_axis = np.tile(alpha_axis, [1, n_beta]).reshape((1, -1))
+        beta_axis = np.tile(beta_axis, [n_alpha, 1]).reshape((1, -1))
+
+        coords = rotmatrix(self.angle) @ np.vstack((alpha_axis, beta_axis))
+
+        return (
+            coords[0].reshape((n_alpha, n_beta)) + self.center.alpha,
+            coords[1].reshape((n_alpha, n_beta)) + self.center.beta,
+        )
+
+    @property
+    def bbox(self):
+        """The bounding box"""
+        return (
+            Coord(
+                min(map(op.attrgetter("alpha"), path := self.path)),
+                min(map(op.attrgetter("beta"), path)),
+            ),
+            Coord(
+                max(map(op.attrgetter("alpha"), path)),
+                max(map(op.attrgetter("beta"), path)),
+            ),
+        )
+
+    @property
+    def path(self):
+        return (self.lower_left, self.lower_right, self.upper_right, self.upper_left)
+
+    def rotate(self, degree: float) -> None:
+        self.angle += degree
+
+    def shift(self, coord: Coord) -> None:
+        self.center += coord
+
+    @property
+    def lower_left(self) -> Coord:
+        return (
+            Coord(-self.alpha_width / 2, -self.beta_width / 2).rotate(self.angle)
+            + self.center
+        )
+
+    @property
+    def lower_right(self) -> Coord:
+        return (
+            Coord(self.alpha_width / 2, -self.beta_width / 2).rotate(self.angle)
+            + self.center
+        )
+
+    @property
+    def upper_left(self) -> Coord:
+        return (
+            Coord(-self.alpha_width / 2, self.beta_width / 2).rotate(self.angle)
+            + self.center
+        )
+
+    @property
+    def upper_right(self) -> Coord:
+        return (
+            Coord(self.alpha_width / 2, self.beta_width / 2).rotate(self.angle)
+            + self.center
+        )
+
+    def __add__(self, coord: Coord) -> "FOV":
+        self.center += coord
+        return self
+
+    def __sub__(self, coord: Coord) -> "FOV":
+        self.center -= coord
+        return self
 
 
 class SpectralBlur:
@@ -80,9 +234,8 @@ class SpectralBlur:
 class ChannelParam:
     """A channel with FOV, slit, spectral blurring and pce"""
 
-    alpha_fov: float
-    beta_fov: float
-    pix_size: float
+    fov: FOV
+    det_pix_size: float
     n_slit: int
     w_blur: SpectralBlur
     pce: array
@@ -107,6 +260,7 @@ class ChannelParam:
     @property
     def n_wavel(self):
         """The number of detector wavelength points"""
+
         return len(self.wavel_axis)
 
     def wslice(self, wavel_input_axis):
@@ -117,9 +271,9 @@ class ChannelParam:
         )
 
     @property
-    def slit_beta_fov(self):
+    def slit_beta_width(self):
         """The width of slit"""
-        return self.beta_fov / self.n_slit
+        return self.fov.beta_width / self.n_slit
 
     def spectral_psf(self, beta, wavel_input_axis, arcsec2micron):
         """Return spectral PSF for monochromatic punctual sources
@@ -135,6 +289,69 @@ class ChannelParam:
         return self.w_blur.psfs(self.wavel_axis, beta, wavel_input_axis, arcsec2micron)
 
 
+class Slicer:
+    def __init__(self, channel: float, alpha_step: float, beta_step: float):
+        self.channel = channel
+        self.alpha_step = alpha_step
+        self.beta_step = beta_step
+
+    def slice(self, inarray: array, pointing: Coord):
+        pass
+
+
+def fov2slices(fov: FOV, alpha_axis: array, beta_axis: array) -> Tuple[slice, slice]:
+    alpha_step = alpha_axis[1] - alpha_axis[0]
+    beta_step = beta_axis[1] - beta_axis[0]
+    # If I understand well, it must be (floor, ceil) or (floor, floor) or (ceil,
+    # ceil), but not round. With (floor, ceil), slit width are all
+    # over-estimated, but it should be compensated by the weight.
+    return (
+        slice(
+            int(floor(fov.start_alpha / alpha_step)),
+            int(ceil(fov.end_alpha / alpha_step)),
+        ),
+        slice(
+            int(floor(fov.start_beta / beta_step)),
+            int(ceil(fov.end_beta / beta_step)),
+        ),
+    )
+
+
+def fov_weight(
+    fov: FOV, slices: Tuple[slice, slice], alpha_axis: array, beta_axis: array
+) -> array:
+    """Suppose the (floor, ceil) hypothesis of `fov2slices`"""
+    alpha_step = alpha_axis[1] - alpha_axis[0]
+    beta_step = beta_axis[1] - beta_axis[0]
+    weights = np.ones(
+        (slices[0].stop - slices[0].start, slices[1].stop - slices[1].start)
+    )
+
+    weights[0, :] = (
+        prop := (fov.start_alpha - alpha_axis[slices[0].start]) / alpha_step
+    )
+    assert (
+        0 <= prop <= 1
+    ), "Proportion of first observed pixel in slit must be in [0, 1]"
+
+    weights[:, 0] = (prop := (fov.start_beta - beta_axis[slices[1].start]) / beta_step)
+    assert (
+        0 <= prop <= 1
+    ), "Proportion of first observed pixel in slit must be in [0, 1]"
+
+    weights[-1, :] = (prop := (alpha_axis[slices[0].stop] - fov.end_alpha) / alpha_step)
+    assert (
+        0 <= prop <= 1
+    ), "Proportion of first observed pixel in slit must be in [0, 1]"
+
+    weights[:, -1] = (prop := (beta_axis[slices[1].stop] - fov.end_beta) / beta_step)
+    assert (
+        0 <= prop <= 1
+    ), "Proportion of first observed pixel in slit must be in [0, 1]"
+
+    return weights
+
+
 class Channel:
     """A channel with FOV, slit, spectral blurring and pce"""
 
@@ -143,10 +360,10 @@ class Channel:
         channelp: ChannelParam,
         beta_step: float,
         wavel_axis: array,
-        components: array,
+        templates: array,
         spsf: array,
         srf: int,
-        ishape: InputShape,
+        ishape: "InputShape",
     ):
         self.channelp = channelp
         self.beta_step = beta_step
@@ -159,68 +376,68 @@ class Channel:
             arcsec2micron=self.channelp.wavel_step / beta_step,
         )
 
-        imshape = (ishape.alpha, ishape.beta)
+        self.imshape = (ishape.alpha, ishape.beta)
         self.otf = [
-            udft.ir2fr(diffracted_psf(comp, spsf, channelp.wslice, wpsf), imshape)
-            * udft.ir2fr(np.ones((srf, 1)), imshape)[
+            udft.ir2fr(diffracted_psf(tpl, spsf, channelp.wslice, wpsf), self.imshape)
+            * udft.ir2fr(np.ones((srf, 1)), self.imshape)[
                 np.newaxis, ...
             ]  # * OTF for SuperResolution in alpha
-            for comp in components
+            for tpl in templates
         ]
 
     @property
     def npix_slit(self) -> int:
         """The number of pixel inside a slit"""
-        return int(np.round(self.channelp.slit_beta_fov / self.beta_step))
+        return int(np.round(self.channelp.slit_beta_width / self.beta_step))
 
     def forward(self, inarray):
         # Σ_β
         for beta_idx in range(self.npix_slit):
             blurred = np.zeros(self.otf.shape[0, 0], dtype=np.complex)
             # Σ_tpl
-            for idx, otf in enumerate(self.otf):
-                blurred += inarray[idx][np.newaxis] * otf[beta_idx]
-            blurred = np.fft.irfftn(blurred, axes=(1, 2), s=shape, norm="ortho")
+            for tpl_idx, otf in enumerate(self.otf):
+                blurred += inarray[tpl_idx][np.newaxis] * otf[beta_idx]
+            blurred = np.fft.irfftn(blurred, axes=(1, 2), s=self.imshape, norm="ortho")
             # spatial_indexing returns a cube with all slit for a specific beta
             # idx inside all slit (that should have the same number of beta)
             out += spatial_indexing(
                 blurred,
                 beta_idx,
                 self.npix_slit,
-                self.spatial_indexs[idx],
+                self.pointed_fov[idx],
                 self.channelp.n_slit,
                 self.srf,
             )
         return out
 
 
-def get_step(pix_size_list: List[float], pix_ratio_tol: int = 5):
+def get_step(det_pix_size_list: List[float], pix_ratio_tol: int = 5):
     """Return the step that respect the tolerance
 
-    that is the error is smaller than min(pix_size) / pix_ratio_tol
+    that is the error is smaller than min(det_pix_size) / pix_ratio_tol
 
-    >>> np.all(pix_size_list % min(pix_size / n) <= min_pix_size / ratio)
+    >>> np.all(det_pix_size_list % min(det_pix_size / n) <= min_det_pix_size / ratio)
 
-    The step is a multiple of the smallest pix_size.
+    The step is a multiple of the smallest det_pix_size.
     """
     num = 1
-    pix_size_list = np.asarray(pix_size_list)
-    min_pix_size = min(pix_size_list)
+    det_pix_size_list = np.asarray(det_pix_size_list)
+    min_det_pix_size = min(det_pix_size_list)
     while not np.all(
-        pix_size_list % (min_pix_size / num) <= min_pix_size / pix_ratio_tol
+        det_pix_size_list % (min_det_pix_size / num) <= min_det_pix_size / pix_ratio_tol
     ):
         num += 1
-    return min_pix_size / num
+    return min_det_pix_size / num
 
 
-def get_srf(pix_size_list: List[float], step: float) -> List[int]:
+def get_srf(det_pix_size_list: List[float], step: float) -> List[int]:
     """Return the Super Resolution Factor (SRF)
 
-    such that SRF = pix_size // step.
+    such that SRF = det_pix_size // step.
 
     Parameters
     ----------
-    pix_size_list: list of float
+    det_pix_size_list: list of float
       A list of spatial pixel size.
     step: float
       A spatial step.
@@ -230,13 +447,10 @@ def get_srf(pix_size_list: List[float], step: float) -> List[int]:
     A list of SRF int.
 
     """
-    return [int(pix_size // step) for pix_size in pix_size_list]
+    return [int(det_pix_size // step) for det_pix_size in det_pix_size_list]
 
 
-Pointing = namedtuple("Pointing", ["alpha", "beta"])
-
-
-class PointingList(list):
+class CoordList(list):
     """A list of Pointing with extra methods"""
 
     @property
@@ -290,11 +504,11 @@ class PointingList(list):
         )
 
 
-def diffracted_psf(component, spsf, wslice, wpsf) -> List[array]:
+def diffracted_psf(template, spsf, wslice, wpsf) -> List[array]:
     """
     Parameters
     ----------
-    component: array in [λ]
+    template: array in [λ]
 
     spsf: array of psf in [λ, α, β]
 
@@ -309,7 +523,7 @@ def diffracted_psf(component, spsf, wslice, wpsf) -> List[array]:
     A list of PSF for each
 
     """
-    weighted_psf = spsf[wslice, ...] * component[wslice].reshape((-1, 1, 1))
+    weighted_psf = spsf[wslice, ...] * template[wslice].reshape((-1, 1, 1))
     return [wblur(weighted_psf, wpsf_i) for wpsf_i in wpsf]
 
 
