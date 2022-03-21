@@ -24,7 +24,7 @@ def mrs_wavel_axis(filename):
         return blob[1].data["WAVELENGTH"]
 
 
-logger.debug("The parameters in this module ARE NOT VALID.")
+logger.debug("THIS IS THE SMALL RMS !")
 
 logger.info("Load pce")
 
@@ -58,18 +58,18 @@ wavel_4c = mrs_wavel_axis("MIRI_FM_MIRIFULONG_4LONG_PCE_07.00.00.fits")
 # https://jwst-docs.stsci.edu/jwst-observatory-characteristics/jwst-observatory-coordinate-system-and-field-of-regard
 # https://jwst-docs.stsci.edu/jwst-mid-infrared-instrument/miri-instrumentation/miri-mrs-field-and-coordinates
 
-res1a = np.mean([3320, 3710])
-res1b = np.mean([3190, 3750])
-res1c = np.mean([3100, 3610])
-res2a = np.mean([2990, 3110])
-res2b = np.mean([2750, 3170])
-res2c = np.mean([2860, 3300])
-res3a = np.mean([2530, 2880])
-res3b = np.mean([1790, 2640])
-res3c = np.mean([1980, 2790])
-res4a = np.mean([1460, 1930])
-res4b = np.mean([1680, 1760])
-res4c = np.mean([1630, 1330])
+res1a = np.mean([3320, 3710]) / 4
+res1b = np.mean([3190, 3750]) / 4
+res1c = np.mean([3100, 3610]) / 4
+res2a = np.mean([2990, 3110]) / 4
+res2b = np.mean([2750, 3170]) / 4
+res2c = np.mean([2860, 3300]) / 4
+res3a = np.mean([2530, 2880]) / 4
+res3b = np.mean([1790, 2640]) / 4
+res3c = np.mean([1980, 2790]) / 4
+res4a = np.mean([1460, 1930]) / 4
+res4b = np.mean([1680, 1760]) / 4
+res4c = np.mean([1630, 1330]) / 4
 
 
 logger.info("Sinc spectral blur")
@@ -88,6 +88,7 @@ spec_blur_4c = ifu.SpectralBlur(res4c)
 
 #%% MRS channel
 logger.debug("ChannelParam. CH3 seems wrong.")
+
 ch1a = ifu.ChannelParam(
     ifu.FOV(3.2, 3.7, origin=ifu.Coord(-503.654, -318.742), angle=8.4),
     0.196,
