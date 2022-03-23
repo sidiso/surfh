@@ -158,8 +158,10 @@ class FOV:
     origin: Coord = Coord(0, 0)
     angle: float = 0
 
-    def coords_self_ref(self, step: float, margin: float = 0) -> (array, array):
-        """Returns uniform Cartesian coordinates inside the FOV in self referential"""
+    def local_coords(
+        self, step: float, alpha_margin: float = 0, beta_margin: float = 0
+    ) -> Tuple[array, array]:
+        """Returns regular Cartesian coordinates inside the FOV in self referential"""
 
         def axis(start, length, step):
             round_start = int(floor(start / step)) * step
@@ -167,35 +169,41 @@ class FOV:
             # num = int(ceil(length / step))
             return np.arange(num + 1) * step + round_start
 
-        alpha_axis = np.reshape(
-            axis(-self.alpha_width / 2 - margin, self.alpha_width + 2 * margin, step),
-            (-1, 1),
+        alpha_axis = axis(
+            -self.alpha_width / 2 - alpha_margin,
+            self.alpha_width + 2 * alpha_margin,
+            step,
         )
-        beta_axis = np.reshape(
-            axis(-self.beta_width / 2 - margin, self.beta_width + 2 * margin, step),
-            (1, -1),
+        beta_axis = axis(
+            -self.beta_width / 2 - beta_margin, self.beta_width + 2 * beta_margin, step
         )
-        n_alpha = alpha_axis.shape[0]
-        n_beta = beta_axis.shape[1]
 
-        return (np.tile(alpha_axis, [1, n_beta]), np.tile(beta_axis, [n_alpha, 1]))
+        return alpha_axis, beta_axis
 
-    def coords(self, step: float, margin: float = 0) -> (array, array):
-        """Returns uniform Cartesian coordinates inside the FOV in global referential"""
+    def local2global(self, alpha_coords, beta_coords):
+        """Returns regular Cartesian local coordinates in global referential"""
+        n_alpha = len(alpha_coords)
+        n_beta = len(beta_coords)
 
-        alpha_coords, beta_coords = self.coords_self_ref(step, margin)
-
-        n_alpha = alpha_coords.shape[0]
-        n_beta = beta_coords.shape[1]
+        alpha_coords = np.tile(alpha_coords.reshape((-1, 1)), [1, n_beta])
+        beta_coords = np.tile(beta_coords.reshape((1, -1)), [n_alpha, 1])
 
         coords = rotmatrix(self.angle) @ np.vstack(
-            (alpha_coords.reshape((1, -1)), beta_coords.reshape((1, -1)))
+            (alpha_coords.ravel(), beta_coords.ravel())
         )
 
         return (
             coords[0].reshape((n_alpha, n_beta)) + self.origin.alpha,
             coords[1].reshape((n_alpha, n_beta)) + self.origin.beta,
         )
+
+    def coords(
+        self, step: float, alpha_margin: float = 0, beta_margin: float = 0
+    ) -> Tuple[array, array]:
+        """Returns regular Cartesian coordinates inside the FOV in global referential"""
+
+        alpha_coords, beta_coords = self.local_coords(step, alpha_margin, beta_margin)
+        return self.local2global(alpha_coords, beta_coords)
 
     def rotate(self, degree: float) -> None:
         """Rotation with respect to the `origin`."""
@@ -253,21 +261,19 @@ class FOV:
 
     @property
     def local(self):
-        """Return the same FOV but without angle"""
+        """The centered FOV without angle"""
         return LocalFOV(self)
 
     def __add__(self, coord: Coord) -> "FOV":
-        self.origin += coord
-        return self
+        return FOV(self.alpha_width, self.beta_width, self.origin + coord, self.angle)
 
     def __sub__(self, coord: Coord) -> "FOV":
-        self.origin -= coord
-        return self
+        return FOV(self.alpha_width, self.beta_width, self.origin - coord, self.angle)
 
 
 class LocalFOV(FOV):
     def __init__(self, fov: FOV):
-        super().__init__(fov.alpha_width, fov.beta_width, fov.origin, angle=0)
+        super().__init__(fov.alpha_width, fov.beta_width, Coord(0, 0), angle=0)
 
     @property
     def alpha_start(self):
@@ -279,27 +285,44 @@ class LocalFOV(FOV):
 
     @property
     def beta_start(self):
-        return self.origin.beta - self.alpha_width / 2
+        return self.origin.beta - self.beta_width / 2
 
     @property
     def beta_end(self):
-        return self.origin.beta + self.alpha_width / 2
+        return self.origin.beta + self.beta_width / 2
 
     def to_slices(self, alpha_axis: array, beta_axis: array) -> Tuple[slice, slice]:
         """FOV 2 slices supposing axis are for local referential"""
-        alpha_step = alpha_axis[1] - alpha_axis[0]
-        beta_step = beta_axis[1] - beta_axis[0]
-        # If I understand well, it must be (floor, ceil) or (floor, floor) or (ceil,
-        # ceil), but not round. With (floor, ceil), slit width are all
-        # over-estimated, but it should be compensated by the weight from `fov_weight`
+        ## I don't remember why I code this below but it does not correspond to
+        ## a slice of the alpha_axis parameter above. I think it's worked only
+        ## with positives axis values
+        # alpha_step = alpha_axis[1] - alpha_axis[0]
+        # beta_step = beta_axis[1] - beta_axis[0]
+        # # If I understand well, it must be (floor, ceil) or (floor, floor) or (ceil,
+        # # ceil), but not round. With (floor, ceil), slit width are all
+        # # over-estimated, but it should be compensated by the weight from `fov_weight`
+        # return (
+        #     slice(
+        #         int(floor(self.alpha_start / alpha_step)),
+        #         int(ceil(self.alpha_end / alpha_step)),
+        #     ),
+        #     slice(
+        #         int(floor(self.beta_start / beta_step)),
+        #         int(ceil(self.beta_end / beta_step)),
+        #     ),
+        # )
         return (
             slice(
-                int(floor(self.alpha_start / alpha_step)),
-                int(ceil(self.alpha_end / alpha_step)),
+                # first α below alpha_start
+                np.flatnonzero(alpha_axis < self.alpha_start)[-1],
+                # first α above alpha_end
+                np.flatnonzero(self.alpha_end < alpha_axis)[0],
             ),
             slice(
-                int(floor(self.beta_start / beta_step)),
-                int(ceil(self.beta_end / beta_step)),
+                # first β below beta_start
+                np.flatnonzero(beta_axis < self.beta_start)[-1],
+                # first β above beta_end
+                np.flatnonzero(self.beta_end < beta_axis)[0],
             ),
         )
 
@@ -315,6 +338,16 @@ class LocalFOV(FOV):
             floor(-self.beta_width / 2 / step)
         )
 
+    def __add__(self, coord: Coord) -> "LocalFOV":
+        lfov = LocalFOV(self)
+        lfov.origin += coord
+        return lfov
+
+    def __sub__(self, coord: Coord) -> "LocalFOV":
+        lfov = LocalFOV(self)
+        lfov.origin -= coord
+        return lfov
+
 
 class SpectralBlur:
     """A spectral response"""
@@ -324,7 +357,7 @@ class SpectralBlur:
 
         # the added margin serves for spectral PSF normalization. It is used in
         # private and is removed in the projected output
-        self._n_margin = 10
+        self._n_margin = 15
 
     @property
     def grating_len(self):
@@ -332,7 +365,7 @@ class SpectralBlur:
         return 2 * 0.44245 / np.pi * self.grating_resolution
 
     def psfs(self, out_axis, beta, wavelength, scale: float = 1):
-        """output array in [beta, wavelength, out_axis]
+        """output array in [beta, out_axis, wavelength]
 
         scale is in arcsec2micron"""
         delta_w = wavelength[1] - wavelength[0]
@@ -378,11 +411,11 @@ class SpectralBlur:
         # from "1" spread in the input spectrum). Sum must be on the input axis.
         out /= np.sum(out, axis=2, keepdims=True)
 
-        return out[:, :, self._n_margin : -self._n_margin]
+        return out[:, :, self._n_margin - 1 : -self._n_margin + 1]
 
 
 def fov_weight(
-    fov: FOV, slices: Tuple[slice, slice], alpha_axis: array, beta_axis: array
+    fov: LocalFOV, slices: Tuple[slice, slice], alpha_axis: array, beta_axis: array
 ) -> array:
     """Suppose the (floor, ceil) hypothesis of `fov2slices`"""
     alpha_step = alpha_axis[1] - alpha_axis[0]
@@ -393,26 +426,28 @@ def fov_weight(
         (slice_alpha.stop - slice_alpha.start, slice_beta.stop - slice_beta.start)
     )
 
-    weights[0, :] = (
-        wght := (fov.start_alpha - alpha_axis[slice_alpha.start]) / alpha_step
+    weights[0, :] *= (
+        wght := (fov.alpha_start - alpha_axis[slice_alpha.start]) / alpha_step
     )
     assert (
         0 <= wght <= 1
     ), "Weight of first alpha observed pixel in slit must be in [0, 1]"
 
-    weights[:, 0] = (wght := (fov.start_beta - beta_axis[slice_beta.start]) / beta_step)
+    weights[:, 0] *= (
+        wght := (fov.beta_start - beta_axis[slice_beta.start]) / beta_step
+    )
     assert (
         0 <= wght <= 1
     ), "Weight of first beta observed pixel in slit must be in [0, 1]"
 
-    weights[-1, :] = (
-        wght := (alpha_axis[slice_alpha.stop] - fov.end_alpha) / alpha_step
+    weights[-1, :] *= (
+        wght := (alpha_axis[slice_alpha.stop] - fov.alpha_end) / alpha_step
     )
     assert (
         0 <= wght <= 1
     ), "Weight of last alpha observed pixel in slit must be in [0, 1]"
 
-    weights[:, -1] = (wght := (beta_axis[slice_beta.stop] - fov.end_beta) / beta_step)
+    weights[:, -1] *= (wght := (beta_axis[slice_beta.stop] - fov.beta_end) / beta_step)
     assert (
         0 <= wght <= 1
     ), "Weight of last beta observed pixel in slit must be in [0, 1]"
@@ -421,7 +456,7 @@ def fov_weight(
 
 
 @dataclass
-class ChannelParam:
+class Instr:
     """A channel with FOV, slit, spectral blurring and pce"""
 
     fov: FOV
@@ -433,18 +468,21 @@ class ChannelParam:
     name: str = "_"
 
     def __post_init__(self):
-        self.slit_fov = list(
+        self.slit_shift = [
+            Coord(0, -self.fov.beta_width / 2)
+            + Coord(0, self.slit_beta_width / 2)
+            + Coord(0, slit_idx * self.slit_beta_width)
+            for slit_idx in range(self.n_slit)
+        ]
+        self.slit_fov = [
             FOV(
                 alpha_width=self.fov.alpha_width,
                 beta_width=self.slit_beta_width,
-                origin=self.fov.origin
-                - Coord(0, self.fov.beta_width / 2)
-                + Coord(0, self.slit_beta_width / 2)
-                + Coord(0, slit_idx * self.slit_beta_width),
+                origin=self.fov.origin + shift,
                 angle=self.fov.angle,
             )
-            for slit_idx in range(self.n_slit)
-        )
+            for shift in self.slit_shift
+        ]
 
     @property
     def wavel_min(self):
@@ -479,14 +517,6 @@ class ChannelParam:
         """The width of slit"""
         return self.fov.beta_width / self.n_slit
 
-    # def slit_fov(self, num_slit):
-    #     """num_slit must start at 0"""
-    #     return (
-    #         FOV(self.fov.alpha_width, self.slit_beta_width)
-    #         + num_slit * self.slit_beta_width
-    #         + self.slit_beta_width / 2
-    #     )
-
     def spectral_psf(self, beta, wavel_input_axis, arcsec2micron):
         """Return spectral PSF for monochromatic punctual sources
 
@@ -501,8 +531,8 @@ class ChannelParam:
         return self.w_blur.psfs(self.wavel_axis, beta, wavel_input_axis, arcsec2micron)
 
     def pix(self, step):
-        logger.info(f"Channel {self.name} pixelized to {step:.2g}")
-        return ChannelParam(
+        logger.info(f"Instr. {self.name} pixelized to {step:.2g}")
+        return Instr(
             FOV(
                 self.fov.alpha_width,
                 self.fov.beta_width,
@@ -523,7 +553,7 @@ class Channel:
 
     def __init__(
         self,
-        channelp: ChannelParam,
+        instr: Instr,
         alpha_axis: array,
         beta_axis: array,
         wavel_axis: array,
@@ -541,48 +571,50 @@ class Channel:
             )
         self.wavel_axis = wavel_axis
 
-        self.channelp = channelp.pix(self.step)
+        self.pointings = pointings.pix(self.step)
+        self.instr = instr.pix(self.step)
 
         # ∈ [0, β_s]
         beta_in_slit = np.arange(0, self.npix_slit) * self.beta_step
-        wpsf = self.channelp.spectral_psf(
+        wpsf = self.instr.spectral_psf(
             beta_in_slit - np.mean(beta_in_slit),  # ∈ [-β_s / 2, β_s / 2]
             wavel_axis,
             # suppose that physical pixel detector are square. Therefor, moving
-            # by Δ_β = Δ_α in β direction should move a point source by one
-            # physical pixel that is Δ_λ logical pixel. This factor make the
+            # on sky by Δ_β = Δ_α in β direction should move a point source by
+            # one physical pixel that is Δ_λ logical pixel. This factor make the
             # conversion.
-            arcsec2micron=self.channelp.wavel_step / self.beta_step,
+            arcsec2micron=self.instr.wavel_step / self.instr.det_pix_size,
         )
 
         self.srf = srf
         self.imshape = (ishape.alpha, ishape.beta)
         logger.info(
-            f"Precompute diffrated PSF {self.channelp.name} with SRF {srf}",
+            f"Precompute diffrated PSF {self.instr.name} with SRF {srf} (can be optimized)",
         )
         otf_np = np.asarray(
             [
                 udft.ir2fr(
-                    diffracted_psf(tpl, spsf, channelp.wslice(wavel_axis), wpsf),
+                    diffracted_psf(tpl, spsf, wpsf),
                     self.imshape,
                 )
-                * udft.ir2fr(np.ones((srf, 1)), self.imshape)[
-                    np.newaxis, np.newaxis, ...
-                ]  # * OTF for SuperResolution in alpha
+                # * udft.ir2fr(np.ones((srf, 1)), self.imshape)[
+                #     np.newaxis, np.newaxis, ...
+                # ]  # * OTF for SuperResolution in alpha
                 for tpl in templates
             ]
         )
 
-        self.otf = xr.DataArray(otf_np, dims=("tpl", "beta", "lout", "nu_a", "nu_b"))
+        self.otf = xr.DataArray(otf_np, dims=("tpl", "beta", "wl_out", "nu_a", "nu_b"))
 
-        self.local_alpha_axis, self.local_beta_axis = self.channelp.fov.coords_self_ref(
-            self.step
+        self.local_alpha_axis, self.local_beta_axis = self.instr.fov.local_coords(
+            self.step,
+            alpha_margin=5 * self.step,
+            beta_margin=5 * self.step,
         )
-        self.pointings = pointings.pix(self.step)
 
     @property
     def name(self) -> str:
-        return self.channelp.name
+        return self.instr.name
 
     @property
     def step(self) -> float:
@@ -599,11 +631,11 @@ class Channel:
     @property
     def npix_slit(self) -> int:
         """The number of pixel inside a slit"""
-        return int(np.round(self.channelp.slit_beta_width / self.beta_step))
+        return int(np.round(self.instr.slit_beta_width / self.beta_step))
 
     @property
     def n_alpha(self) -> int:
-        return self.channelp.fov.local.n_alpha(self.step)
+        return self.instr.fov.local.n_alpha(self.step)
 
     def slit(
         self,
@@ -612,55 +644,60 @@ class Channel:
         num_slit: int,
     ) -> array:
         """Return a weighted slice of gridded. num_slit start at 0."""
-        slit_fov = self.channelp.slit_fov[num_slit] + pointing
-        slices = slit_fov.local.to_slices(
-            self.local_alpha_axis[:, 0], self.local_beta_axis[0, :]
-        )
-        return gridded[:, slices[0], slices[1]] * self.slit_weight(num_slit, pointing)
+        slit_fov = self.instr.slit_fov[num_slit]
+        local_fov = slit_fov.local + self.instr.slit_shift[num_slit]
+        slices = local_fov.to_slices(self.local_alpha_axis, self.local_beta_axis)
+        return gridded[:, slices[0], slices[1]] * self.slit_weight(local_fov, slices)
 
-    def slit_weight(self, num_slit, pointing):
-        fov = self.channelp.slit_fov[num_slit] + pointing
+    def slit_weight(self, fov, slices):
         return fov_weight(
             fov,
-            fov.local.to_slices(
-                self.local_alpha_axis[:, 0], self.local_beta_axis[0, :]
-            ),
+            slices,
             self.local_alpha_axis,
             self.local_beta_axis,
+        )[np.newaxis, ...]
+
+    def gridding(self, inarray, pointing):
+        # α and β inside the FOV shifted to pointing, in the global ref.
+        alpha_coord, beta_coord = (self.instr.fov + pointing).local2global(
+            self.local_alpha_axis, self.local_beta_axis
         )
 
-    def gridding(self, inarray):
-        alpha_coord, beta_coord = self.channelp.fov.coords(self.step)
-        l_coord = np.arange(inarray.shape[0])
+        # Necessary for interpn to process 3D array. No interpolation is done
+        # along that axis.
+        wl_idx = np.arange(inarray.shape[0])
 
-        oshape = (len(l_coord),) + alpha_coord.shape
+        out_shape = (len(wl_idx),) + alpha_coord.shape
 
-        new_lab = np.vstack(
+        local_coords = np.vstack(
             [
                 np.repeat(
-                    np.repeat(l_coord.reshape((-1, 1, 1)), oshape[1], axis=1),
-                    oshape[2],
+                    np.repeat(wl_idx.reshape((-1, 1, 1)), out_shape[1], axis=1),
+                    out_shape[2],
                     axis=2,
                 ).ravel(),
-                np.repeat(alpha_coord[np.newaxis], oshape[0], axis=0).ravel(),
-                np.repeat(beta_coord[np.newaxis], oshape[0], axis=0).ravel(),
+                np.repeat(alpha_coord[np.newaxis], out_shape[0], axis=0).ravel(),
+                np.repeat(beta_coord[np.newaxis], out_shape[0], axis=0).ravel(),
             ]
         ).T
 
+        # This output can be processed in local ref.
         return scipy.interpolate.interpn(
-            (l_coord, self.alpha_axis, self.beta_axis), inarray, new_lab
-        ).reshape(oshape)
+            (wl_idx, self.alpha_axis, self.beta_axis), inarray, local_coords
+        ).reshape(out_shape)
 
     def forward(self, inarray):
         """inarray is supposed in self coordinate"""
         # First interpolate in channel self referentiel
 
+        # [pointing, slit, λ', α]
         out = np.zeros(
             (
                 len(self.pointings),
-                self.channelp.n_slit,
-                len(self.wavel_axis),
-                self.n_alpha // self.srf,
+                self.instr.n_slit,
+                len(self.instr.wavel_axis),
+                # self.n_alpha // self.srf,
+                ceil(self.n_alpha / self.srf),
             )
         )
 
@@ -671,12 +708,14 @@ class Channel:
                 abd[np.newaxis] * otf[beta_idx] for abd, otf in zip(inarray, self.otf)
             )
             blurred = np.fft.irfftn(blurred, axes=(1, 2), s=self.imshape, norm="ortho")
-            gridded = self.gridding(blurred)
             for p_idx, pointing in enumerate(self.pointings):
-                for num_slit in range(self.channelp.n_slit):
-                    out[p_idx, num_slit, :, :] += self.slit(
-                        gridded, pointing, num_slit
-                    )[:, :: self.srf, beta_idx]
+                gridded = self.gridding(blurred, pointing)
+                for num_slit in range(self.instr.n_slit):
+                    # [λ', α]
+                    sliced = self.slit(gridded, pointing, num_slit)[:, :, beta_idx]
+                    out[p_idx, num_slit, :, :] += np.add.reduceat(
+                        sliced, range(0, sliced.shape[1], self.srf), axis=1
+                    )
 
         return out
 
@@ -729,7 +768,7 @@ def get_srf(det_pix_size_list: List[float], step: float) -> List[int]:
     return [int(det_pix_size // step) for det_pix_size in det_pix_size_list]
 
 
-def diffracted_psf(template, spsf, wslice, wpsf) -> List[array]:
+def diffracted_psf(template, spsf, wpsf) -> List[array]:
     """
     Parameters
     ----------
@@ -737,9 +776,7 @@ def diffracted_psf(template, spsf, wslice, wpsf) -> List[array]:
 
     spsf: array of psf in [λ, α, β]
 
-    wslice: a Slice in λ for a channel
-
-    wpsf : array of psf in [β_idx, λ, λ']
+    wpsf : array of psf in [β_idx, λ', λ]
 
     shape : the spatial shape of input sky
 
@@ -748,8 +785,8 @@ def diffracted_psf(template, spsf, wslice, wpsf) -> List[array]:
     A list of PSF for each
 
     """
-    weighted_psf = spsf[wslice, ...] * template[wslice].reshape((-1, 1, 1))
-    return np.asarray([wblur(weighted_psf, wpsf_i[:, wslice]) for wpsf_i in wpsf])
+    weighted_psf = spsf * template.reshape((-1, 1, 1))
+    return np.asarray([wblur(weighted_psf, wpsf_i) for wpsf_i in wpsf])
 
 
 def wblur(arr: array, wpsf: array) -> array:
@@ -768,6 +805,7 @@ def wblur(arr: array, wpsf: array) -> array:
       A wavelength blurred array in [λ', α, β].
     """
     # [λ', α, β] = ∑_λ arr[λ, α, β] wpsf[λ', λ]
+    # Σ_λ
     return np.sum(
         # in [1, λ, α, β]
         arr.reshape((1, arr.shape[0], arr.shape[1], arr.shape[2]))

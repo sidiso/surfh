@@ -26,7 +26,7 @@ def mrs_wavel_axis(filename):
 
 logger.debug("THIS IS THE SMALL RMS !")
 
-logger.info("Load pce")
+logger.info("Load PCE")
 
 pce1a = mrs_pce("MIRI_FM_MIRIFUSHORT_1SHORT_PCE_07.00.00.fits")
 pce1b = mrs_pce("MIRI_FM_MIRIFUSHORT_1MEDIUM_PCE_07.00.00.fits")
@@ -72,7 +72,7 @@ res4b = np.mean([1680, 1760]) / 4
 res4c = np.mean([1630, 1330]) / 4
 
 
-logger.info("Sinc spectral blur")
+logger.info("Sinc² spectral blur")
 spec_blur_1a = ifu.SpectralBlur(res1a)
 spec_blur_1b = ifu.SpectralBlur(res1b)
 spec_blur_1c = ifu.SpectralBlur(res1c)
@@ -87,9 +87,9 @@ spec_blur_4b = ifu.SpectralBlur(res4b)
 spec_blur_4c = ifu.SpectralBlur(res4c)
 
 #%% MRS channel
-logger.debug("ChannelParam. CH3 seems wrong.")
+logger.debug("Instr. CH3 seems wrong.")
 
-ch1a = ifu.ChannelParam(
+ch1a = ifu.Instr(
     ifu.FOV(3.2, 3.7, origin=ifu.Coord(-503.654, -318.742), angle=8.4),
     0.196,
     21,
@@ -98,7 +98,7 @@ ch1a = ifu.ChannelParam(
     wavel_1a,
     "1A",
 )
-ch1b = ifu.ChannelParam(
+ch1b = ifu.Instr(
     ifu.FOV(3.2, 3.7, origin=ifu.Coord(-503.654, -318.742), angle=8.4),
     0.196,
     21,
@@ -107,7 +107,7 @@ ch1b = ifu.ChannelParam(
     wavel_1b,
     "1B",
 )
-ch1c = ifu.ChannelParam(
+ch1c = ifu.Instr(
     ifu.FOV(3.2, 3.7, origin=ifu.Coord(-503.654, -318.742), angle=8.4),
     0.196,
     21,
@@ -116,7 +116,7 @@ ch1c = ifu.ChannelParam(
     wavel_1c,
     "1C",
 )
-ch2a = ifu.ChannelParam(
+ch2a = ifu.Instr(
     ifu.FOV(4.0, 4.8, origin=ifu.Coord(-503.636, -319.091), angle=8.1),
     0.196,
     17,
@@ -125,7 +125,7 @@ ch2a = ifu.ChannelParam(
     wavel_2a,
     "2A",
 )
-ch2b = ifu.ChannelParam(
+ch2b = ifu.Instr(
     ifu.FOV(4.0, 4.8, origin=ifu.Coord(-503.636, -319.091), angle=8.1),
     0.196,
     17,
@@ -134,7 +134,7 @@ ch2b = ifu.ChannelParam(
     wavel_2b,
     "2B",
 )
-ch2c = ifu.ChannelParam(
+ch2c = ifu.Instr(
     ifu.FOV(4.0, 4.8, origin=ifu.Coord(-503.636, -319.091), angle=8.1),
     0.196,
     17,
@@ -143,7 +143,7 @@ ch2c = ifu.ChannelParam(
     wavel_2c,
     "2C",
 )
-ch3a = ifu.ChannelParam(
+ch3a = ifu.Instr(
     ifu.FOV(5.5, 6.2, origin=ifu.Coord(-504.372, -318.798), angle=7.7),
     0.245,
     16,
@@ -152,7 +152,7 @@ ch3a = ifu.ChannelParam(
     wavel_3a,
     "3A",
 )
-ch3b = ifu.ChannelParam(
+ch3b = ifu.Instr(
     ifu.FOV(5.5, 6.2, origin=ifu.Coord(-504.372, -318.798), angle=7.7),
     0.245,
     16,
@@ -161,7 +161,7 @@ ch3b = ifu.ChannelParam(
     wavel_3b,
     "3B",
 )
-ch3c = ifu.ChannelParam(
+ch3c = ifu.Instr(
     ifu.FOV(5.5, 6.2, origin=ifu.Coord(-504.372, -318.798), angle=7.7),
     0.245,
     16,
@@ -170,7 +170,7 @@ ch3c = ifu.ChannelParam(
     wavel_3c,
     "3C",
 )
-ch4a = ifu.ChannelParam(
+ch4a = ifu.Instr(
     ifu.FOV(6.9, 7.9, origin=ifu.Coord(-503.129, -319.488), angle=8.3),
     0.273,
     12,
@@ -179,7 +179,7 @@ ch4a = ifu.ChannelParam(
     wavel_4a,
     "4A",
 )
-ch4b = ifu.ChannelParam(
+ch4b = ifu.Instr(
     ifu.FOV(6.9, 7.9, origin=ifu.Coord(-503.129, -319.488), angle=8.3),
     0.273,
     12,
@@ -188,7 +188,7 @@ ch4b = ifu.ChannelParam(
     wavel_4b,
     "4B",
 )
-ch4c = ifu.ChannelParam(
+ch4c = ifu.Instr(
     ifu.FOV(6.9, 7.9, origin=ifu.Coord(-503.129, -319.488), angle=8.3),
     0.273,
     12,
