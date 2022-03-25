@@ -285,19 +285,21 @@ class LocalFOV(FOV):
 
     @property
     def beta_start(self):
-        return self.origin.beta - self.beta_width / 2
+        return round(self.origin.beta - self.beta_width / 2, 3)
 
     @property
     def beta_end(self):
-        return self.origin.beta + self.beta_width / 2
+        return round(self.origin.beta + self.beta_width / 2, 3)
 
     def to_slices(self, alpha_axis: array, beta_axis: array) -> Tuple[slice, slice]:
         """FOV 2 slices supposing axis are for local referential"""
-        ## I don't remember why I code this below but it does not correspond to
-        ## a slice of the alpha_axis parameter above. I think it's worked only
-        ## with positives axis values
-        # alpha_step = alpha_axis[1] - alpha_axis[0]
-        # beta_step = beta_axis[1] - beta_axis[0]
+        ## I don't remember why I code this version ① below but it does not
+        ## correspond to a slice of the alpha_axis parameter above. I think it's
+        ## worked only with positives axis values
+
+        # Version ①
+        alpha_step = alpha_axis[1] - alpha_axis[0]
+        beta_step = beta_axis[1] - beta_axis[0]
         # # If I understand well, it must be (floor, ceil) or (floor, floor) or (ceil,
         # # ceil), but not round. With (floor, ceil), slit width are all
         # # over-estimated, but it should be compensated by the weight from `fov_weight`
@@ -311,18 +313,32 @@ class LocalFOV(FOV):
         #         int(ceil(self.beta_end / beta_step)),
         #     ),
         # )
+
+        # # Version ②
+        # return (
+        #     slice(
+        #         # first α below alpha_start
+        #         np.flatnonzero(alpha_axis < self.alpha_start)[-1],
+        #         # first α above alpha_end
+        #         np.flatnonzero(self.alpha_end < alpha_axis)[0] + 1,
+        #     ),
+        #     slice(
+        #         # first β below beta_start
+        #         np.flatnonzero(beta_axis < self.beta_start)[-1],
+        #         # first β above beta_end
+        #         np.flatnonzero(self.beta_end < beta_axis)[0] + 1,
+        #     ),
+        # )
+
+        # Version ③
         return (
             slice(
-                # first α below alpha_start
-                np.flatnonzero(alpha_axis < self.alpha_start)[-1],
-                # first α above alpha_end
-                np.flatnonzero(self.alpha_end < alpha_axis)[0],
+                np.flatnonzero(self.alpha_start < alpha_axis + alpha_step / 2)[0],
+                np.flatnonzero(alpha_axis - alpha_step / 2 < self.alpha_end)[-1] + 1,
             ),
             slice(
-                # first β below beta_start
-                np.flatnonzero(beta_axis < self.beta_start)[-1],
-                # first β above beta_end
-                np.flatnonzero(self.beta_end < beta_axis)[0],
+                np.flatnonzero(self.beta_start < beta_axis + beta_step / 2)[0],
+                np.flatnonzero(beta_axis - beta_step / 2 < self.beta_end)[-1] + 1,
             ),
         )
 
@@ -422,35 +438,41 @@ def fov_weight(
     beta_step = beta_axis[1] - beta_axis[0]
     slice_alpha, slice_beta = slices
 
+    selected_alpha = alpha_axis[slice_alpha]
+    selected_beta = beta_axis[slice_beta]
+
     weights = np.ones(
         (slice_alpha.stop - slice_alpha.start, slice_beta.stop - slice_beta.start)
     )
 
+    # Weight for first α for all β
     weights[0, :] *= (
-        wght := (fov.alpha_start - alpha_axis[slice_alpha.start]) / alpha_step
+        wght := abs(selected_alpha[0] - alpha_step / 2 - fov.alpha_start) / alpha_step
     )
     assert (
         0 <= wght <= 1
-    ), "Weight of first alpha observed pixel in slit must be in [0, 1]"
+    ), f"Weight of first alpha observed pixel in slit must be in [0, 1] ({wght:.2f})"
 
     weights[:, 0] *= (
-        wght := (fov.beta_start - beta_axis[slice_beta.start]) / beta_step
+        wght := abs(selected_beta[0] - beta_step / 2 - fov.beta_start) / beta_step
     )
     assert (
         0 <= wght <= 1
-    ), "Weight of first beta observed pixel in slit must be in [0, 1]"
+    ), f"Weight of first beta observed pixel in slit must be in [0, 1] ({wght:.2f})"
 
     weights[-1, :] *= (
-        wght := (alpha_axis[slice_alpha.stop] - fov.alpha_end) / alpha_step
+        wght := abs(selected_alpha[-1] + alpha_step / 2 - fov.alpha_end) / alpha_step
     )
     assert (
         0 <= wght <= 1
-    ), "Weight of last alpha observed pixel in slit must be in [0, 1]"
+    ), f"Weight of last alpha observed pixel in slit must be in [0, 1] ({wght:.2f})"
 
-    weights[:, -1] *= (wght := (beta_axis[slice_beta.stop] - fov.beta_end) / beta_step)
+    weights[:, -1] *= (
+        wght := abs(selected_beta[-1] + beta_step / 2 - fov.beta_end) / beta_step
+    )
     assert (
         0 <= wght <= 1
-    ), "Weight of last beta observed pixel in slit must be in [0, 1]"
+    ), f"Weight of last beta observed pixel in slit must be in [0, 1] ({wght:.2f})"
 
     return weights
 
@@ -469,8 +491,7 @@ class Instr:
 
     def __post_init__(self):
         self.slit_shift = [
-            Coord(0, -self.fov.beta_width / 2)
-            + Coord(0, self.slit_beta_width / 2)
+            Coord(0, -self.fov.beta_width / 2 + self.slit_beta_width / 2)
             + Coord(0, slit_idx * self.slit_beta_width)
             for slit_idx in range(self.n_slit)
         ]
@@ -505,11 +526,15 @@ class Instr:
 
         return len(self.wavel_axis)
 
-    def wslice(self, wavel_input_axis):
-        """Return the measured wavelength within a selected channel"""
+    def wslice(self, wavel_input_axis, margin=0):
+        """Return the measured wavelength within a selected channel. margin in λ."""
         return slice(
-            np.where(wavel_input_axis <= self.wavel_min)[0][-1],
-            np.where(wavel_input_axis >= self.wavel_max)[0][0],
+            np.flatnonzero(
+                wavel_input_axis <= max(self.wavel_min - margin, wavel_input_axis.min())
+            )[-1],
+            np.flatnonzero(
+                wavel_input_axis >= min(self.wavel_max + margin, wavel_input_axis.max())
+            )[0],
         )
 
     @property
@@ -576,6 +601,7 @@ class Channel:
 
         # ∈ [0, β_s]
         beta_in_slit = np.arange(0, self.npix_slit) * self.beta_step
+        # [β_idx, λ', λ]
         wpsf = self.instr.spectral_psf(
             beta_in_slit - np.mean(beta_in_slit),  # ∈ [-β_s / 2, β_s / 2]
             wavel_axis,
@@ -589,27 +615,54 @@ class Channel:
         self.srf = srf
         self.imshape = (ishape.alpha, ishape.beta)
         logger.info(
-            f"Precompute diffrated PSF {self.instr.name} with SRF {srf} (can be optimized)",
-        )
-        otf_np = np.asarray(
-            [
-                udft.ir2fr(
-                    diffracted_psf(tpl, spsf, wpsf),
-                    self.imshape,
-                )
-                # * udft.ir2fr(np.ones((srf, 1)), self.imshape)[
-                #     np.newaxis, np.newaxis, ...
-                # ]  # * OTF for SuperResolution in alpha
-                for tpl in templates
-            ]
+            f"Precompute diffrated PSF {self.instr.name} with SRF {srf}",
         )
 
-        self.otf = xr.DataArray(otf_np, dims=("tpl", "beta", "wl_out", "nu_a", "nu_b"))
+        # Make a λ slice because it is not necessary to compute diffracted psf
+        # with all the input axis. Outside the λ' it is quickly negligeable.
+        # margin is mandatory.
+        wslices = self.instr.wslice(self.wavel_axis, margin=1)
+        # otf_np = np.asarray(
+        #     [
+        #         udft.ir2fr(
+        #             diffracted_psf(
+        #                 tpl[wslices], spsf[wslices, ...], wpsf[..., wslices]
+        #             ),
+        #             self.imshape,
+        #         )
+        #         # * udft.ir2fr(np.ones((srf, 1)), self.imshape)[
+        #         #     np.newaxis, np.newaxis, ...
+        #         # ]  # * OTF for SuperResolution in alpha
+        #         for tpl in templates
+        #     ]
+        # )
+
+        # self.otf = xr.DataArray(otf_np, dims=("tpl", "beta", "wl_out", "nu_a", "nu_b"))
 
         self.local_alpha_axis, self.local_beta_axis = self.instr.fov.local_coords(
             self.step,
             alpha_margin=5 * self.step,
             beta_margin=5 * self.step,
+        )
+        self.ishape = (
+            len(templates),
+            len(alpha_axis),
+            len(beta_axis),
+        )
+        self.cshape = (
+            len(self.instr.wavel_axis),
+            len(alpha_axis),
+            len(beta_axis),
+        )
+        self.local_shape = (
+            len(self.instr.wavel_axis),
+            len(self.local_alpha_axis),
+            len(self.local_beta_axis),
+        )
+        self.slit_shape = (
+            len(self.instr.wavel_axis),
+            self.n_alpha,
+            self.npix_slit,
         )
 
     @property
@@ -631,31 +684,38 @@ class Channel:
     @property
     def npix_slit(self) -> int:
         """The number of pixel inside a slit"""
-        return int(np.round(self.instr.slit_beta_width / self.beta_step))
+        return int(round(self.instr.slit_beta_width / self.beta_step))
 
     @property
     def n_alpha(self) -> int:
         return self.instr.fov.local.n_alpha(self.step)
 
-    def slit(
-        self,
-        gridded: array,
-        pointing: Coord,
-        num_slit: int,
-    ) -> array:
-        """Return a weighted slice of gridded. num_slit start at 0."""
+    def slit_local_fov(self, num_slit):
         slit_fov = self.instr.slit_fov[num_slit]
-        local_fov = slit_fov.local + self.instr.slit_shift[num_slit]
-        slices = local_fov.to_slices(self.local_alpha_axis, self.local_beta_axis)
-        return gridded[:, slices[0], slices[1]] * self.slit_weight(local_fov, slices)
+        return slit_fov.local + self.instr.slit_shift[num_slit]
 
-    def slit_weight(self, fov, slices):
+    def slit_slices(self, num_slit):
+        return self.slit_local_fov(num_slit).to_slices(
+            self.local_alpha_axis, self.local_beta_axis
+        )
+
+    def slit_weight(self, num_slit):
         return fov_weight(
-            fov,
-            slices,
+            self.slit_local_fov(num_slit),
+            self.slit_slices(num_slit),
             self.local_alpha_axis,
             self.local_beta_axis,
         )[np.newaxis, ...]
+
+    def slicing(
+        self,
+        gridded: array,
+        num_slit: int,
+    ) -> array:
+        """Return a weighted slice of gridded. num_slit start at 0."""
+        slices = self.slit_slices(num_slit)
+        weights = self.slit_weight(num_slit)
+        return gridded[:, slices[0], slices[1]] * weights
 
     def gridding(self, inarray, pointing):
         # α and β inside the FOV shifted to pointing, in the global ref.
@@ -688,8 +748,6 @@ class Channel:
 
     def forward(self, inarray):
         """inarray is supposed in self coordinate"""
-        # First interpolate in channel self referentiel
-
         # [pointing, slit, λ', α]
         out = np.zeros(
             (
@@ -701,21 +759,66 @@ class Channel:
             )
         )
 
-        # Σ_β
+        # duplicate in β
         for beta_idx in range(self.npix_slit):
-            # Σ_tpl
+            # Σ_tpl, duplicate in λ
             blurred = sum(
                 abd[np.newaxis] * otf[beta_idx] for abd, otf in zip(inarray, self.otf)
             )
             blurred = np.fft.irfftn(blurred, axes=(1, 2), s=self.imshape, norm="ortho")
+            # Duplicate for each pointing
             for p_idx, pointing in enumerate(self.pointings):
                 gridded = self.gridding(blurred, pointing)
+                # Duplicate for each slit
                 for num_slit in range(self.instr.n_slit):
-                    # [λ', α]
-                    sliced = self.slit(gridded, pointing, num_slit)[:, :, beta_idx]
+                    # [λ', α]. Extract the result for this β in slit because
+                    # it is the blur for this β
+                    sliced = self.slicing(gridded, num_slit)[:, :, beta_idx]
+                    # Σ_α for SR and Σ_β in slit
                     out[p_idx, num_slit, :, :] += np.add.reduceat(
                         sliced, range(0, sliced.shape[1], self.srf), axis=1
                     )
+
+        return out
+
+    def adjoint(self, measures):
+        out = np.zeros(self.ishape)
+        gridded = np.zeros(self.local_shape)
+        blurredT = np.zeros(self.cshape)
+        sliced = np.zeros(self.slit_shape)
+        for beta_idx in range(self.npix_slit):
+            blurredT.fill(0)
+            for p_idx in pointing in enumerate(self.pointings):
+                sliced.fill(0)
+                # acc. slit
+                for num_slit in range(self.instr.n_slit):
+                    # β zero filling and duplicate α for SR
+                    sliced[:, :, beta_idx] = np.repeat(
+                        measures[p_idx, num_slit, :, :], self.srf, axis=1
+                    )[:, self.n_alpha]
+
+                    slices = self.slit_slices(num_slit)
+                    assert (
+                        slices[1].stop - slices[1].start == self.npix_slit
+                    ), "The number of pixel in slit must corresponds to the slices size"
+
+                    # acc. for slit
+                    gridded[:, slices[0], slices[1]] += sliced * self.slit_weight(
+                        num_slit
+                    )
+                # acc. pointing
+                blurredT += self.degridding(gridded, pointing)
+
+            # blurredT contains all pointing and specific beta of all slit
+            blurredTf = np.fft.rfftn(blurredT, axes=(1, 2), norm="ortho")
+            # Duplicate for tpl and Σ_λ and Σ_β
+            for tpl_idx in range(self.ishape[0]):
+                out[tpl_idx] += np.fft.irfftn(
+                    np.sum(blurredTf * np.conj(otf[tpl_idx, beta_idx]), axis=0),
+                    axes=(1, 2),
+                    s=self.imshape,
+                    norm="ortho",
+                )
 
         return out
 
@@ -729,7 +832,7 @@ class Data:
     name: str
 
 
-def get_step(det_pix_size_list: List[float], pix_ratio_tol: int = 5):
+def get_step(det_pix_size_list: List[float], pix_ratio_tol: int = 3):
     """Return the step that respect the tolerance
 
     that is the error is smaller than min(det_pix_size) / pix_ratio_tol
