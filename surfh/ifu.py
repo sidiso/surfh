@@ -384,14 +384,14 @@ class SpectralBlur:
         return 2 * 0.44245 / np.pi * self.grating_resolution
 
     def psfs(self, out_axis, beta, wavelength, scale: float = 1):
-        """output array in [beta, out_axis, wavelength]
+        """output array in [out_axis, wavelength, beta]
 
         scale is in arcsec2micron"""
-        delta_w = wavelength[1] - wavelength[0]
+        delta_w = min(np.diff(wavelength))
 
         # [β, λ', λ]
-        beta = np.asarray(beta).reshape((-1, 1, 1))
-        out_axis = np.asarray(out_axis).reshape((1, -1, 1))
+        beta = np.asarray(beta).reshape((1, 1, -1))
+        out_axis = np.asarray(out_axis).reshape((-1, 1, 1))
         wavelength = np.asarray(wavelength)
 
         # Add margin to have correct normalisation
@@ -410,7 +410,7 @@ class SpectralBlur:
                 ),
             ],
             axis=0,
-        ).reshape((1, 1, -1))
+        ).reshape((1, -1, 1))
 
         # Since we are doing normalization, factor is not necessary here but we
         # keep it to have a trace of theoretical continuous normalisation
@@ -428,9 +428,9 @@ class SpectralBlur:
 
         # Normalize in the convolution sense ("1" on the detector must comes
         # from "1" spread in the input spectrum). Sum must be on the input axis.
-        out /= np.sum(out, axis=2, keepdims=True)
+        out /= np.sum(out, axis=1, keepdims=True)
 
-        return out[:, :, self._n_margin - 1 : -self._n_margin + 1]
+        return out[:, self._n_margin - 1 : -self._n_margin + 1, :]
 
 
 def fov_weight(
@@ -449,12 +449,12 @@ def fov_weight(
     )
 
     # Weight for first α for all β
-    weights[0, :] *= (
-        wght := abs(selected_alpha[0] - alpha_step / 2 - fov.alpha_start) / alpha_step
-    )
-    assert (
-        0 <= wght <= 1
-    ), f"Weight of first alpha observed pixel in slit must be in [0, 1] ({wght:.2f})"
+    # weights[0, :] *= (
+    #     wght := abs(selected_alpha[0] - alpha_step / 2 - fov.alpha_start) / alpha_step
+    # )
+    # assert (
+    #     0 <= wght <= 1
+    # ), f"Weight of first alpha observed pixel in slit must be in [0, 1] ({wght:.2f})"
 
     weights[:, 0] *= (
         wght := abs(selected_beta[0] - beta_step / 2 - fov.beta_start) / beta_step
@@ -463,12 +463,12 @@ def fov_weight(
         0 <= wght <= 1
     ), f"Weight of first beta observed pixel in slit must be in [0, 1] ({wght:.2f})"
 
-    weights[-1, :] *= (
-        wght := abs(selected_alpha[-1] + alpha_step / 2 - fov.alpha_end) / alpha_step
-    )
-    assert (
-        0 <= wght <= 1
-    ), f"Weight of last alpha observed pixel in slit must be in [0, 1] ({wght:.2f})"
+    # weights[-1, :] *= (
+    #     wght := abs(selected_alpha[-1] + alpha_step / 2 - fov.alpha_end) / alpha_step
+    # )
+    # assert (
+    #     0 <= wght <= 1
+    # ), f"Weight of last alpha observed pixel in slit must be in [0, 1] ({wght:.2f})"
 
     weights[:, -1] *= (
         wght := abs(selected_beta[-1] + beta_step / 2 - fov.beta_end) / beta_step
@@ -576,7 +576,7 @@ class Instr:
         )
 
 
-class VoxChannel:
+class Channel:
     """A channel with FOV, slit, spectral blurring and pce"""
 
     def __init__(
@@ -587,7 +587,6 @@ class VoxChannel:
         wavel_axis: array,
         srf: int,
         pointings: CoordList,
-        ishape: "InputShape",
     ):
         self.wavel_axis = wavel_axis
         self.alpha_axis = alpha_axis
@@ -602,7 +601,7 @@ class VoxChannel:
         self.instr = instr.pix(self.step)
 
         self.srf = srf
-        self.imshape = (ishape.alpha, ishape.beta)
+        self.imshape = (len(alpha_axis), len(beta_axis))
         self._otf_sr = udft.ir2fr(np.ones((srf, 1)), self.imshape)[np.newaxis, ...]
 
         self.local_alpha_axis, self.local_beta_axis = self.instr.fov.local_coords(
@@ -611,7 +610,7 @@ class VoxChannel:
             beta_margin=5 * self.step,
         )
 
-        self.ishape = ishape
+        self.ishape = (len(wavel_axis),) + self.imshape
         self.oshape = (
             len(self.pointings),
             self.instr.n_slit,
@@ -651,7 +650,7 @@ class VoxChannel:
 
     @property
     def wslice(self) -> slice:
-        return self.instr.wslice(self.wavel_axis, 1)
+        return self.instr.wslice(self.wavel_axis, 0.1)
 
     def slit_local_fov(self, slit_idx):
         slit_fov = self.instr.slit_fov[slit_idx]
@@ -677,7 +676,6 @@ class VoxChannel:
             self.local_alpha_axis,
             self.local_beta_axis,
         )[np.newaxis, ...]
-
 
     def slicing(
         self,
@@ -801,15 +799,21 @@ class VoxChannel:
         """inarray is supposed in global coordinate and spatially blurred"""
         # [pointing, slit, λ', α]
         out = np.empty(self.oshape)
+        logger.info(f"{self.name} : IDFT2({inarray_f.shape})")
         blurred = self.sblur(inarray_f[self.wslice, ...])
         for p_idx, pointing in enumerate(self.pointings):
+            logger.info(
+                f"{self.name} : gridding {blurred.shape} -> {(blurred.shape[0],) + self.local_shape[1:]}"
+            )
             gridded = self.gridding(blurred, pointing)
             for slit_idx in range(self.instr.n_slit):
                 # Slicing, weighting and α subsampling for SR
+                logger.info(f"{self.name} : slicing {slit_idx} / {self.instr.n_slit}")
                 sliced = self.slicing(gridded, slit_idx)[
                     :, : self.oshape[3] * self.srf : self.srf
                 ]
                 # λ blurring and Σ_β
+                logger.info(f"{self.name} : wblur {sliced.shape} → {out.shape[2:]}")
                 out[p_idx, slit_idx, :, :] = self.wblur(sliced).sum(axis=2)
         return out
 
@@ -831,6 +835,64 @@ class VoxChannel:
                 gridded += self.slicing_t(sliced, slit_idx)
             blurred += self.gridding_t(gridded, pointing)
         out[self.wslice, ...] = self.sblur_t(blurred)
+        return out
+
+
+class Spectro:
+    def __init__(
+        self,
+        instrs: List[Instr],
+        alpha_axis: array,
+        beta_axis: array,
+        wavel_axis: array,
+        sotf: array,
+        pointings: CoordList,
+    ):
+        self.wavel_axis = wavel_axis
+        self.alpha_axis = alpha_axis
+        self.beta_axis = beta_axis
+
+        self.sotf = sotf
+        self.pointings = pointings
+
+        srfs = get_srf(
+            [chan.det_pix_size for chan in instrs],
+            self.step,
+        )
+
+        self.channels = [
+            Channel(
+                instr,
+                alpha_axis,
+                beta_axis,
+                wavel_axis,
+                srf,
+                pointings,
+            )
+            for srf, instr in zip(srfs, instrs)
+        ]
+
+        self._idx = np.cumsum([0] + [np.prod(chan.oshape) for chan in self.channels])
+        self.ishape = (len(wavel_axis), len(alpha_axis), len(beta_axis))
+        self.oshape = (self._idx[-1],)
+
+    @property
+    def step(self) -> float:
+        return self.alpha_axis[1] - self.alpha_axis[0]
+
+    def get_chan_data(self, inarray: array, chan_idx: int) -> array:
+        return np.reshape(
+            inarray[self._idx[chan_idx] : self._idx[chan_idx + 1]],
+            self.channels[chan_idx].oshape,
+        )
+
+    def forward(self, inarray: array) -> array:
+        out = np.zeros(self.oshape)
+        logger.info(f"Spatial blurring DFT2({inarray.shape})")
+        blurred_f = dft(inarray) * self.sotf
+        for idx, chan in enumerate(self.channels):
+            logger.info(f"Channel {chan.name}")
+            out[self._idx[idx] : self._idx[idx + 1]] = chan.forward(blurred_f).ravel()
         return out
 
 
@@ -881,7 +943,7 @@ def diffracted_psf(template, spsf, wpsf) -> List[array]:
 
     spsf: array of psf in [λ, α, β]
 
-    wpsf : array of psf in [β_idx, λ', λ]
+    wpsf : array of psf in [λ', λ, β]
 
     shape : the spatial shape of input sky
 
@@ -891,7 +953,7 @@ def diffracted_psf(template, spsf, wpsf) -> List[array]:
 
     """
     weighted_psf = spsf * template.reshape((-1, 1, 1))
-    return np.asarray([wblur(weighted_psf, wpsf_i) for wpsf_i in wpsf])
+    return wblur(weighted_psf, wpsf)
 
 
 def wblur(arr: array, wpsf: array) -> array:
@@ -902,7 +964,7 @@ def wblur(arr: array, wpsf: array) -> array:
     arr: array-like
       Input of shape [λ, α, β].
     wpsf: array-like
-      Wavelength PSF of shape [λ', λ]
+      Wavelength PSF of shape [λ', λ, β]
 
     Returns
     -------
@@ -913,9 +975,9 @@ def wblur(arr: array, wpsf: array) -> array:
     # Σ_λ
     return np.sum(
         # in [1, λ, α, β]
-        arr.reshape((1, arr.shape[0], arr.shape[1], arr.shape[2]))
-        # wpsf in [λ', λ, 1, 1]
-        * wpsf.reshape((wpsf.shape[0], wpsf.shape[1], 1, 1)),
+        np.expand_dims(arr, axis=0)
+        # wpsf in [λ', λ, 1, β]
+        * np.expand_dims(wpsf, axis=2),
         axis=1,
     )
 
