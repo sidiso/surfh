@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-
 # class SpectralFilter:
 #     def __init__(self, measured_wavelength, measured_values, name=""):
 #         """A wavelength filter
@@ -46,7 +45,7 @@
 #         axe.set_ylabel("Transmittance")
 
 
-class LMMChannel:
+class ChannelLMMPreCalc:
     """A channel with FOV, slit, spectral blurring and pce"""
 
     def __init__(
@@ -156,7 +155,7 @@ class LMMChannel:
     @property
     def npix_slit(self) -> int:
         """The number of pixel inside a slit"""
-        return int(round(self.instr.slit_beta_width / self.beta_step))
+        return ceil(round(self.instr.slit_beta_width / self.beta_step))
 
     @property
     def n_alpha(self) -> int:

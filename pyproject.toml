@@ -30,6 +30,7 @@ see = "^1.4.1"
 jupyterlab = "^3.3.2"
 yapf = "^0.32.0"
 jupyter-contrib-nbextensions = "^0.5.1"
+ipympl = "^0.8.8"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

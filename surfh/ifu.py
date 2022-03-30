@@ -17,14 +17,22 @@ import udft
 import xarray as xr
 from loguru import logger
 from numpy import ndarray as array
-from udft import irdftn as idft
-from udft import rdft2 as dft
 
 
 def rotmatrix(degree: float) -> array:
     """Angle in degree"""
     theta = np.radians(degree)
     return np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
+
+
+def dft(inarray):
+    return scipy.fft.rfftn(inarray, axes=range(-2, 0), norm="ortho", workers=-1)
+
+
+def idft(inarray, shape):
+    return scipy.fft.irfftn(
+        inarray, s=shape, axes=range(-len(shape), 0), norm="ortho", workers=-1
+    )
 
 
 @dataclass
@@ -65,9 +73,7 @@ class Coord:
     def rotate(self, degree: float) -> "Coord":
         """Rotate the coordinate"""
         tmp = rotmatrix(degree) @ self
-        self.alpha = tmp[0]
-        self.beta = tmp[1]
-        return self
+        return Coord(float(tmp[0]), float(tmp[1]))
 
     def pix(self, step):
         return Coord(round(self.alpha / step) * step, round(self.beta / step) * step)
@@ -197,6 +203,26 @@ class FOV:
         return (
             coords[0].reshape((n_alpha, n_beta)) + self.origin.alpha,
             coords[1].reshape((n_alpha, n_beta)) + self.origin.beta,
+        )
+
+    def global2local(self, alpha_coords, beta_coords):
+        """Returns regular Cartesian global coordinates in local referential"""
+        n_alpha = len(alpha_coords)
+        n_beta = len(beta_coords)
+
+        alpha_coords = alpha_coords - self.origin.alpha
+        beta_coords = beta_coords - self.origin.beta
+
+        alpha_coords = np.tile(alpha_coords.reshape((-1, 1)), [1, n_beta])
+        beta_coords = np.tile(beta_coords.reshape((1, -1)), [n_alpha, 1])
+
+        coords = rotmatrix(-self.angle) @ np.vstack(
+            (alpha_coords.ravel(), beta_coords.ravel())
+        )
+
+        return (
+            coords[0].reshape((n_alpha, n_beta)),
+            coords[1].reshape((n_alpha, n_beta)),
         )
 
     def coords(
@@ -456,12 +482,14 @@ def fov_weight(
     #     0 <= wght <= 1
     # ), f"Weight of first alpha observed pixel in slit must be in [0, 1] ({wght:.2f})"
 
-    weights[:, 0] *= (
-        wght := abs(selected_beta[0] - beta_step / 2 - fov.beta_start) / beta_step
-    )
-    assert (
-        0 <= wght <= 1
-    ), f"Weight of first beta observed pixel in slit must be in [0, 1] ({wght:.2f})"
+    if selected_beta[0] - beta_step / 2 < fov.beta_start:
+        weights[:, 0] *= (
+            wght := 1
+            - abs(selected_beta[0] - beta_step / 2 - fov.beta_start) / beta_step
+        )
+        assert (
+            0 <= wght <= 1
+        ), f"Weight of first beta observed pixel in slit must be in [0, 1] ({wght:.2f})"
 
     # weights[-1, :] *= (
     #     wght := abs(selected_alpha[-1] + alpha_step / 2 - fov.alpha_end) / alpha_step
@@ -470,12 +498,14 @@ def fov_weight(
     #     0 <= wght <= 1
     # ), f"Weight of last alpha observed pixel in slit must be in [0, 1] ({wght:.2f})"
 
-    weights[:, -1] *= (
-        wght := abs(selected_beta[-1] + beta_step / 2 - fov.beta_end) / beta_step
-    )
-    assert (
-        0 <= wght <= 1
-    ), f"Weight of last beta observed pixel in slit must be in [0, 1] ({wght:.2f})"
+    if selected_beta[-1] + beta_step / 2 > fov.beta_end:
+        weights[:, -1] *= (
+            wght := 1
+            - abs(selected_beta[-1] + beta_step / 2 - fov.beta_end) / beta_step
+        )
+        assert (
+            0 <= wght <= 1
+        ), f"Weight of last beta observed pixel in slit must be in [0, 1] ({wght:.2f})"
 
     return weights
 
@@ -502,7 +532,7 @@ class Instr:
             FOV(
                 alpha_width=self.fov.alpha_width,
                 beta_width=self.slit_beta_width,
-                origin=self.fov.origin + shift,
+                origin=self.fov.origin + shift.rotate(self.fov.angle),
                 angle=self.fov.angle,
             )
             for shift in self.slit_shift
@@ -610,7 +640,7 @@ class Channel:
             beta_margin=5 * self.step,
         )
 
-        self.ishape = (len(wavel_axis),) + self.imshape
+        self.ishape = (len(wavel_axis), self.imshape[0], self.imshape[1] // 2 + 1)
         self.oshape = (
             len(self.pointings),
             self.instr.n_slit,
@@ -623,7 +653,8 @@ class Channel:
             len(beta_axis),
         )
         self.local_shape = (
-            self.instr.n_wavel,
+            # self.instr.n_wavel,
+            self.wslice.stop - self.wslice.start,
             len(self.local_alpha_axis),
             len(self.local_beta_axis),
         )
@@ -652,19 +683,37 @@ class Channel:
     def wslice(self) -> slice:
         return self.instr.wslice(self.wavel_axis, 0.1)
 
+    @property
+    def npix_slit(self) -> int:
+        """The number of pixel inside a slit"""
+        return int(ceil(self.instr.slit_beta_width / self.beta_step))
+
     def slit_local_fov(self, slit_idx):
         slit_fov = self.instr.slit_fov[slit_idx]
         return slit_fov.local + self.instr.slit_shift[slit_idx]
 
     def slit_slices(self, slit_idx):
-        return self.slit_local_fov(slit_idx).to_slices(
+        slices = self.slit_local_fov(slit_idx).to_slices(
             self.local_alpha_axis, self.local_beta_axis
         )
+        # If slice to long
+        if (slices[1].stop - slices[1].start) > self.npix_slit:
+            if abs(
+                self.local_beta_axis[slices[1].stop]
+                - self.slit_local_fov(slit_idx).beta_end
+            ) > abs(
+                self.local_beta_axis[slices[1].start]
+                - self.slit_local_fov(slit_idx).beta_start
+            ):
+                slices = (slices[0], slice(slices[1].start, slices[1].stop - 1))
+            else:
+                slices = (slices[0], slice(slices[1].start + 1, slices[1].stop))
+        return slices
 
     def slit_shape(self, slit_idx):
-        slices = (self.slit_slices(slit_idx),)
+        slices = self.slit_slices(slit_idx)
         return (
-            len(self.wavel_axis),
+            self.wslice.stop - self.wslice.start,
             slices[0].stop - slices[0].start,
             slices[1].stop - slices[1].start,
         )
@@ -730,8 +779,8 @@ class Channel:
 
     def gridding_t(self, inarray: array, pointing: Coord) -> array:
         # α and β inside the FOV shifted to pointing, in the global ref.
-        alpha_coord, beta_coord = (self.instr.fov + pointing).local2global(
-            self.local_alpha_axis, self.local_beta_axis
+        alpha_coord, beta_coord = (self.instr.fov + pointing).global2local(
+            self.alpha_axis, self.beta_axis
         )
 
         # Necessary for interpn to process 3D array. No interpolation is done
@@ -742,29 +791,17 @@ class Channel:
 
         global_coords = np.vstack(
             [
-                np.repeat(
-                    np.repeat(wl_idx.reshape((-1, 1, 1)), out_shape[1], axis=1),
-                    out_shape[2],
-                    axis=2,
+                np.tile(
+                    wl_idx.reshape((-1, 1, 1)), (1, out_shape[1], out_shape[2])
                 ).ravel(),
-                np.repea(
-                    np.repeat(
-                        self.alpha_axis.reshape((1, -1, 1)), out_shape[0], axis=0
-                    ),
-                    out_shape[2],
-                    axis=2,
-                ).ravel(),
-                np.repeat(
-                    np.repeat(self.beta_axis.reshape((1, 1, -1)), out_shape[0], axis=0),
-                    out_shape[1],
-                    axis=1,
-                ).ravel(),
+                np.repeat(alpha_coord[np.newaxis], out_shape[0], axis=0).ravel(),
+                np.repeat(beta_coord[np.newaxis], out_shape[0], axis=0).ravel(),
             ]
         ).T
 
         # This output can be processed in local ref.
         return scipy.interpolate.interpn(
-            (wl_idx, alpha_coord, beta_coord),
+            (wl_idx, self.local_alpha_axis, self.local_beta_axis),
             inarray,
             global_coords,
             bounds_error=False,
@@ -803,37 +840,51 @@ class Channel:
         blurred = self.sblur(inarray_f[self.wslice, ...])
         for p_idx, pointing in enumerate(self.pointings):
             logger.info(
-                f"{self.name} : gridding {blurred.shape} -> {(blurred.shape[0],) + self.local_shape[1:]}"
+                f"{self.name} : gridding [{p_idx}/{len(self.pointings)}] {blurred.shape} -> {(blurred.shape[0],) + self.local_shape[1:]}"
             )
             gridded = self.gridding(blurred, pointing)
             for slit_idx in range(self.instr.n_slit):
                 # Slicing, weighting and α subsampling for SR
-                logger.info(f"{self.name} : slicing {slit_idx} / {self.instr.n_slit}")
+                logger.info(f"{self.name} : slicing [{slit_idx+1}/{self.instr.n_slit}]")
                 sliced = self.slicing(gridded, slit_idx)[
                     :, : self.oshape[3] * self.srf : self.srf
                 ]
                 # λ blurring and Σ_β
                 logger.info(f"{self.name} : wblur {sliced.shape} → {out.shape[2:]}")
-                out[p_idx, slit_idx, :, :] = self.wblur(sliced).sum(axis=2)
+                out[p_idx, slit_idx, :, :] = self.instr.pce[
+                    ..., np.newaxis
+                ] * self.wblur(sliced).sum(axis=2)
         return out
 
     def adjoint(self, measures: array) -> array:
-        out = np.zeros(self.ishape)
+        out = np.zeros(self.ishape, dtype=np.complex128)
         blurred = np.zeros(self.cshape)
         for p_idx, pointing in enumerate(self.pointings):
+            logger.info(f"{self.name} : pointing [{p_idx+1}/{len(self.pointings)}]")
             gridded = np.zeros(self.local_shape)
             for slit_idx in range(self.instr.n_slit):
+                logger.info(f"{self.name} : slicing [{slit_idx+1}/{self.instr.n_slit}]")
                 sliced = np.zeros(self.slit_shape(slit_idx))
                 # α zero-filling, λ blurrling_t, and β duplication
+                logger.info(
+                    f"{self.name} : wblur^T {measures.shape[2:] + (sliced.shape[2],)}"
+                )
                 sliced[:, : self.oshape[3] * self.srf : self.srf] = self.wblur_t(
                     np.repeat(
-                        measures[p_idx, slit_idx][..., np.newaxis],
+                        np.expand_dims(
+                            measures[p_idx, slit_idx] * self.instr.pce[..., np.newaxis],
+                            axis=2,
+                        ),
                         sliced.shape[2],
                         axis=2,
                     )
                 )
                 gridded += self.slicing_t(sliced, slit_idx)
+            logger.info(
+                f"{self.name} : gridding^T [{p_idx+1}/{len(self.pointings)}] {gridded.shape} -> {blurred.shape}"
+            )
             blurred += self.gridding_t(gridded, pointing)
+        logger.info(f"{self.name} : DFT2({blurred.shape})")
         out[self.wslice, ...] = self.sblur_t(blurred)
         return out
 
@@ -873,6 +924,7 @@ class Spectro:
         ]
 
         self._idx = np.cumsum([0] + [np.prod(chan.oshape) for chan in self.channels])
+        self.imshape = (len(alpha_axis), len(beta_axis))
         self.ishape = (len(wavel_axis), len(alpha_axis), len(beta_axis))
         self.oshape = (self._idx[-1],)
 
@@ -894,6 +946,104 @@ class Spectro:
             logger.info(f"Channel {chan.name}")
             out[self._idx[idx] : self._idx[idx + 1]] = chan.forward(blurred_f).ravel()
         return out
+
+    def adjoint(self, inarray: array) -> array:
+        tmp = np.zeros(
+            self.ishape[:2] + (self.ishape[2] // 2 + 1,), dtype=np.complex128
+        )
+        for idx, chan in enumerate(self.channels):
+            logger.info(f"Channel {chan.name}")
+            tmp += chan.adjoint(
+                np.reshape(inarray[self._idx[idx] : self._idx[idx + 1]], chan.oshape)
+            )
+        logger.info(f"Spatial blurring^T : IDFT2({tmp.shape})")
+        return idft(tmp * self.sotf.conj(), self.imshape)
+
+
+class SpectroLMM:
+    def __init__(
+        self,
+        instrs: List[Instr],
+        alpha_axis: array,
+        beta_axis: array,
+        wavel_axis: array,
+        sotf: array,
+        pointings: CoordList,
+        templates: array,
+    ):
+        self.wavel_axis = wavel_axis
+        self.alpha_axis = alpha_axis
+        self.beta_axis = beta_axis
+
+        self.sotf = sotf
+        self.pointings = pointings
+
+        self.tpls = templates
+
+        srfs = get_srf(
+            [chan.det_pix_size for chan in instrs],
+            self.step,
+        )
+
+        self.channels = [
+            Channel(
+                instr,
+                alpha_axis,
+                beta_axis,
+                wavel_axis,
+                srf,
+                pointings,
+            )
+            for srf, instr in zip(srfs, instrs)
+        ]
+
+        self._idx = np.cumsum([0] + [np.prod(chan.oshape) for chan in self.channels])
+        self.imshape = (len(alpha_axis), len(beta_axis))
+        self.ishape = (len(wavel_axis), len(alpha_axis), len(beta_axis))
+        self.oshape = (self._idx[-1],)
+
+    @property
+    def step(self) -> float:
+        return self.alpha_axis[1] - self.alpha_axis[0]
+
+    def get_chan_data(self, inarray: array, chan_idx: int) -> array:
+        return np.reshape(
+            inarray[self._idx[chan_idx] : self._idx[chan_idx + 1]],
+            self.channels[chan_idx].oshape,
+        )
+
+    def forward(self, inarray: array) -> array:
+        out = np.zeros(self.oshape)
+        logger.info(f"Cube generation")
+        cube = np.sum(
+            np.expand_dims(inarray, 1) * self.tpls[..., np.newaxis, np.newaxis], axis=0
+        )
+        logger.info(f"Spatial blurring DFT2({inarray.shape})")
+        blurred_f = dft(cube) * self.sotf
+        for idx, chan in enumerate(self.channels):
+            logger.info(f"Channel {chan.name}")
+            out[self._idx[idx] : self._idx[idx + 1]] = chan.forward(blurred_f).ravel()
+        return out
+
+    def adjoint(self, inarray: array) -> array:
+        tmp = np.zeros(
+            self.ishape[:2] + (self.ishape[2] // 2 + 1,), dtype=np.complex128
+        )
+        for idx, chan in enumerate(self.channels):
+            logger.info(f"Channel {chan.name}")
+            tmp += chan.adjoint(
+                np.reshape(inarray[self._idx[idx] : self._idx[idx + 1]], chan.oshape)
+            )
+        logger.info(f"Spatial blurring^T : IDFT2({tmp.shape})")
+        cube = idft(tmp * self.sotf.conj(), self.imshape)
+        logger.info(f"Maps summation generation")
+        return np.concatenate(
+            [
+                np.sum(cube * tpl[..., np.newaxis, np.newaxis], axis=0)[np.newaxis, ...]
+                for tpl in self.tpls
+            ],
+            axis=0,
+        )
 
 
 def get_step(det_pix_size_list: List[float], pix_ratio_tol: int = 3):
@@ -990,7 +1140,7 @@ def wblur_t(arr: array, wpsf: array) -> array:
     arr: array-like
       Input of shape [λ', α, β].
     wpsf: array-like
-      Wavelength PSF of shape [λ', λ]
+      Wavelength PSF of shape [λ', λ, β]
 
     Returns
     -------
@@ -1001,9 +1151,9 @@ def wblur_t(arr: array, wpsf: array) -> array:
     # Σ_λ'
     return np.sum(
         # in [λ', 1, α, β]
-        arr.reshape((arr.shape[0], 1, arr.shape[1], arr.shape[2]))
-        # wpsf in [λ', λ, 1, 1]
-        * wpsf.reshape((wpsf.shape[0], wpsf.shape[1], 1, 1)),
+        np.expand_dims(arr, axis=1)
+        # wpsf in [λ', λ, 1, β]
+        * np.expand_dims(wpsf, axis=2),
         axis=0,
     )
 
