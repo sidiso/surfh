@@ -483,7 +483,7 @@ def fov_weight(
     # ), f"Weight of first alpha observed pixel in slit must be in [0, 1] ({wght:.2f})"
 
     if selected_beta[0] - beta_step / 2 < fov.beta_start:
-        weights[:, 0] *= (
+        weights[:, 0] = (
             wght := 1
             - abs(selected_beta[0] - beta_step / 2 - fov.beta_start) / beta_step
         )
@@ -499,7 +499,7 @@ def fov_weight(
     # ), f"Weight of last alpha observed pixel in slit must be in [0, 1] ({wght:.2f})"
 
     if selected_beta[-1] + beta_step / 2 > fov.beta_end:
-        weights[:, -1] *= (
+        weights[:, -1] = (
             wght := 1
             - abs(selected_beta[-1] + beta_step / 2 - fov.beta_end) / beta_step
         )
@@ -696,7 +696,7 @@ class Channel:
         slices = self.slit_local_fov(slit_idx).to_slices(
             self.local_alpha_axis, self.local_beta_axis
         )
-        # If slice to long
+        # If slice to long, remove one pixel at the beginning or the end
         if (slices[1].stop - slices[1].start) > self.npix_slit:
             if abs(
                 self.local_beta_axis[slices[1].stop]
@@ -719,12 +719,26 @@ class Channel:
         )
 
     def slit_weights(self, slit_idx):
-        return fov_weight(
+        slices = self.slit_slices(slit_idx)
+
+        weights = fov_weight(
             self.slit_local_fov(slit_idx),
-            self.slit_slices(slit_idx),
+            slices,
             self.local_alpha_axis,
             self.local_beta_axis,
-        )[np.newaxis, ...]
+        )
+
+        # If previous do not share a pixel
+        if slit_idx > 0:
+            if self.slit_slices(slit_idx - 1)[1].stop - 1 != slices[1].start:
+                weights[:, 0] = 1
+
+        # If next do not share a pixel
+        if slit_idx < self.npix_slit - 1:
+            if slices[1].stop - 1 != self.slit_slices(slit_idx + 1)[1].start:
+                weights[:, -1] = 1
+
+        return weights[np.newaxis, ...]
 
     def slicing(
         self,
