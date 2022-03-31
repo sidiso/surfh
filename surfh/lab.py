@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+"""Laboratory for code. Not functionnal."""
 
 # class SpectralFilter:
 #     def __init__(self, measured_wavelength, measured_values, name=""):

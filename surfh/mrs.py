@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
-
+# Copyright (C) 2022 François Orieux <francois.orieux@universite-paris-saclay.fr>
+# Copyright (C) 2018-2021 Ralph Abirizk <ralph.abirizk@universite-paris-saclay.fr>
 
 from importlib import resources
 

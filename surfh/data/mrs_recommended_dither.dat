@@ -1,0 +1,49 @@
+# Default MIRISim dither pattern for MRS.
+#
+# Based on "MIRI-TN-00074-ATC Mrs dither definitions Draft B.pdf",
+# 7 May 2015, appendix 6.
+#
+# Offsets are defined in the MRS channel-band field-of-view,
+# and are tabulated as (alpha, beta) coordinates (in units of arcsec)
+# relative to initial pointing center at (0, 0).
+#
+
+# Optimized for channel 1.
+-1.078,  0.528
+ 0.980, -0.440
+ 1.078, -0.528
+-0.980,  0.440
+ 1.078,  0.528
+-0.980, -0.440
+-1.078, -0.528
+ 0.980,  0.440
+
+# Optimized for channel 2.
+-1.078,  1.584
+ 0.980, -1.320
+ 1.078, -1.459
+-0.980,  1.446
+ 1.078,  1.584
+-0.980, -1.320
+-1.078, -1.459
+ 0.980,  1.446
+
+# Optimized for channel 3.
+-2.156,  2.218
+ 1.870, -0.686
+ 1.992, -0.880
+-2.034,  2.024
+ 1.992,  2.218
+-2.034, -0.686
+-2.156, -0.880
+ 1.870,  2.024
+
+# Optimized for channel 4.
+-1.960,  3.168
+ 2.817, -1.672
+ 2.954, -1.994
+-1.824,  2.845
+ 2.954,  3.168
+-1.824, -1.672
+-1.960, -1.994
+ 2.817,  2.845

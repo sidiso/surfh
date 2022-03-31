@@ -6,6 +6,7 @@ authors = ["François Orieux <orieux@l2s.centralesupelec.fr>"]
 
 [tool.poetry.dependencies]
 python = ">=3.8,<3.10"
+aljabr = {git = "https://github.com/forieux/aljabr.git", rev = "main"}
 numpy = "^1.22.2"
 scipy = "^1.8.0"
 qmm = "^0.11.0"
@@ -31,6 +32,7 @@ jupyterlab = "^3.3.2"
 yapf = "^0.32.0"
 jupyter-contrib-nbextensions = "^0.5.1"
 ipympl = "^0.8.8"
+frappuccino = "^0.0.8"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
