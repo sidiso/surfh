@@ -19,3 +19,8 @@ To use `models.SpectroLMM`, the data must be in this format.
 - Try precomputation of otf with LMM model (like in tci2022)
 - Parallelization on channel
 - Parallelization on pointing
+
+- Use HPC tools like cython, pythran, numba for intra-node
+- https://flothesof.github.io/optimizing-python-code-numpy-cython-pythran-numba.html
+- https://jochenschroeder.com/blog/articles/DSP_with_Python2/
+- mpi is also a possiblity for inter-node
