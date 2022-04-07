@@ -49,7 +49,7 @@ def vox_reconstruction(
         init = data_adeq.ht_data
 
     return qmm.mmmg(
-        data_adeq + spat_prior_r + spat_prior_r + spec_prior, x0=init, max_iter=500
+        data_adeq + spat_prior_r + spat_prior_c + spec_prior, x0=init, max_iter=500
     )
 
 
@@ -85,4 +85,4 @@ def lmm_reconstruction(
     if init is None:
         init = data_adeq.ht_data
 
-    return qmm.mmmg(data_adeq + spat_prior_r + spat_prior_r, x0=init, max_iter=500)
+    return qmm.mmmg(data_adeq + spat_prior_r + spat_prior_c, x0=init, max_iter=500)
