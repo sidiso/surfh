@@ -20,7 +20,7 @@ To use `models.SpectroLMM`, the data must be in this format.
 - Parallelization on channel
 - Parallelization on pointing
 
-- Use HPC tools like cython, pythran, numba for intra-node
+- Use HPC tools like cython, pythran, numba, mpi4py for intra-node
 - https://flothesof.github.io/optimizing-python-code-numpy-cython-pythran-numba.html
 - https://jochenschroeder.com/blog/articles/DSP_with_Python2/
 - mpi is also a possiblity for inter-node
