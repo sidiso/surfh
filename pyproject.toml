@@ -2,7 +2,21 @@
 name = "surfh"
 version = "0.1.0"
 description = "SUper Resolution and Fusion for Hyperspectral images"
-authors = ["François Orieux <orieux@l2s.centralesupelec.fr>"]
+authors = ["François Orieux <francois.orieux@universite-paris-saclay.fr>", "Ralph Abirizk  <ralph.abirizk@universite-paris-saclay.fr>"]
+maintainers = ["François Orieux <francois.orieux@universite-paris-saclay.fr>"]
+readme = "README.md"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/sidiso/surfh/"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Typing :: Typed", ]
+include = ["LICENSE"]
 
 [tool.poetry.dependencies]
 python = ">=3.8,<3.10"
