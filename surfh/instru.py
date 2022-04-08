@@ -1,9 +1,23 @@
+# SURFH - SUper Resolution and Fusion for Hyperspectral images
+#
 # Copyright (C) 2022 François Orieux <francois.orieux@universite-paris-saclay.fr>
 # Copyright (C) 2018-2021 Ralph Abirizk <ralph.abirizk@universite-paris-saclay.fr>
+#
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <http://www.gnu.org/licenses/>.
 
-"""IFU
+"""instru
 
-IFU instrument modeling
+Instrument modeling
 
 """
 
@@ -29,6 +43,45 @@ def rotmatrix(degree: float) -> array:
     """
     theta = np.radians(degree)
     return np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
+
+
+def get_step(det_pix_size_list: List[float], pix_ratio_tol: int = 3):
+    """Return the step that respect the tolerance
+
+    that is the error is smaller than min(det_pix_size) / pix_ratio_tol
+
+    >>> np.all(det_pix_size_list % min(det_pix_size / n) <= min_det_pix_size / ratio)
+
+    The step is a multiple of the smallest det_pix_size.
+    """
+    num = 1
+    det_pix_size_arr = np.asarray(det_pix_size_list)
+    min_det_pix_size = min(det_pix_size_list)
+    while not np.all(
+        det_pix_size_arr % (min_det_pix_size / num) <= min_det_pix_size / pix_ratio_tol
+    ):
+        num += 1
+    return min_det_pix_size / num
+
+
+def get_srf(det_pix_size_list: List[float], step: float) -> List[int]:
+    """Return the Super Resolution Factor (SRF)
+
+    such that SRF = det_pix_size // step.
+
+    Parameters
+    ----------
+    det_pix_size_list: list of float
+      A list of spatial pixel size.
+    step: float
+      A spatial step.
+
+    Returns
+    -------
+    A list of SRF int.
+
+    """
+    return [int(det_pix_size // step) for det_pix_size in det_pix_size_list]
 
 
 @dataclass
@@ -150,7 +203,7 @@ class CoordList(list):
         """(Δα, Δβ)"""
         return (self.alpha_box, self.beta_box)
 
-    def fov(self, instr_list: List["Instr"], margin=5) -> "CoordList":
+    def fov(self, instr_list: List["IFU"], margin=5) -> "CoordList":
         """Total FOV
 
         Return the smallest and largest `Coord` That include all channel with
@@ -510,7 +563,7 @@ class SpectralBlur:
 
 
 @dataclass
-class Instr:
+class IFU:
     """A channel with FOV, slit, spectral blurring and pce
 
     Attributs
@@ -612,8 +665,8 @@ class Instr:
 
     def pix(self, step):
         """Return an equivalent with rounded `origin` coordinate."""
-        logger.info(f"Instr. {self.name} pixelized to {step:.2g}")
-        return Instr(
+        logger.info(f"IFU. {self.name} pixelized to {step:.2g}")
+        return IFU(
             FOV(
                 self.fov.alpha_width,
                 self.fov.beta_width,
@@ -629,43 +682,54 @@ class Instr:
         )
 
 
-def get_step(det_pix_size_list: List[float], pix_ratio_tol: int = 3):
-    """Return the step that respect the tolerance
-
-    that is the error is smaller than min(det_pix_size) / pix_ratio_tol
-
-    >>> np.all(det_pix_size_list % min(det_pix_size / n) <= min_det_pix_size / ratio)
-
-    The step is a multiple of the smallest det_pix_size.
-    """
-    num = 1
-    det_pix_size_arr = np.asarray(det_pix_size_list)
-    min_det_pix_size = min(det_pix_size_list)
-    while not np.all(
-        det_pix_size_arr % (min_det_pix_size / num) <= min_det_pix_size / pix_ratio_tol
+class WavelFilter:
+    def __init__(
+        self, measured_wavelength: array, measured_values: array, name: str = ""
     ):
-        num += 1
-    return min_det_pix_size / num
+        """A wavelength filter
+
+        Parameters
+        ----------
+        measured_wavelength: array-like
+          The wavelength where values is acquired
+        measured_values: array-like
+          The measured transmittance of the filter
+        """
+        self.measured_wavelength = measured_wavelength
+        self.measured_values = measured_values
+        self.name = name
+
+    def transmittance(self, wavelengths: array, normalized: bool = False) -> array:
+        spectrum = np.interp(
+            wavelengths, self.measured_wavelength, self.measured_values, left=0, right=0
+        )
+        if normalized:
+            return spectrum / np.sum(spectrum)
+        else:
+            return spectrum
+
+    def integrate_hsi(self, cube: array, wavelength: array) -> array:
+        """cube is [λ, α, β] and wavelength is "λ"
+
+        return im[α, β] = ∑_λ cube[λ, α, β] * filter[λ]"""
+        return sum(
+            image * weight
+            for image, weight in zip(cube, self.transmittance(wavelength, True))
+        )
+
+    def integrate_spectrum(self, spectrum: array, wavelength: array) -> float:
+        """Return i = ∑_λ spectrum[λ] * filter[λ]"""
+        return np.sum(spectrum * self.transmittance(wavelength, True))
 
 
-def get_srf(det_pix_size_list: List[float], step: float) -> List[int]:
-    """Return the Super Resolution Factor (SRF)
+@dataclass
+class MSImager:
+    """Multi-Spectral Imager"""
 
-    such that SRF = det_pix_size // step.
-
-    Parameters
-    ----------
-    det_pix_size_list: list of float
-      A list of spatial pixel size.
-    step: float
-      A spatial step.
-
-    Returns
-    -------
-    A list of SRF int.
-
-    """
-    return [int(det_pix_size // step) for det_pix_size in det_pix_size_list]
+    sotf: array
+    fov: FOV
+    wfilters: List[WavelFilter]
+    det_pix_size: float
 
 
 #%% Dither
