@@ -7,7 +7,7 @@ import numpy as np
 from astropy.io import fits
 from loguru import logger
 
-from . import ifu
+from . import instru
 
 
 def mrs_pce(filename):
@@ -73,24 +73,24 @@ res4c = np.mean([1630, 1330]) / 4
 
 
 logger.info("Sinc² spectral blur")
-spec_blur_1a = ifu.SpectralBlur(res1a)
-spec_blur_1b = ifu.SpectralBlur(res1b)
-spec_blur_1c = ifu.SpectralBlur(res1c)
-spec_blur_2a = ifu.SpectralBlur(res2a)
-spec_blur_2b = ifu.SpectralBlur(res2b)
-spec_blur_2c = ifu.SpectralBlur(res2c)
-spec_blur_3a = ifu.SpectralBlur(res3a)
-spec_blur_3b = ifu.SpectralBlur(res3b)
-spec_blur_3c = ifu.SpectralBlur(res3c)
-spec_blur_4a = ifu.SpectralBlur(res4a)
-spec_blur_4b = ifu.SpectralBlur(res4b)
-spec_blur_4c = ifu.SpectralBlur(res4c)
+spec_blur_1a = instru.SpectralBlur(res1a)
+spec_blur_1b = instru.SpectralBlur(res1b)
+spec_blur_1c = instru.SpectralBlur(res1c)
+spec_blur_2a = instru.SpectralBlur(res2a)
+spec_blur_2b = instru.SpectralBlur(res2b)
+spec_blur_2c = instru.SpectralBlur(res2c)
+spec_blur_3a = instru.SpectralBlur(res3a)
+spec_blur_3b = instru.SpectralBlur(res3b)
+spec_blur_3c = instru.SpectralBlur(res3c)
+spec_blur_4a = instru.SpectralBlur(res4a)
+spec_blur_4b = instru.SpectralBlur(res4b)
+spec_blur_4c = instru.SpectralBlur(res4c)
 
 #%% MRS channel
 logger.debug("Instr. CH3 seems wrong.")
 
-ch1a = ifu.Instr(
-    ifu.FOV(3.2, 3.7, origin=ifu.Coord(-503.654, -318.742), angle=8.4),
+ch1a = instru.IFU(
+    instru.FOV(3.2, 3.7, origin=instru.Coord(-503.654, -318.742), angle=8.4),
     0.196,
     21,
     spec_blur_1a,
@@ -98,8 +98,8 @@ ch1a = ifu.Instr(
     wavel_1a,
     "1A",
 )
-ch1b = ifu.Instr(
-    ifu.FOV(3.2, 3.7, origin=ifu.Coord(-503.654, -318.742), angle=8.4),
+ch1b = instru.IFU(
+    instru.FOV(3.2, 3.7, origin=instru.Coord(-503.654, -318.742), angle=8.4),
     0.196,
     21,
     spec_blur_1b,
@@ -107,8 +107,8 @@ ch1b = ifu.Instr(
     wavel_1b,
     "1B",
 )
-ch1c = ifu.Instr(
-    ifu.FOV(3.2, 3.7, origin=ifu.Coord(-503.654, -318.742), angle=8.4),
+ch1c = instru.IFU(
+    instru.FOV(3.2, 3.7, origin=instru.Coord(-503.654, -318.742), angle=8.4),
     0.196,
     21,
     spec_blur_1c,
@@ -116,8 +116,8 @@ ch1c = ifu.Instr(
     wavel_1c,
     "1C",
 )
-ch2a = ifu.Instr(
-    ifu.FOV(4.0, 4.8, origin=ifu.Coord(-503.636, -319.091), angle=8.1),
+ch2a = instru.IFU(
+    instru.FOV(4.0, 4.8, origin=instru.Coord(-503.636, -319.091), angle=8.1),
     0.196,
     17,
     spec_blur_2a,
@@ -125,8 +125,8 @@ ch2a = ifu.Instr(
     wavel_2a,
     "2A",
 )
-ch2b = ifu.Instr(
-    ifu.FOV(4.0, 4.8, origin=ifu.Coord(-503.636, -319.091), angle=8.1),
+ch2b = instru.IFU(
+    instru.FOV(4.0, 4.8, origin=instru.Coord(-503.636, -319.091), angle=8.1),
     0.196,
     17,
     spec_blur_2b,
@@ -134,8 +134,8 @@ ch2b = ifu.Instr(
     wavel_2b,
     "2B",
 )
-ch2c = ifu.Instr(
-    ifu.FOV(4.0, 4.8, origin=ifu.Coord(-503.636, -319.091), angle=8.1),
+ch2c = instru.IFU(
+    instru.FOV(4.0, 4.8, origin=instru.Coord(-503.636, -319.091), angle=8.1),
     0.196,
     17,
     spec_blur_2c,
@@ -143,8 +143,8 @@ ch2c = ifu.Instr(
     wavel_2c,
     "2C",
 )
-ch3a = ifu.Instr(
-    ifu.FOV(5.5, 6.2, origin=ifu.Coord(-504.372, -318.798), angle=7.7),
+ch3a = instru.IFU(
+    instru.FOV(5.5, 6.2, origin=instru.Coord(-504.372, -318.798), angle=7.7),
     0.245,
     16,
     spec_blur_3a,
@@ -152,8 +152,8 @@ ch3a = ifu.Instr(
     wavel_3a,
     "3A",
 )
-ch3b = ifu.Instr(
-    ifu.FOV(5.5, 6.2, origin=ifu.Coord(-504.372, -318.798), angle=7.7),
+ch3b = instru.IFU(
+    instru.FOV(5.5, 6.2, origin=instru.Coord(-504.372, -318.798), angle=7.7),
     0.245,
     16,
     spec_blur_3b,
@@ -161,8 +161,8 @@ ch3b = ifu.Instr(
     wavel_3b,
     "3B",
 )
-ch3c = ifu.Instr(
-    ifu.FOV(5.5, 6.2, origin=ifu.Coord(-504.372, -318.798), angle=7.7),
+ch3c = instru.IFU(
+    instru.FOV(5.5, 6.2, origin=instru.Coord(-504.372, -318.798), angle=7.7),
     0.245,
     16,
     spec_blur_3c,
@@ -170,8 +170,8 @@ ch3c = ifu.Instr(
     wavel_3c,
     "3C",
 )
-ch4a = ifu.Instr(
-    ifu.FOV(6.9, 7.9, origin=ifu.Coord(-503.129, -319.488), angle=8.3),
+ch4a = instru.IFU(
+    instru.FOV(6.9, 7.9, origin=instru.Coord(-503.129, -319.488), angle=8.3),
     0.273,
     12,
     spec_blur_4a,
@@ -179,8 +179,8 @@ ch4a = ifu.Instr(
     wavel_4a,
     "4A",
 )
-ch4b = ifu.Instr(
-    ifu.FOV(6.9, 7.9, origin=ifu.Coord(-503.129, -319.488), angle=8.3),
+ch4b = instru.IFU(
+    instru.FOV(6.9, 7.9, origin=instru.Coord(-503.129, -319.488), angle=8.3),
     0.273,
     12,
     spec_blur_4b,
@@ -188,8 +188,8 @@ ch4b = ifu.Instr(
     wavel_4b,
     "4B",
 )
-ch4c = ifu.Instr(
-    ifu.FOV(6.9, 7.9, origin=ifu.Coord(-503.129, -319.488), angle=8.3),
+ch4c = instru.IFU(
+    instru.FOV(6.9, 7.9, origin=instru.Coord(-503.129, -319.488), angle=8.3),
     0.273,
     12,
     spec_blur_4c,
@@ -217,10 +217,10 @@ all_chan = [
 with resources.path("surfh.data", "mrs_recommended_dither.dat") as path:
     dithering = np.loadtxt(path, delimiter=",")
 
-ch1_dither = ifu.CoordList.from_array(dithering[:8, :])
-ch2_dither = ifu.CoordList.from_array(dithering[8:16, :])
-ch3_dither = ifu.CoordList.from_array(dithering[16:24, :])
-ch4_dither = ifu.CoordList.from_array(dithering[24:, :])
+ch1_dither = instru.CoordList.from_array(dithering[:8, :])
+ch2_dither = instru.CoordList.from_array(dithering[8:16, :])
+ch3_dither = instru.CoordList.from_array(dithering[16:24, :])
+ch4_dither = instru.CoordList.from_array(dithering[24:, :])
 
 
 ### Local Variables:

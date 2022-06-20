@@ -24,3 +24,12 @@ To use `models.SpectroLMM`, the data must be in this format.
 - https://flothesof.github.io/optimizing-python-code-numpy-cython-pythran-numba.html
 - https://jochenschroeder.com/blog/articles/DSP_with_Python2/
 - mpi is also a possiblity for inter-node
+
+- Python multiprocessing, sharedarray
+- numba : vitesse C sans compilation (jit), faire l'interplation avec
+- Cython pour le parallelism
+- pythran : le plus performant
+- mpi4py : multi noeud (cluster)
+
+profile:
+-

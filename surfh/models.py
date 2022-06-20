@@ -26,7 +26,7 @@ from aljabr import LinOp
 from loguru import logger
 from numpy import ndarray as array
 
-from . import ifu
+from . import instru
 
 array = np.ndarray
 InputShape = namedtuple("InputShape", ["wavel", "alpha", "beta"])
@@ -67,7 +67,10 @@ def idft(inarray: array, shape: Tuple[int, int]) -> array:
 
 
 def fov_weight(
-    fov: ifu.LocalFOV, slices: Tuple[slice, slice], alpha_axis: array, beta_axis: array
+    fov: instru.LocalFOV,
+    slices: Tuple[slice, slice],
+    alpha_axis: array,
+    beta_axis: array,
 ) -> array:
     """The weight windows of the FOV given slices of axis
 
@@ -137,7 +140,7 @@ def wblur(arr: array, wpsf: array) -> array:
     out: array-like
       A wavelength blurred array in [λ', α, β].
     """
-    # [λ', α, β] = ∑_λ arr[λ, α, β] wpsf[λ', λ]
+    # [λ', α, β] = ∑_λ arr[λ, α, β] wpsf[λ', λ, β]
     # Σ_λ
     return np.sum(
         # in [1, λ, α, β]
@@ -200,8 +203,8 @@ class Channel(LinOp):
 
     Attributs
     ---------
-    instr: Instr
-      The Instr that contains physical information.
+    instr: IFU
+      The IFU that contains physical information.
     alpha_axis: array
       The alpha axis of the input.
     beta_axis: array
@@ -238,19 +241,19 @@ class Channel(LinOp):
 
     def __init__(
         self,
-        instr: ifu.Instr,
+        instr: instru.IFU,
         alpha_axis: array,
         beta_axis: array,
         wavel_axis: array,
         srf: int,
-        pointings: ifu.CoordList,
+        pointings: instru.CoordList,
     ):
         """Forward model of a Channel
 
         Attributs
         ---------
-        instr: Instr
-          The Instr that contains physical information.
+        instr: IFU
+          The IFU that contains physical information.
         alpha_axis: array
           The alpha axis of the input.
         beta_axis: array
@@ -334,7 +337,7 @@ class Channel(LinOp):
             ceil(self.instr.slit_beta_width / (self.beta_axis[1] - self.beta_axis[0]))
         )
 
-    def slit_local_fov(self, slit_idx) -> ifu.LocalFOV:
+    def slit_local_fov(self, slit_idx) -> instru.LocalFOV:
         """The FOV of slit `slit_idx` in local ref"""
         slit_fov = self.instr.slit_fov[slit_idx]
         return slit_fov.local + self.instr.slit_shift[slit_idx]
@@ -412,7 +415,7 @@ class Channel(LinOp):
         out[:, slices[0], slices[1]] = gridded * weights
         return out
 
-    def gridding(self, inarray: array, pointing: ifu.Coord) -> array:
+    def gridding(self, inarray: array, pointing: instru.Coord) -> array:
         """Returns interpolation of inarray in local referential"""
         # α and β inside the FOV shifted to pointing, in the global ref.
         alpha_coord, beta_coord = (self.instr.fov + pointing).local2global(
@@ -442,7 +445,7 @@ class Channel(LinOp):
             (wl_idx, self.alpha_axis, self.beta_axis), inarray, local_coords
         ).reshape(out_shape)
 
-    def gridding_t(self, inarray: array, pointing: ifu.Coord) -> array:
+    def gridding_t(self, inarray: array, pointing: instru.Coord) -> array:
         """Returns interpolation of inarray in global referential"""
         # α and β inside the FOV shifted to pointing, in the global ref.
         alpha_coord, beta_coord = (self.instr.fov + pointing).global2local(
@@ -503,7 +506,7 @@ class Channel(LinOp):
         """Returns spectral blurring transpose of inarray"""
         return wblur_t(inarray, self._wpsf(inarray.shape[2], self.beta_step))
 
-    def forward(self, inarray_f: array) -> array:
+    def forward(self, inarray_f: array, pointing) -> array:
         """inarray is supposed in global coordinate, spatially blurred and in Fourier space.
 
         Outoutp is an array of shape (pointing, slit, wavelength, alpha)."""
@@ -565,12 +568,12 @@ class Channel(LinOp):
 class Spectro(LinOp):
     def __init__(
         self,
-        instrs: List[ifu.Instr],
+        instrs: List[instru.IFU],
         alpha_axis: array,
         beta_axis: array,
         wavel_axis: array,
         sotf: array,
-        pointings: ifu.CoordList,
+        pointings: instru.CoordList,
     ):
         self.wavel_axis = wavel_axis
         self.alpha_axis = alpha_axis
@@ -579,7 +582,7 @@ class Spectro(LinOp):
         self.sotf = sotf
         self.pointings = pointings
 
-        srfs = ifu.get_srf(
+        srfs = instru.get_srf(
             [chan.det_pix_size for chan in instrs],
             self.step,
         )
@@ -655,7 +658,7 @@ class SpectroLMM(LinOp):
 
         self.tpls = templates
 
-        srfs = ifu.get_srf(
+        srfs = instru.get_srf(
             [chan.det_pix_size for chan in instrs],
             self.step,
         )
