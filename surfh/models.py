@@ -506,10 +506,10 @@ class Channel(LinOp):
         """Returns spectral blurring transpose of inarray"""
         return wblur_t(inarray, self._wpsf(inarray.shape[2], self.beta_step))
 
-    def forward(self, inarray_f: array, pointing) -> array:
+    def forward(self, inarray_f: array) -> array:
         """inarray is supposed in global coordinate, spatially blurred and in Fourier space.
 
-        Outoutp is an array of shape (pointing, slit, wavelength, alpha)."""
+        Output is an array of shape (pointing, slit, wavelength, alpha)."""
         # [pointing, slit, λ', α]
         out = np.empty(self.oshape)
         logger.info(f"{self.name} : IDFT2({inarray_f.shape})")
@@ -637,16 +637,75 @@ class Spectro(LinOp):
         logger.info(f"Spatial blurring^T : IDFT2({tmp.shape})")
         return idft(tmp * self.sotf.conj(), self.imshape)
 
+    def qdcoadd(self, measures: array) -> array:
+        out = np.zeros(self.ishape)
+        nhit = np.zeros(self.ishape)
+
+        def interp_l(measures, i_wl, o_wl):
+            slit_idx = np.arange(measures.shape[1])
+            i_coord = (i_wl, slit_idx)
+            o_coord = np.vstack(  # output coordinate
+                [
+                    np.tile(o_wl.reshape((-1, 1)), (1, len(slit_idx))).ravel(),
+                    np.tile(slit_idx.reshape((1, -1)), (len(o_wl), 1)).ravel(),
+                ]
+            ).T
+            return sp.interpolate.interpn(
+                i_coord,  # input axis
+                measures,
+                o_coord,
+                bounds_error=False,
+                fill_value=0,
+            ).reshape((len(o_wl), measures.shape[1]))
+
+        def chan_coadd(measures, chan):
+            out = np.zeros(self.ishape, dtype=np.float)
+            for p_idx, pointing in enumerate(self.pointings):
+                gridded = np.zeros(chan.local_shape)
+                for slit_idx in range(chan.instr.n_slit):
+                    sliced = np.zeros(chan.slit_shape(slit_idx))
+                    # λ interpolation, α repeat, and β duplication (tiling)
+                    sliced[:] = np.tile(
+                        np.repeat(
+                            interp_l(
+                                measures[p_idx, slit_idx]
+                                / chan.instr.pce[..., np.newaxis],
+                                chan.instr.wavel_axis,
+                                self.wavel_axis[chan.wslice],
+                            ),
+                            repeats=chan.srf,
+                            axis=1,
+                        )[..., np.newaxis][:, : sliced.shape[1], :],
+                        reps=(1, 1, sliced.shape[2]),
+                    )
+                    gridded += chan.slicing_t(sliced, slit_idx)
+                out[chan.wslice, ...] += chan.gridding_t(gridded, pointing)
+            return out
+
+        for idx, chan in enumerate(self.channels):
+            out += chan_coadd(
+                np.reshape(measures[self._idx[idx] : self._idx[idx + 1]], chan.oshape),
+                chan,
+            )
+            nhit += chan_coadd(
+                np.reshape(
+                    np.ones_like(measures[self._idx[idx] : self._idx[idx + 1]]),
+                    chan.oshape,
+                ),
+                chan,
+            )
+        return out / nhit, nhit
+
 
 class SpectroLMM(LinOp):
     def __init__(
         self,
-        instrs: List[ifu.Instr],
+        instrs: List[instru.IFU],
         alpha_axis: array,
         beta_axis: array,
         wavel_axis: array,
         sotf: array,
-        pointings: ifu.CoordList,
+        pointings: instru.CoordList,
         templates: array,
     ):
         self.wavel_axis = wavel_axis
