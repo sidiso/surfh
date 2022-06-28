@@ -1,5 +1,7 @@
 # surfh
 
+SUper Resolution and Fusion for Hyperspectral images
+
 Package for processing of MIRI MRS data.
 
 NOT USABLE at that time.
