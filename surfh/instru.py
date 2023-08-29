@@ -147,7 +147,7 @@ class Coord:
     def __array__(self, dtype=None):
         """return as a 2x1 numpy array"""
         if dtype is None:
-            dtype = np.float
+            dtype = np.float32
         return np.array([self.alpha, self.beta]).astype(dtype).reshape((2, 1))
 
 
