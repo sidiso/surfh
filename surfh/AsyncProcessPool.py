@@ -432,20 +432,25 @@ class AsyncProcessPool (object):
         # figure out the handler, and how to pass it to the queue
         # If this is a function, then describe it by function id, None
         if inspect.isfunction(handler):
+            print("ISFUNCTION")
             handler_id, method = id(handler), None
             handler_desc  = "%s()" % handler.__name__
         # If this is a bound method, describe it by instance id, method_name
         elif inspect.ismethod(handler):
-            instance = getattr(handler, "im_self", handler.__self__)
+            print("IS HANDLER")
+            instance = handler.__self__
+            handler_id, method = id(instance), handler.__func__
+            """ instance = getattr(handler, "im_self", handler.__self__)
             if instance is None:
                 raise RuntimeError("Job '%s': handler %s is not a bound method. This is a bug." % (job_id, handler))
-            handler_id, method = id(instance), handler.__name__
+            handler_id, method = id(instance), handler.__func__
             handler_desc = "%s.%s()" % (getattr(handler, "im_class", handler.__class__).__name__, method)
+            print("HANDLER DESC is ", handler_desc) """
         else:
             raise TypeError("'handler' argument must be a function or a bound method")
 
         # create the job item
-        jobitem = dict(job_id=job_id, handler=(handler_id, method, handler_desc),
+        jobitem = dict(job_id=job_id, handler=(instance, handler_id, method),#handler=(handler_id, method, handler_desc),
                        counter=counter and id(counter),
                        collect_result=collect_result,
                        args=args, kwargs=kwargs)
@@ -454,8 +459,6 @@ class AsyncProcessPool (object):
             job = self._results_map[job_id] = Job(job_id, jobitem, singleton=singleton)
         ## normal paralell mode, stick job on queue
         if self.ncpu > 1 and not serial:
-            print("PARALLEL")
-            print("JobITEM is", jobitem)
             if self.verbose > 2:
                 print("enqueueing job %s: %s"%(job_id, handler_desc))
             # place it on appropriate queue
@@ -669,10 +672,11 @@ class AsyncProcessPool (object):
         try:
             job_id, counter_id, args, kwargs = [jobitem.get(attr) for attr in
                                                          ["job_id", "counter", "args", "kwargs"]]
-            handler_id, method, handler_desc = jobitem["handler"]
-            handler = self._job_handlers.get(handler_id)
-            if handler is None:
-                raise RuntimeError("Job %s: unknown handler %s. This is a bug." % (job_id, handler_desc))
+            #handler_id, method, handler_desc = jobitem["handler"]
+            instance, handler_id, method = jobitem["handler"]
+            #handler = self._job_handlers.get(handler_id)
+            #if handler is None:
+            #    raise RuntimeError("Job %s: unknown handler %s. This is a bug." % (job_id, handler_desc))
             # find counter object, if specified
             # instantiate SharedDict arguments
             args = [ arg for arg in args ]
@@ -684,10 +688,11 @@ class AsyncProcessPool (object):
                 # call object directly
                 result = handler(*args, **kwargs)
             else:
-                call = getattr(handler, method, None)
-                if not callable(call):
-                    raise KeyError("Job %s: unknown method '%s' for handler %s" % (job_id, method, handler_desc))
-                result = call(*args, **kwargs)
+                #call = getattr(handler, method, None)
+                #if not callable(call):
+                #    raise KeyError("Job %s: unknown method '%s' for handler %s" % (job_id, method, handler_desc))
+                #result = call(*args, **kwargs)
+                result = method(instance, *args, **kwargs)
             if self.verbose > 3:
                 print("job %s: %s returns %s" % (job_id, handler_desc, result))
             # Send result back
@@ -745,12 +750,12 @@ def _init_default():
     global APP
     if APP is None:
         APP = AsyncProcessPool()
-        APP.init(psutil.cpu_count(), affinity=0, num_io_processes=1, verbose=0)
+        APP.init(16, affinity=0, num_io_processes=1, verbose=0)
 
 _init_default()
 
 def init(ncpu=None, affinity=None, parent_affinity=0, num_io_processes=1, verbose=0, pause_on_start=False):
     global APP
-    APP.init(ncpu, affinity, parent_affinity, num_io_processes, verbose, pause_on_start=pause_on_start)
+    APP.init(16, affinity, parent_affinity, num_io_processes, verbose, pause_on_start=pause_on_start)
 
 

@@ -187,7 +187,7 @@ def _init_default():
     if CFAPP is None:
         print("CFAPP Initialized with %d cpu"%(psutil.cpu_count()))
         #CFAPP = AsyncProcessPool(psutil.cpu_count())
-        CFAPP = AsyncProcessPool(1)
+        CFAPP = AsyncProcessPool(16)
 
 _init_default()
 
