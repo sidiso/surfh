@@ -113,11 +113,15 @@ spectro = models.Spectro(
 
 
 out = np.zeros(spectro.oshape)
-print("SPECTRO oshape is ", spectro.oshape)
-blurred_f = dft(cube) * spectro.sotf
+print("Spectro oshape is ", spectro.oshape)
+blurred_f = dft(cube)* spectro.sotf
 
-start2 = time.time()
-for idx, chan in enumerate(spectro.channels):
+_idx = np.cumsum([0] + [np.prod(chan.oshape) for chan in spectro.channels])
+oshape = (_idx[-1],)
+data = np.zeros(oshape)
+
+# fORWARD
+""" for idx, chan in enumerate(spectro.channels):
     #out[self._idx[idx] : self._idx[idx + 1]] = chan.forward(blurred_f).ravel()
 
     blurred = chan.sblur(blurred_f[chan.wslice, ...])
@@ -157,7 +161,7 @@ for idx, chan in enumerate(spectro.channels):
         start3 = time.time()
         nWave = local_coords[-1,0] + 1
         custom_local_coord =(local_coords[0:int(local_coords.shape[0]//nWave),:])[:,1:3]
-        custom_result = scipy_optimize_python_interpolate.interpn( (chan.alpha_axis, chan.beta_axis), blurred, custom_local_coord, local_coords.shape).reshape(out_shape)
+        custom_result = scipy_optimize_python_interpolate.interpn( (chan.alpha_axis, chan.beta_axis), blurred, custom_local_coord, local_coords.shape, nWave).reshape(out_shape)
         end3 = time.time()
 
 
@@ -165,3 +169,102 @@ print("Scipy time is", end1-start1)
 print("Scipy python time is", end2-start2)
 print("Custom Scipy python time is", end3-start3)
 print("is Scipy and Python Scipy the same ? ", np.allclose(scipy_result, python_result))
+print("is Scipy and Custom python the same ? ", np.allclose(scipy_result, custom_result))
+ """
+
+data = spectro.forward(cube)
+
+print("#################################\n\n")
+print("#################################")
+# Adjoint
+tmp = np.zeros(
+    spectro.ishape[:2] + (spectro.ishape[2] // 2 + 1,), dtype=np.complex128
+)
+for idx, chan in enumerate(spectro.channels):
+    out = np.zeros(chan.ishape, dtype=np.complex128)
+    scipy_blurred = np.zeros(chan.cshape)
+    python_blurred = np.zeros(chan.cshape)
+    custom_blurred = np.zeros(chan.cshape)
+    for p_idx, pointing in enumerate(chan.pointings):
+        gridded = np.zeros(chan.local_shape)
+        for slit_idx in range(chan.instr.n_slit):
+            sliced = np.zeros(chan.slit_shape(slit_idx))
+
+            sliced[:, : chan.oshape[3] * chan.srf : chan.srf] = chan.wblur_t(
+                np.repeat(
+                    np.expand_dims(
+                        np.reshape(data[spectro._idx[idx] : spectro._idx[idx + 1]], chan.oshape) [p_idx, slit_idx] * chan.instr.pce[..., np.newaxis],
+                        axis=2,
+                    ),
+                    sliced.shape[2],
+                    axis=2,
+                )
+            )
+            gridded += chan.slicing_t(sliced, slit_idx)
+
+        alpha_coord, beta_coord = (chan.instr.fov + pointing).global2local(
+            chan.alpha_axis, chan.beta_axis
+        )
+
+        # Necessary for interpn to process 3D array. No interpolation is done
+        # along that axis.
+        wl_idx = np.arange(gridded.shape[0])
+
+        out_shape = (len(wl_idx), len(chan.alpha_axis), len(chan.beta_axis))
+
+        global_coords = np.vstack(
+            [
+                np.tile(
+                    wl_idx.reshape((-1, 1, 1)), (1, out_shape[1], out_shape[2])
+                ).ravel(),
+                np.repeat(alpha_coord[np.newaxis], out_shape[0], axis=0).ravel(),
+                np.repeat(beta_coord[np.newaxis], out_shape[0], axis=0).ravel(),
+            ]
+        ).T
+
+        # This output can be processed in local ref.
+        startT1 = time.time()
+        scipy_blurred += sp.interpolate.interpn(
+            (wl_idx, chan.local_alpha_axis, chan.local_beta_axis),
+            gridded,
+            global_coords,
+            bounds_error=False,
+            fill_value=0,
+        ).reshape(out_shape)
+        endT1 = time.time()
+
+        startT2 = time.time()
+        python_blurred += scipy_python_interpolate.interpn((wl_idx, chan.local_alpha_axis, chan.local_beta_axis),
+            gridded,
+            global_coords,
+            bounds_error=False,
+            fill_value=0,
+        ).reshape(out_shape)
+        endT2 = time.time()
+
+        startT3 = time.time()
+        nWave = global_coords[-1,0] + 1
+        custom_global_coord =(global_coords[0:int(global_coords.shape[0]//nWave),:])[:,1:3]
+
+        custom_blurred += scipy_optimize_python_interpolate.interpn( (chan.local_alpha_axis, chan.local_beta_axis), 
+                                                                    gridded, 
+                                                                    custom_global_coord, 
+                                                                    global_coords.shape, 
+                                                                    nWave, 
+                                                                    bounds_error=False, 
+                                                                    fill_value=0,).reshape(out_shape)
+        endT3 = time.time()
+
+
+print("Scipy Transpose Interpolation time is ", endT1 - startT1)
+print("Python Transpose Interpolation time is ", endT2 - startT2)
+print("Custom Transpose Interpolation time is ", endT3 - startT3)
+
+print("is Scipy.T and Python Scipy.T the same ? ", np.allclose(scipy_blurred, python_blurred))
+print("is Scipy.T and Custom python.T the same ? ", np.allclose(scipy_blurred, custom_blurred))
+
+
+
+
+
+

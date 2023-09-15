@@ -75,7 +75,7 @@ def find_interval_ascending(x,
         if xval < x[low+1]:
             high = low
 
-        # En gros c'est un "Guess the number", en prenant la moitié de l'intervale entre high et low à chaque iteration
+        # En gros c'est un "cherche le nombre", en prenant la moitié de l'intervale entre high et low à chaque iteration
         while low < high:
             mid = (high + low)//2
             if xval < x[mid]:
@@ -98,7 +98,6 @@ def find_indices(grid, xi):
     # Axes to iterate over
     I = xi.shape[0] # = 2 because we took the Transpose of xi
     J = xi.shape[1] # = 66203 because we took the Transpose of xi
-    print("There is J = ", J)
     index = 0
     # Indices of relevant edges between which xi are situated
     indices = np.empty_like(xi, dtype=int)
@@ -111,23 +110,34 @@ def find_indices(grid, xi):
         grid_i = grid[i] # = array of 512 element
         grid_i_size = grid_i.shape[0] # = 512, the size of the input grid
 
-        for j in range(J):
-            value = xi[i, j] # Select one one of the 2D coordinate of xi
+        if grid_i_size == 1:
+            # special case length-one dimensions
+            for j in range(J):
+                # Should equal 0. Setting it to -1 is a hack: evaluate_linear 
+                # looks at indices [i, i+1] which both end up =0 with wraparound. 
+                # Conclusion: change -1 to 0 here together with refactoring
+                # evaluate_linear, which will also need to special-case
+                # length-one axes
+                indices[i, j] = -1
+                # norm_distances[i, j] is already zero
+        else:
+            for j in range(J):
+                value = xi[i, j] # Select one one of the 2D coordinate of xi
 
-            # Return the low idx of the input grid corresponding to the current output Alpha or Beta coordinate
-            index = find_interval_ascending(grid_i,
-                                            grid_i_size,
-                                            value,
-                                            prev_interval=index,
-                                            extrapolate=1)
-            indices[i, j] = index
+                # Return the low idx of the input grid corresponding to the current output Alpha or Beta coordinate
+                index = find_interval_ascending(grid_i,
+                                                grid_i_size,
+                                                value,
+                                                prev_interval=index,
+                                                extrapolate=1)
+                indices[i, j] = index
 
 
-            # Return the equivalent of "step", the Alpha or Beta distance between 2 input pixels grid
-            denom = grid_i[index + 1] - grid_i[index]
+                # Return the equivalent of "step", the Alpha or Beta distance between 2 input pixels grid
+                denom = grid_i[index + 1] - grid_i[index]
 
-            # Compute the distance
-            norm_distances[i, j] = (value - grid_i[index]) / denom
+                # Compute the distance
+                norm_distances[i, j] = (value - grid_i[index]) / denom
 
 
     return np.asarray(indices), np.asarray(norm_distances)
@@ -141,7 +151,6 @@ def _ndim_coords_from_arrays(points, ndim=None):
     """
     # j, n
 
-    print("Before check, points is ", type(points), len(points), points.shape)
     if isinstance(points, tuple) and len(points) == 1:
         # handle argument tuple
         points = points[0]
@@ -161,7 +170,6 @@ def _ndim_coords_from_arrays(points, ndim=None):
                 points = points.reshape(-1, 1)
             else:
                 points = points.reshape(-1, ndim)
-    print("After check, points is ", type(points), len(points), points.shape)
     return points
 
 
@@ -406,8 +414,6 @@ class RegularGridInterpolator:
                                  "of a type compatible with values")
         return fill_value
 
-
-
     def __call__(self, xi, method=None):
         """
         Interpolation at coordinates.
@@ -448,8 +454,6 @@ class RegularGridInterpolator:
 
         xi, xi_shape, ndim, nans, out_of_bounds = self._prepare_xi(xi)
 
-        print("python out_of_bounds is ", out_of_bounds, out_of_bounds.shape)
-
         if method == "linear":
             # Return | indices : Array of the same time of Xi, where each element is the idx of the input 
             #                    grid corresponding to the element with the closest coordinates of the output grid.
@@ -467,14 +471,12 @@ class RegularGridInterpolator:
                 # out is a vector of the size of the number of element is the output grid
                 out = np.empty(indices.shape[1], dtype=self.values.dtype)
 
-                print("Going to do evaluate_linear_2d")
                 result = evaluate_linear_2d(self.values,
                                             indices,
                                             norm_distances,
                                             self.grid,
                                             out)
             else:
-                print("Going to do _evaluate_linear")
                 result = self._evaluate_linear(indices, norm_distances)
 
 
@@ -521,7 +523,6 @@ class RegularGridInterpolator:
         shift_norm_distances = [1 - yi for yi in norm_distances]
         shift_indices = [i + 1 for i in indices]
 
-
         # The formula for linear interpolation in 2d takes the form:
         # values = self.values[(i0, i1)] * (1 - y0) * (1 - y1) + \
         #          self.values[(i0, i1 + 1)] * (1 - y0) * y1 + \
@@ -530,7 +531,7 @@ class RegularGridInterpolator:
         # We pair i with 1 - yi (zipped1) and i + 1 with yi (zipped2)
         zipped1 = zip(indices, shift_norm_distances)
         zipped2 = zip(shift_indices, norm_distances)
-        
+
         # Take all products of zipped1 and zipped2 and iterate over them
         # to get the terms in the above formula. This corresponds to iterating
         # over the vertices of a hypercube.
@@ -660,18 +661,8 @@ def interpn(points, values, xi, method="linear", bounds_error=True,
                          "%d, but this RegularGridInterpolator has "
                          "dimension %d" % (xi.shape[-1], len(grid)))
 
-    print("####### python")
-    print("GrisShape is ", len(grid))
-    print("xi shape", xi.shape)
-    print(grid[0][0])
-    print("len(xi), xi[0]", len(xi[0]), xi[0])
-    print("bounds_error is ", bounds_error)
-
     if bounds_error:
         for i, p in enumerate(xi.T):
-            print(i,p)
-            print("Test1 :", np.all(grid[i][0] <= p))
-            print("Test2 :", np.all(p <= grid[i][-1]))
             # Check if the coordinates of xi (ch14) is embeded in the coordinates of grid (xa, xb) (ch4a)
             if not np.logical_and(np.all(grid[i][0] <= p),
                                   np.all(p <= grid[i][-1])):

@@ -311,7 +311,7 @@ class RegularGridInterpolator:
     _SPLINE_METHODS = list(_SPLINE_DEGREE_MAP.keys())
     _ALL_METHODS = ["linear", "nearest"] + _SPLINE_METHODS
 
-    def __init__(self, points, values, o_shape, method="linear", bounds_error=True,
+    def __init__(self, points, values, o_shape, nWave, method="linear", bounds_error=True,
                  fill_value=np.nan):
         if method not in self._ALL_METHODS:
             raise ValueError("Method '%s' is not defined" % method)
@@ -327,6 +327,7 @@ class RegularGridInterpolator:
         #Set value of "im" to float
         self.values = self._check_values(values)
         self.o_shape = o_shape
+        self.nWave = int(nWave)
 
         # Set fill value to np.nan
         self.fill_value = self._check_fill_value(self.values, fill_value)
@@ -398,6 +399,7 @@ class RegularGridInterpolator:
             raise ValueError("Method '%s' is not defined" % method)
 
         xi, xi_shape, ndim, nans, out_of_bounds = self._prepare_xi(xi)
+        out_of_bounds = np.tile(out_of_bounds, self.nWave)
 
 
         indices, norm_distances = find_indices(self.grid, xi.T)
@@ -467,17 +469,17 @@ class RegularGridInterpolator:
         # Avec cette version optimisé, il faut duppliquer norm_distances et indices pour toutes les wavelength
         # De plus, il faut ajouter une colonne qui contient la distance par rapport à la wavelength pour "norm_distance"
         # et l'indice de fréquence pour "indices" --> à noter que la structure de cette colonne doit être vérifier pour indice
-        new_norm_distances = np.tile(norm_distances, [1, 412])
-        c = np.zeros(412)
-        c = np.repeat(c, int(new_norm_distances.shape[1]//412))
-        c[int(new_norm_distances.shape[1]/412)*(412-1):] = 1
+        new_norm_distances = np.tile(norm_distances, [1, self.nWave])
+        c = np.zeros(self.nWave)
+        c = np.repeat(c, int(new_norm_distances.shape[1]//self.nWave))
+        c[int(new_norm_distances.shape[1]/self.nWave)*(self.nWave-1):] = 1
         c = c[np.newaxis,:]
         new_norm_distances = np.insert(new_norm_distances, 0, c, axis=0)
         
-        new_indices = np.tile(indices, [1,412])
-        c = np.arange(412)
-        c = np.repeat(c, int(new_indices.shape[1]//412))
-        c[int(new_norm_distances.shape[1]/412)*(412-2):] = c[int(new_norm_distances.shape[1]/412)*(412-2)]
+        new_indices = np.tile(indices, [1,self.nWave])
+        c = np.arange(self.nWave)
+        c = np.repeat(c, int(new_indices.shape[1]//self.nWave))
+        c[int(new_norm_distances.shape[1]/self.nWave)*(self.nWave-2):] = c[int(new_norm_distances.shape[1]/self.nWave)*(self.nWave-2)]
         c = c[np.newaxis,:]
         new_indices = np.insert(new_indices, 0, c, axis=0)
 
@@ -485,6 +487,8 @@ class RegularGridInterpolator:
         shift_norm_distances = [1 - yi for yi in new_norm_distances]
         shift_indices = [i + 1 for i in new_indices]
 
+
+        
 
         # slice for broadcasting over trailing dimensions in self.values
         vslice = (slice(None),) + (None,)*(self.values.ndim - len(new_indices))
@@ -528,13 +532,16 @@ class RegularGridInterpolator:
         # check for out of bounds xi
         out_of_bounds = np.zeros((xi.shape[1]), dtype=bool)
         # iterate through dimensions
+        print("CP DEBUG")
         for x, grid in zip(xi, self.grid):
+            print("0 : ",grid[0])
+            print("1 : ",grid[-1])
             out_of_bounds += x < grid[0]
             out_of_bounds += x > grid[-1]
         return out_of_bounds
 
 
-def interpn(points, values, xi, o_shape, method="linear", bounds_error=True,
+def interpn(points, values, xi, o_shape, nWave, method="linear", bounds_error=True,
             fill_value=np.nan):
     """
     Multidimensional interpolation on regular or rectilinear grids.
@@ -624,9 +631,19 @@ def interpn(points, values, xi, o_shape, method="linear", bounds_error=True,
                          "%d, but this RegularGridInterpolator has "
                          "dimension %d" % (xi.shape[-1], len(grid)))
 
+    print("####### Custom")
+    print("GrisShape is ", len(grid))
+    print("xi shape", xi.shape)
+    print(grid[0][0])
+    print("len(xi[0]), xi[0]", len(xi[0]), xi[0])
+    print("bounds_error is ", bounds_error)
+
     if bounds_error:
         for i, p in enumerate(xi.T):
             # Check if the coordinates of xi (ch14) is embeded in the coordinates of grid (xa, xb) (ch4a)
+            print(i,p)
+            print("Test1 :", np.all(grid[i][0] <= p))
+            print("Test2 :", np.all(p <= grid[i][-1]))
             if not np.logical_and(np.all(grid[i][0] <= p),
                                   np.all(p <= grid[i][-1])):
                 raise ValueError("One of the requested xi is out of bounds "
@@ -634,7 +651,7 @@ def interpn(points, values, xi, o_shape, method="linear", bounds_error=True,
 
     # perform interpolation
     if method in ["linear"]:
-        interp = RegularGridInterpolator(points, values, o_shape, method=method,
+        interp = RegularGridInterpolator(points, values, o_shape, nWave, method=method,
                                          bounds_error=bounds_error,
                                          fill_value=fill_value)
         # Call __call function of class RegularGridInterpolator

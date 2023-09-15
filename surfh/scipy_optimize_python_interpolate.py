@@ -98,7 +98,6 @@ def find_indices(grid, xi):
     # Axes to iterate over
     I = xi.shape[0] # = 2 because we took the Transpose of xi
     J = xi.shape[1] # = 66203 because we took the Transpose of xi
-    print("There is J = ", J)
     index = 0
     # Indices of relevant edges between which xi are situated
     indices = np.empty_like(xi, dtype=int)
@@ -131,38 +130,6 @@ def find_indices(grid, xi):
 
 
     return np.asarray(indices), np.asarray(norm_distances)
-
-
-# OLD Cython
-def _ndim_coords_from_arrays(points, ndim=None):
-    """
-    Convert a tuple of coordinate arrays to a (..., ndim)-shaped array.
-
-    """
-    # j, n
-
-    print("Before check, points is ", type(points), len(points), points.shape)
-    if isinstance(points, tuple) and len(points) == 1:
-        # handle argument tuple
-        points = points[0]
-    if isinstance(points, tuple):
-        p = np.broadcast_arrays(*points)
-        n = len(p)
-        for j in range(1, n):
-            if p[j].shape != p[0].shape:
-                raise ValueError("coordinate arrays do not have the same shape")
-        points = np.empty(p[0].shape + (len(points),), dtype=float)
-        for j, item in enumerate(p):
-            points[...,j] = item
-    else:
-        points = np.asanyarray(points)
-        if points.ndim == 1:
-            if ndim is None:
-                points = points.reshape(-1, 1)
-            else:
-                points = points.reshape(-1, ndim)
-    print("After check, points is ", type(points), len(points), points.shape)
-    return points
 
 
 
@@ -258,18 +225,6 @@ def _check_points(points):
     return tuple(grid), tuple(descending_dimensions)
 
 
-def _check_dimensionality(points, values):
-    if len(points) > values.ndim:
-        raise ValueError("There are %d point arrays, but values has %d "
-                         "dimensions" % (len(points), values.ndim))
-    for i, p in enumerate(points):
-        if not np.asarray(p).ndim == 1:
-            raise ValueError("The points in dimension %d must be "
-                             "1-dimensional" % i)
-        if not values.shape[i] == len(p):
-            raise ValueError("There are %d points and %d values in "
-                             "dimension %d" % (len(p), values.shape[i], i))
-
 class RegularGridInterpolator:
     """
     Interpolation on a regular or rectilinear grid in arbitrary dimensions.
@@ -355,7 +310,7 @@ class RegularGridInterpolator:
     _SPLINE_METHODS = list(_SPLINE_DEGREE_MAP.keys())
     _ALL_METHODS = ["linear", "nearest"] + _SPLINE_METHODS
 
-    def __init__(self, points, values, method="linear", bounds_error=True,
+    def __init__(self, points, values, o_shape, nWave, method="linear", bounds_error=True,
                  fill_value=np.nan):
         if method not in self._ALL_METHODS:
             raise ValueError("Method '%s' is not defined" % method)
@@ -370,17 +325,14 @@ class RegularGridInterpolator:
 
         #Set value of "im" to float
         self.values = self._check_values(values)
-
-        #Check if "im" and xa,xb have same coordinate dimension
-        self._check_dimensionality(self.grid, self.values)
+        self.o_shape = o_shape
+        self.nWave = int(nWave)
 
         # Set fill value to np.nan
         self.fill_value = self._check_fill_value(self.values, fill_value)
         if self._descending_dimensions:
             self.values = np.flip(values, axis=self._descending_dimensions)
 
-    def _check_dimensionality(self, grid, values):
-        _check_dimensionality(grid, values)
 
     def _check_points(self, points):
         return _check_points(points)
@@ -405,7 +357,6 @@ class RegularGridInterpolator:
                 raise ValueError("fill_value must be either 'None' or "
                                  "of a type compatible with values")
         return fill_value
-
 
 
     def __call__(self, xi, method=None):
@@ -447,35 +398,31 @@ class RegularGridInterpolator:
             raise ValueError("Method '%s' is not defined" % method)
 
         xi, xi_shape, ndim, nans, out_of_bounds = self._prepare_xi(xi)
+        out_of_bounds = np.tile(out_of_bounds, self.nWave)
 
-        print("python out_of_bounds is ", out_of_bounds, out_of_bounds.shape)
 
-        if method == "linear":
-            # Return | indices : Array of the same time of Xi, where each element is the idx of the input 
-            #                    grid corresponding to the element with the closest coordinates of the output grid.
-            #        | norm_distances : Same as indices but the element in the array is the distance
-            indices, norm_distances = find_indices(self.grid, xi.T)
+        indices, norm_distances = find_indices(self.grid, xi.T)
 
-            if (ndim == 2 and hasattr(self.values, 'dtype') and
-                    self.values.ndim == 2 and self.values.flags.writeable and
-                    self.values.dtype in (np.float64, np.complex128) and
-                    self.values.dtype.byteorder == '='):
-                # until cython supports const fused types, the fast path
-                # cannot support non-writeable values
-                # a fast path
+        # Case where Input image is 3D
+        if (ndim == 2 and hasattr(self.values, 'dtype') and
+                self.values.ndim == 2 and self.values.flags.writeable and
+                self.values.dtype in (np.float64, np.complex128) and
+                self.values.dtype.byteorder == '='):
+            # until cython supports const fused types, the fast path
+            # cannot support non-writeable values
+            # a fast path
 
-                # out is a vector of the size of the number of element is the output grid
-                out = np.empty(indices.shape[1], dtype=self.values.dtype)
+            # out is a vector of the size of the number of element is the output grid
+            out = np.empty(indices.shape[1], dtype=self.values.dtype)
 
-                print("Going to do evaluate_linear_2d")
-                result = evaluate_linear_2d(self.values,
-                                            indices,
-                                            norm_distances,
-                                            self.grid,
-                                            out)
-            else:
-                print("Going to do _evaluate_linear")
-                result = self._evaluate_linear(indices, norm_distances)
+            result = evaluate_linear_2d(self.values,
+                                        indices,
+                                        norm_distances,
+                                        self.grid,
+                                        out)
+        # Case where input image is 3D (2D + lambda)
+        else:
+            result = self._evaluate_linear(indices, norm_distances)
 
 
         if not self.bounds_error and self.fill_value is not None:
@@ -484,11 +431,10 @@ class RegularGridInterpolator:
         # f(nan) = nan, if any
         if np.any(nans):
             result[nans] = np.nan
-        return result.reshape(xi_shape[:-1] + self.values.shape[ndim:])
+        return result.reshape(self.o_shape[:-1] + self.values.shape[ndim+1:])
 
     def _prepare_xi(self, xi):
         ndim = len(self.grid)
-        xi = _ndim_coords_from_arrays(xi, ndim=ndim)
         if xi.shape[-1] != len(self.grid):
             raise ValueError("The requested sample points xi have dimension "
                              f"{xi.shape[-1]} but this "
@@ -513,13 +459,38 @@ class RegularGridInterpolator:
 
         return xi, xi_shape, ndim, nans, out_of_bounds
 
+    
     def _evaluate_linear(self, indices, norm_distances):
-        # slice for broadcasting over trailing dimensions in self.values
-        vslice = (slice(None),) + (None,)*(self.values.ndim - len(indices))
+
 
         # Compute shifting up front before zipping everything together
-        shift_norm_distances = [1 - yi for yi in norm_distances]
-        shift_indices = [i + 1 for i in indices]
+
+        # Avec cette version optimisé, il faut duppliquer norm_distances et indices pour toutes les wavelength
+        # De plus, il faut ajouter une colonne qui contient la distance par rapport à la wavelength pour "norm_distance"
+        # et l'indice de fréquence pour "indices" --> à noter que la structure de cette colonne doit être vérifier pour indice
+        new_norm_distances = np.tile(norm_distances, [1, self.nWave])
+        c = np.zeros(self.nWave)
+        c = np.repeat(c, int(new_norm_distances.shape[1]//self.nWave))
+        c[int(new_norm_distances.shape[1]/self.nWave)*(self.nWave-1):] = 1
+        c = c[np.newaxis,:]
+        new_norm_distances = np.insert(new_norm_distances, 0, c, axis=0)
+        
+        new_indices = np.tile(indices, [1,self.nWave])
+        c = np.arange(self.nWave)
+        c = np.repeat(c, int(new_indices.shape[1]//self.nWave))
+        c[int(new_norm_distances.shape[1]/self.nWave)*(self.nWave-2):] = c[int(new_norm_distances.shape[1]/self.nWave)*(self.nWave-2)]
+        c = c[np.newaxis,:]
+        new_indices = np.insert(new_indices, 0, c, axis=0)
+
+
+        shift_norm_distances = [1 - yi for yi in new_norm_distances]
+        shift_indices = [i + 1 for i in new_indices]
+
+
+        
+
+        # slice for broadcasting over trailing dimensions in self.values
+        vslice = (slice(None),) + (None,)*(self.values.ndim - len(new_indices))
 
 
         # The formula for linear interpolation in 2d takes the form:
@@ -528,9 +499,9 @@ class RegularGridInterpolator:
         #          self.values[(i0 + 1, i1)] * y0 * (1 - y1) + \
         #          self.values[(i0 + 1, i1 + 1)] * y0 * y1
         # We pair i with 1 - yi (zipped1) and i + 1 with yi (zipped2)
-        zipped1 = zip(indices, shift_norm_distances)
-        zipped2 = zip(shift_indices, norm_distances)
-        
+        zipped1 = zip(new_indices, shift_norm_distances)
+        zipped2 = zip(shift_indices, new_norm_distances)
+
         # Take all products of zipped1 and zipped2 and iterate over them
         # to get the terms in the above formula. This corresponds to iterating
         # over the vertices of a hypercube.
@@ -566,7 +537,7 @@ class RegularGridInterpolator:
         return out_of_bounds
 
 
-def interpn(points, values, xi, method="linear", bounds_error=True,
+def interpn(points, values, xi, o_shape, nWave, method="linear", bounds_error=True,
             fill_value=np.nan):
     """
     Multidimensional interpolation on regular or rectilinear grids.
@@ -650,28 +621,15 @@ def interpn(points, values, xi, method="linear", bounds_error=True,
     # Check the points
     # Grid is the new name of points and (xa, xb)
     grid, descending_dimensions = _check_points(points)
-    _check_dimensionality(grid, values)
 
-    # sanity check requested xi
-    # return xi as a np.array
-    xi = _ndim_coords_from_arrays(xi, ndim=len(grid))
     if xi.shape[-1] != len(grid):
         raise ValueError("The requested sample points xi have dimension "
                          "%d, but this RegularGridInterpolator has "
                          "dimension %d" % (xi.shape[-1], len(grid)))
 
-    print("####### python")
-    print("GrisShape is ", len(grid))
-    print("xi shape", xi.shape)
-    print(grid[0][0])
-    print("len(xi), xi[0]", len(xi[0]), xi[0])
-    print("bounds_error is ", bounds_error)
 
     if bounds_error:
         for i, p in enumerate(xi.T):
-            print(i,p)
-            print("Test1 :", np.all(grid[i][0] <= p))
-            print("Test2 :", np.all(p <= grid[i][-1]))
             # Check if the coordinates of xi (ch14) is embeded in the coordinates of grid (xa, xb) (ch4a)
             if not np.logical_and(np.all(grid[i][0] <= p),
                                   np.all(p <= grid[i][-1])):
@@ -680,7 +638,7 @@ def interpn(points, values, xi, method="linear", bounds_error=True,
 
     # perform interpolation
     if method in ["linear"]:
-        interp = RegularGridInterpolator(points, values, method=method,
+        interp = RegularGridInterpolator(points, values, o_shape, nWave, method=method,
                                          bounds_error=bounds_error,
                                          fill_value=fill_value)
         # Call __call function of class RegularGridInterpolator
