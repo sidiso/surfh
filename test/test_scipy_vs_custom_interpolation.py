@@ -19,6 +19,7 @@ from surfh import utils
 
 import scipy_python_interpolate 
 import scipy_optimize_python_interpolate
+import scipy_optimize_cython_interpolate
 
 
 def orion():
@@ -121,7 +122,7 @@ oshape = (_idx[-1],)
 data = np.zeros(oshape)
 
 # fORWARD
-""" for idx, chan in enumerate(spectro.channels):
+for idx, chan in enumerate(spectro.channels):
     #out[self._idx[idx] : self._idx[idx + 1]] = chan.forward(blurred_f).ravel()
 
     blurred = chan.sblur(blurred_f[chan.wslice, ...])
@@ -156,23 +157,28 @@ data = np.zeros(oshape)
         scipy_result= sp.interpolate.interpn( (wl_idx, chan.alpha_axis, chan.beta_axis), blurred, local_coords).reshape(out_shape)
         end1 = time.time()
         start2 = time.time()
-        python_result = scipy_python_interpolate.interpn( (wl_idx, chan.alpha_axis, chan.beta_axis), blurred, local_coords).reshape(out_shape)
+        #python_result = scipy_python_interpolate.interpn( (wl_idx, chan.alpha_axis, chan.beta_axis), blurred, local_coords).reshape(out_shape)
         end2 = time.time()
         start3 = time.time()
         nWave = local_coords[-1,0] + 1
         custom_local_coord =(local_coords[0:int(local_coords.shape[0]//nWave),:])[:,1:3]
         custom_result = scipy_optimize_python_interpolate.interpn( (chan.alpha_axis, chan.beta_axis), blurred, custom_local_coord, local_coords.shape, nWave).reshape(out_shape)
         end3 = time.time()
+        start4 = time.time()
+        cython_result = scipy_optimize_cython_interpolate.interpn( (chan.alpha_axis, chan.beta_axis), blurred, custom_local_coord, local_coords.shape, nWave).reshape(out_shape)
+        end4 = time.time()
 
 
 print("Scipy time is", end1-start1)
 print("Scipy python time is", end2-start2)
 print("Custom Scipy python time is", end3-start3)
-print("is Scipy and Python Scipy the same ? ", np.allclose(scipy_result, python_result))
+print("Custom Cython time is", end4-start4)
+#print("is Scipy and Python Scipy the same ? ", np.allclose(scipy_result, python_result))
 print("is Scipy and Custom python the same ? ", np.allclose(scipy_result, custom_result))
- """
+print("is Scipy and Cython python the same ? ", np.allclose(scipy_result, cython_result))
 
-data = spectro.forward(cube)
+
+""" data = spectro.forward(cube)
 
 print("#################################\n\n")
 print("#################################")
@@ -261,7 +267,7 @@ print("Python Transpose Interpolation time is ", endT2 - startT2)
 print("Custom Transpose Interpolation time is ", endT3 - startT3)
 
 print("is Scipy.T and Python Scipy.T the same ? ", np.allclose(scipy_blurred, python_blurred))
-print("is Scipy.T and Custom python.T the same ? ", np.allclose(scipy_blurred, custom_blurred))
+print("is Scipy.T and Custom python.T the same ? ", np.allclose(scipy_blurred, custom_blurred)) """
 
 
 

@@ -3,94 +3,11 @@ __all__ = ['RegularGridInterpolator', 'interpn']
 import itertools
 
 import numpy as np
+import time
+
+import cythons_files
 
 # OLD Cython
-def find_interval_ascending(x,
-                            nx,
-                            xval,
-                            prev_interval=0,
-                            extrapolate=1):
-    """
-    Find an interval such that x[interval] <= xval < x[interval+1]. Assuming
-    that x is sorted in the ascending order.
-    If xval < x[0], then interval = 0, if xval > x[-1] then interval = n - 2.
-
-    Parameters
-    ----------
-    x : array of double, shape (m,)
-        Piecewise polynomial breakpoints sorted in ascending order.
-    xval : double
-        Point to find.
-    prev_interval : int, optional
-        Interval where a previous point was found.
-    extrapolate : bint, optional
-        Whether to return the last of the first interval if the
-        point is out-of-bounds.
-
-    Returns
-    -------
-    interval : int
-        Suitable interval or -1 if nan.
-
-    """
-    # high, low, mid
-    interval = prev_interval
-
-    #First value of x
-    a = x[0]
-
-    #Last value of x
-    b = x[nx - 1]
-    if interval < 0 or interval >= nx:
-        interval = 0
-
-    # Check if the value to find is in the range of the input value
-    if not (a <= xval <= b):
-        # Out-of-bounds (or nan)
-        if xval < a and extrapolate:
-            # below
-            interval = 0
-        elif xval > b and extrapolate:
-            # above
-            interval = nx - 2
-        else:
-            # nan or no extrapolation
-            interval = -1
-    # Check if the value to find is at eh boundery
-    elif xval == b:
-        # Make the interval closed from the right
-        interval = nx - 2
-    else:
-        # Find the interval the coordinate is in
-        # (binary search with locality)
-
-        # Split the value to search in half (not equal )
-        if xval >= x[interval]:
-            low = interval
-            high = nx - 2
-        else:
-            low = 0
-            high = interval
-
-        if xval < x[low+1]:
-            high = low
-
-        # En gros c'est un "Guess the number", en prenant la moitié de l'intervale entre high et low à chaque iteration
-        while low < high:
-            mid = (high + low)//2
-            if xval < x[mid]:
-                # mid < high
-                high = mid
-            elif xval >= x[mid + 1]:
-                low = mid + 1
-            else:
-                # x[mid] <= xval < x[mid+1]
-                low = mid
-                break
-
-        interval = low
-
-    return interval
 
 # OLD Cython
 def find_indices(grid, xi):
@@ -114,7 +31,7 @@ def find_indices(grid, xi):
             value = xi[i, j] # Select one one of the 2D coordinate of xi
 
             # Return the low idx of the input grid corresponding to the current output Alpha or Beta coordinate
-            index = find_interval_ascending(grid_i,
+            index = cythons_files.find_interval_ascending(grid_i,
                                             grid_i_size,
                                             value,
                                             prev_interval=index,
@@ -401,7 +318,7 @@ class RegularGridInterpolator:
         out_of_bounds = np.tile(out_of_bounds, self.nWave)
 
 
-        indices, norm_distances = find_indices(self.grid, xi.T)
+        indices, norm_distances = cythons_files.find_indices(self.grid, xi.T)
 
         # Case where Input image is 3D
         if (ndim == 2 and hasattr(self.values, 'dtype') and
@@ -483,37 +400,59 @@ class RegularGridInterpolator:
         new_indices = np.insert(new_indices, 0, c, axis=0)
 
 
-        shift_norm_distances = [1 - yi for yi in new_norm_distances]
-        shift_indices = [i + 1 for i in new_indices]
+        #shift_norm_distances = [1 - yi for yi in new_norm_distances]
+        shift_norm_distances = 1 - new_norm_distances
+        #shift_indices = [i + 1 for i in new_indices]
+        shift_indices = 1 + new_indices
 
-
-        
-
-        # slice for broadcasting over trailing dimensions in self.values
-        vslice = (slice(None),) + (None,)*(self.values.ndim - len(new_indices))
-
-
+        print(shift_norm_distances.dtype, new_norm_distances.dtype, shift_indices.dtype, new_indices.dtype)
         # The formula for linear interpolation in 2d takes the form:
         # values = self.values[(i0, i1)] * (1 - y0) * (1 - y1) + \
         #          self.values[(i0, i1 + 1)] * (1 - y0) * y1 + \
         #          self.values[(i0 + 1, i1)] * y0 * (1 - y1) + \
         #          self.values[(i0 + 1, i1 + 1)] * y0 * y1
         # We pair i with 1 - yi (zipped1) and i + 1 with yi (zipped2)
-        zipped1 = zip(new_indices, shift_norm_distances)
+        """ zipped1 = zip(new_indices, shift_norm_distances)
         zipped2 = zip(shift_indices, new_norm_distances)
 
+        print("Shape indices are ", new_indices.shape, shift_indices.shape, new_norm_distances.shape)
         # Take all products of zipped1 and zipped2 and iterate over them
         # to get the terms in the above formula. This corresponds to iterating
         # over the vertices of a hypercube.
         hypercube = itertools.product(*zip(zipped1, zipped2))
         value = np.array([0.])
+        start = time.time()
         for h in hypercube:
             edge_indices, weights = zip(*h)
             weight = np.array([1.])
+            print("STOP")
             for w in weights:
+                print("Weight", len(w))
                 weight = weight * w
-            term = np.asarray(self.values[edge_indices]) * weight[vslice]
-            value = value + term   # cannot use += because broadcasting
+            a = self.values[edge_indices]
+            b = weight
+            #term =  a*b
+            term = cythons_files.element_wise_vector_multiplication(a, b, b.size
+            )
+            value = value + term   # cannot use += because broadcasting """
+        start = time.time()
+        all_norm_distances = np.ascontiguousarray(np.concatenate((shift_norm_distances.ravel(), new_norm_distances.ravel())))
+        all_indices = np.ascontiguousarray(np.concatenate((new_indices.ravel(), shift_indices.ravel())))
+        in_values_ravel = np.ascontiguousarray(self.values.ravel())
+        end = time.time()
+
+        size_i = new_indices.shape[0]
+        size_j = new_indices.shape[1]
+        image_size = self.values.shape[1]
+        
+        
+        
+
+        print("PREPROC time is ", end-start)
+        value = cythons_files.solve_hypercube(all_indices, all_norm_distances, in_values_ravel, size_i, size_j, image_size)
+
+        
+       
         return value
 
     def _validate_grid_dimensions(self, points, method):
@@ -600,6 +539,12 @@ def interpn(points, values, xi, o_shape, nWave, method="linear", bounds_error=Tr
     units and differ by many orders of magnitude, the interpolant may have
     numerical artifacts. Consider rescaling the data before interpolation.
     """
+
+    res = cythons_files.test(5,8)
+    print("####################")
+    print("Res = ", res)
+    print("#########################")
+
     # sanity check 'method' kwarg
     if method not in ["linear", "nearest", "cubic", "quintic", "pchip",
                       "splinef2d", "slinear"]:
@@ -626,6 +571,7 @@ def interpn(points, values, xi, o_shape, nWave, method="linear", bounds_error=Tr
         raise ValueError("The requested sample points xi have dimension "
                          "%d, but this RegularGridInterpolator has "
                          "dimension %d" % (xi.shape[-1], len(grid)))
+
 
     if bounds_error:
         for i, p in enumerate(xi.T):
