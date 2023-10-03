@@ -6,7 +6,7 @@ from libc.math cimport NAN
 import numpy as np
 cimport numpy as np
 cimport cython
-from libc.stdlib cimport malloc, free
+from libc.stdlib cimport malloc, free, calloc
 
 ctypedef double complex double_complex
 
@@ -188,7 +188,7 @@ def element_wise_vector_multiplication(a, b, size):
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.initializedcheck(False)
-cdef c_element_wise_vector_multiplication(double[:] c_a, double[:]c_b, int c_size, double *res):
+cdef double c_element_wise_vector_multiplication(double* c_a, double* c_b, int c_size, double *res):
 
     cdef:
         int i = 0
@@ -214,10 +214,15 @@ def solve_hypercube(const long[:] c_all_indices, const double[:]c_all_norm_dista
         double[::1]c_out_values = np.ascontiguousarray(np.zeros(shape_j))
         #double[::1]c_all_norm_distances = np.ascontiguousarray(all_norm_distances) # Vector
 
-        double[::1]c_weight = np.ascontiguousarray(np.zeros(size_j))
-        double[::1]c_vals = np.ascontiguousarray(np.zeros(size_j))
 
-        double[::1]term = np.ascontiguousarray(np.zeros(size_j))
+
+        #double *c_weight = <double *>c_valsmalloc(size_j * sizeof(double))
+        #double *c_vals = <double *>malloc(size_j * sizeof(double))
+        double[::1]c_weight = np.ascontiguousarray(np.zeros(shape_j))
+        double[::1]c_vals = np.ascontiguousarray(np.zeros(shape_j))
+
+        double[::1]term = np.ascontiguousarray(np.zeros(shape_j))
+        #double *term = <double *>malloc(size_j * sizeof(double))
 
 
         
@@ -242,8 +247,50 @@ def solve_hypercube(const long[:] c_all_indices, const double[:]c_all_norm_dista
                     c_all_indices[id2*3*size_j + 2*size_j + j]
             c_vals[j] = c_in_values[idx]
 
-        c_element_wise_vector_multiplication(c_vals, c_weight, size_j, &term[0])
+        c_element_wise_vector_multiplication(&c_vals[0], &c_weight[0], size_j, &term[0])
         for j in range(size_j):
             c_out_values[j] += term[j]
+
+    #free(term)
+    #free(c_vals)
+    #free(c_weight)
+
+    return np.asarray(c_out_values)
+
+
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+@cython.cdivision(True)
+@cython.initializedcheck(False)
+def solve_2D_hypercube(const long[:,:] c_indices, const double[:,:]c_norm_distances, 
+                       const double[:,:,:]c_in_values, int shape_j, int nWave):
+
+    cdef:
+        int num_points = shape_j
+        int j = 0
+        long i0, i1 = 0
+        double y0, y1 = 0.
+        double w1, w2, w3, w4 = 0.
+       
+        double[:,:]c_out_values = np.ascontiguousarray(np.zeros((nWave, num_points)))
+   
+    for j in range(num_points):
+        i0 = c_indices[0, j]
+        i1 = c_indices[1, j]
+
+        y0 = c_norm_distances[0,j]
+        y1 = c_norm_distances[1,j]
+
+        w1 = ((1. - y0) * (1. - y1))
+        w2 = ((1. - y0) * y1)
+        w3 = (y0 * (1. - y1))
+        w4 = (y0 * y1)
+
+        for l in range(nWave):
+            c_out_values[l,j] = c_in_values[l, i0, i1]*w1
+            c_out_values[l,j] = c_out_values[l,j] + c_in_values[l, i0, i1+1]*w2
+            c_out_values[l,j] = c_out_values[l,j] + c_in_values[l, i0+1, i1]*w3
+            c_out_values[l,j] = c_out_values[l,j] + c_in_values[l, i0+1, i1+1]*w4
 
     return np.asarray(c_out_values)

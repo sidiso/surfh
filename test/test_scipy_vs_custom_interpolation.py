@@ -20,6 +20,7 @@ from surfh import utils
 import scipy_python_interpolate 
 import scipy_optimize_python_interpolate
 import scipy_optimize_cython_interpolate
+import cython_2D_interpolation
 
 
 def orion():
@@ -152,30 +153,74 @@ for idx, chan in enumerate(spectro.channels):
             ]
         ).T
 
+        optimized_local_coords = np.vstack(
+            [
+                alpha_coord.ravel(),
+                beta_coord.ravel()
+            ]
+        ).T
+
         # This output can be processed in local ref.
+        print("################################# ")
+        print("##########        SCIPY ######### ")
+        print("################################# ")
         start1 = time.time()
         scipy_result= sp.interpolate.interpn( (wl_idx, chan.alpha_axis, chan.beta_axis), blurred, local_coords).reshape(out_shape)
         end1 = time.time()
+        print("\n\n\n")
+
+        print("################################# ")
+        print("########## Python SCIPY ######### ")
+        print("################################# ")
         start2 = time.time()
         #python_result = scipy_python_interpolate.interpn( (wl_idx, chan.alpha_axis, chan.beta_axis), blurred, local_coords).reshape(out_shape)
         end2 = time.time()
+        print("\n\n\n")
+
+        print("################################# ")
+        print("########## Python Cutstom ######### ")
+        print("################################# ")
         start3 = time.time()
         nWave = local_coords[-1,0] + 1
         custom_local_coord =(local_coords[0:int(local_coords.shape[0]//nWave),:])[:,1:3]
         custom_result = scipy_optimize_python_interpolate.interpn( (chan.alpha_axis, chan.beta_axis), blurred, custom_local_coord, local_coords.shape, nWave).reshape(out_shape)
         end3 = time.time()
+        print("\n\n\n")
+
+        print("################################# ")
+        print("########## Cython Cutstom ######### ")
+        print("################################# ")
         start4 = time.time()
         cython_result = scipy_optimize_cython_interpolate.interpn( (chan.alpha_axis, chan.beta_axis), blurred, custom_local_coord, local_coords.shape, nWave).reshape(out_shape)
         end4 = time.time()
+
+
+        print("################################# ")
+        print("########## 2D Cython Cutstom ######### ")
+        print("################################# ")
+        start5 = time.time()
+        cython_2D_result = cython_2D_interpolation.interpn( (chan.alpha_axis, chan.beta_axis), blurred, optimized_local_coords, local_coords.shape, nWave).reshape(out_shape)
+        end5 = time.time()
+
 
 
 print("Scipy time is", end1-start1)
 print("Scipy python time is", end2-start2)
 print("Custom Scipy python time is", end3-start3)
 print("Custom Cython time is", end4-start4)
+print("Custom 2D Cython time is", end5-start5)
 #print("is Scipy and Python Scipy the same ? ", np.allclose(scipy_result, python_result))
 print("is Scipy and Custom python the same ? ", np.allclose(scipy_result, custom_result))
 print("is Scipy and Cython python the same ? ", np.allclose(scipy_result, cython_result))
+print("is Scipy and 2D Cython python the same ? ", np.allclose(scipy_result, cython_2D_result))
+
+
+
+
+
+
+
+
 
 
 """ data = spectro.forward(cube)

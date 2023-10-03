@@ -320,26 +320,7 @@ class RegularGridInterpolator:
 
         indices, norm_distances = cythons_files.find_indices(self.grid, xi.T)
 
-        # Case where Input image is 3D
-        if (ndim == 2 and hasattr(self.values, 'dtype') and
-                self.values.ndim == 2 and self.values.flags.writeable and
-                self.values.dtype in (np.float64, np.complex128) and
-                self.values.dtype.byteorder == '='):
-            # until cython supports const fused types, the fast path
-            # cannot support non-writeable values
-            # a fast path
-
-            # out is a vector of the size of the number of element is the output grid
-            out = np.empty(indices.shape[1], dtype=self.values.dtype)
-
-            result = evaluate_linear_2d(self.values,
-                                        indices,
-                                        norm_distances,
-                                        self.grid,
-                                        out)
-        # Case where input image is 3D (2D + lambda)
-        else:
-            result = self._evaluate_linear(indices, norm_distances)
+        result = cythons_files.solve_2D_hypercube(indices, norm_distances, self.values, indices.shape[1], self.nWave)
 
 
         if not self.bounds_error and self.fill_value is not None:
@@ -348,7 +329,8 @@ class RegularGridInterpolator:
         # f(nan) = nan, if any
         if np.any(nans):
             result[nans] = np.nan
-        return result.reshape(self.o_shape[:-1] + self.values.shape[ndim+1:])
+        return result
+
 
     def _prepare_xi(self, xi):
         ndim = len(self.grid)
@@ -379,108 +361,49 @@ class RegularGridInterpolator:
 
     def _evaluate_linear_optim(self, indices, norm_distances):
 
-
-        # Compute shifting up front before zipping everything together
-
-        # Avec cette version optimisé, il faut duppliquer norm_distances et indices pour toutes les wavelength
-        # De plus, il faut ajouter une colonne qui contient la distance par rapport à la wavelength pour "norm_distance"
-        # et l'indice de fréquence pour "indices" --> à noter que la structure de cette colonne doit être vérifier pour indice
-        start = time.time()
-
-        end = time.time()
-        print("PREPREPREPRE PROC time is ", end-start)
-
-        #shift_norm_distances = [1 - yi for yi in new_norm_distances]
-        shift_norm_distances = 1 - norm_distances
-        #shift_indices = [i + 1 for i in new_indices]
-        shift_indices = 1 + indices
-
-        print(shift_norm_distances.dtype, norm_distances.dtype, shift_indices.dtype, indices.dtype)
+        num_points = indices.shape[1]
+        
+        out = np.empty((self.nWave, indices.shape[1]), dtype=self.values.dtype)
         # The formula for linear interpolation in 2d takes the form:
         # values = self.values[(i0, i1)] * (1 - y0) * (1 - y1) + \
         #          self.values[(i0, i1 + 1)] * (1 - y0) * y1 + \
         #          self.values[(i0 + 1, i1)] * y0 * (1 - y1) + \
         #          self.values[(i0 + 1, i1 + 1)] * y0 * y1
         # We pair i with 1 - yi (zipped1) and i + 1 with yi (zipped2)
-        start = time.time()
-        all_norm_distances = np.ascontiguousarray(np.concatenate((shift_norm_distances.ravel(), norm_distances.ravel())))
-        all_indices = np.ascontiguousarray(np.concatenate((indices.ravel(), shift_indices.ravel())))
-        in_values_ravel = np.ascontiguousarray(self.values.ravel())
-        end = time.time()
+                # Remind indices shape is (2, X)
+        for point in range(num_points):
 
-        size_i = indices.shape[0]
-        size_j = indices.shape[1]
-        image_size = self.values.shape[1]
-        
-        print("PREPROC time is ", end-start)
-        start = time.time()
-        value = cythons_files.solve_hypercube(all_indices, all_norm_distances, in_values_ravel, size_i, size_j, image_size)
-        end = time.time()
-        print("SolveHYPERCUBE time is ", end-start)
-        
+            # Take the Alpĥa and Beta idexes of the input grid from the output grid
+            i0, i1 = indices[0, point], indices[1, point]
+
+            # Verification of non-zero index (Error)
+            if i0 >=0 and i1 >=0:
+
+                # Take the norm distance of the closest pixel
+                y0, y1 = norm_distances[0, point], norm_distances[1, point]
+
+                result = 0.0
+                # Compute the interpolated point following (https://paulbourke.net/miscellaneous/interpolation/   , Trilinear interpolation)
+                result = result + self.values[:,i0, i1] * (1 - y0) * (1 - y1)
+                if point == 0:
+                    print(y0)
+                result = result + self.values[:,i0, i1+1] * (1 - y0) * y1
+                if point == 0:
+                    print(y1)
+                result = result + self.values[:,i0+1, i1] * y0 * (1 - y1)
+                if point == 0:
+                    print((1 - y0))
+                result = result + self.values[:,i0+1, i1+1] * y0 * y1
+                if point == 0:
+                    print((1-y1))
+                out[:,point] = result
+            else:
+                print("ERRORRRRRRRR : NAN")
+                # xi was nan
+                #out[point] = np.nan      
        
-        return value 
+        return  out
 
-    def _evaluate_linear(self, indices, norm_distances):
-
-
-        # Compute shifting up front before zipping everything together
-
-        # Avec cette version optimisé, il faut duppliquer norm_distances et indices pour toutes les wavelength
-        # De plus, il faut ajouter une colonne qui contient la distance par rapport à la wavelength pour "norm_distance"
-        # et l'indice de fréquence pour "indices" --> à noter que la structure de cette colonne doit être vérifier pour indice
-        start = time.time()
-        new_norm_distances = np.tile(norm_distances, [1, self.nWave])
-        c = np.zeros(self.nWave)
-        c = np.repeat(c, int(new_norm_distances.shape[1]//self.nWave))
-        c[int(new_norm_distances.shape[1]/self.nWave)*(self.nWave-1):] = 0
-        c = c[np.newaxis,:]
-        print("Hey, ", int(new_norm_distances.shape[1]/self.nWave)*(self.nWave-1))
-        print("CCCCCCC is ", np.where(c==0))
-        new_norm_distances = np.insert(new_norm_distances, 0, c, axis=0)
-        
-        new_indices = np.tile(indices, [1,self.nWave])
-        c = np.arange(self.nWave)
-        c = np.repeat(c, int(new_indices.shape[1]//self.nWave))
-        c[int(new_norm_distances.shape[1]/self.nWave)*(self.nWave-2):] = c[int(new_norm_distances.shape[1]/self.nWave)*(self.nWave-2)]
-        c = c[np.newaxis,:]
-        new_indices = np.insert(new_indices, 0, c, axis=0)
-        end = time.time()
-        print("PREPREPREPRE PROC time is ", end-start)
-
-        #shift_norm_distances = [1 - yi for yi in new_norm_distances]
-        shift_norm_distances = 1 - new_norm_distances
-        #shift_indices = [i + 1 for i in new_indices]
-        shift_indices = 1 + new_indices
-
-        print(shift_norm_distances.dtype, new_norm_distances.dtype, shift_indices.dtype, new_indices.dtype)
-        # The formula for linear interpolation in 2d takes the form:
-        # values = self.values[(i0, i1)] * (1 - y0) * (1 - y1) + \
-        #          self.values[(i0, i1 + 1)] * (1 - y0) * y1 + \
-        #          self.values[(i0 + 1, i1)] * y0 * (1 - y1) + \
-        #          self.values[(i0 + 1, i1 + 1)] * y0 * y1
-        # We pair i with 1 - yi (zipped1) and i + 1 with yi (zipped2)
-        start = time.time()
-        all_norm_distances = np.ascontiguousarray(np.concatenate((shift_norm_distances.ravel(), new_norm_distances.ravel())))
-        all_indices = np.ascontiguousarray(np.concatenate((new_indices.ravel(), shift_indices.ravel())))
-        in_values_ravel = np.ascontiguousarray(self.values.ravel())
-        end = time.time()
-
-        size_i = new_indices.shape[0]
-        size_j = new_indices.shape[1]
-        image_size = self.values.shape[1]
-        
-        
-        
-
-        print("PREPROC time is ", end-start)
-        start = time.time()
-        value = cythons_files.solve_hypercube(all_indices, all_norm_distances, in_values_ravel, size_i, size_j, image_size)
-        end = time.time()
-        print("SolveHYPERCUBE time is ", end-start)
-        
-       
-        return value
 
     def _validate_grid_dimensions(self, points, method):
         k = self._SPLINE_DEGREE_MAP[method]
@@ -567,10 +490,6 @@ def interpn(points, values, xi, o_shape, nWave, method="linear", bounds_error=Tr
     numerical artifacts. Consider rescaling the data before interpolation.
     """
 
-    res = cythons_files.test(5,8)
-    print("####################")
-    print("Res = ", res)
-    print("#########################")
 
     # sanity check 'method' kwarg
     if method not in ["linear", "nearest", "cubic", "quintic", "pchip",

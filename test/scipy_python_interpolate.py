@@ -448,8 +448,6 @@ class RegularGridInterpolator:
 
         xi, xi_shape, ndim, nans, out_of_bounds = self._prepare_xi(xi)
 
-        print("python out_of_bounds is ", out_of_bounds, out_of_bounds.shape)
-
         if method == "linear":
             # Return | indices : Array of the same time of Xi, where each element is the idx of the input 
             #                    grid corresponding to the element with the closest coordinates of the output grid.
