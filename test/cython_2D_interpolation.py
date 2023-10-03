@@ -315,16 +315,17 @@ class RegularGridInterpolator:
             raise ValueError("Method '%s' is not defined" % method)
 
         xi, xi_shape, ndim, nans, out_of_bounds = self._prepare_xi(xi)
-        out_of_bounds = np.tile(out_of_bounds, self.nWave)
-
 
         indices, norm_distances = cythons_files.find_indices(self.grid, xi.T)
 
         result = cythons_files.solve_2D_hypercube(indices, norm_distances, self.values, indices.shape[1], self.nWave)
+        
 
 
         if not self.bounds_error and self.fill_value is not None:
-            result[out_of_bounds] = self.fill_value
+            print("Out_of_bounds shape is ", out_of_bounds.shape)
+            print("Res shape" , result.shape)
+            result[:,out_of_bounds] = self.fill_value
 
         # f(nan) = nan, if any
         if np.any(nans):
@@ -420,9 +421,11 @@ class RegularGridInterpolator:
         # check for out of bounds xi
         out_of_bounds = np.zeros((xi.shape[1]), dtype=bool)
         # iterate through dimensions
+        print("SHAPE GRID is ", len(self.grid), len(self.grid[0]), xi.shape)
         for x, grid in zip(xi, self.grid):
             out_of_bounds += x < grid[0]
             out_of_bounds += x > grid[-1]
+        print(out_of_bounds, out_of_bounds.shape)
         return out_of_bounds
 
 

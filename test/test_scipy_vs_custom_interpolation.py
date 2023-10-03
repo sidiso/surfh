@@ -223,7 +223,7 @@ print("is Scipy and 2D Cython python the same ? ", np.allclose(scipy_result, cyt
 
 
 
-""" data = spectro.forward(cube)
+data = spectro.forward(cube)
 
 print("#################################\n\n")
 print("#################################")
@@ -274,6 +274,9 @@ for idx, chan in enumerate(spectro.channels):
         ).T
 
         # This output can be processed in local ref.
+        print("################################# ")
+        print("##########        SCIPY ######### ")
+        print("################################# \n\n")
         startT1 = time.time()
         scipy_blurred += sp.interpolate.interpn(
             (wl_idx, chan.local_alpha_axis, chan.local_beta_axis),
@@ -284,19 +287,26 @@ for idx, chan in enumerate(spectro.channels):
         ).reshape(out_shape)
         endT1 = time.time()
 
+        print("################################# ")
+        print("########## Python SCIPY ######### ")
+        print("#################################\n\n ")
         startT2 = time.time()
-        python_blurred += scipy_python_interpolate.interpn((wl_idx, chan.local_alpha_axis, chan.local_beta_axis),
+        """ python_blurred += scipy_python_interpolate.interpn((wl_idx, chan.local_alpha_axis, chan.local_beta_axis),
             gridded,
             global_coords,
             bounds_error=False,
             fill_value=0,
-        ).reshape(out_shape)
+        ).reshape(out_shape) """
         endT2 = time.time()
 
-        startT3 = time.time()
+
+
+        print("################################# ")
+        print("########## Python Cutstom ######### ")
+        print("#################################\n\n ")
         nWave = global_coords[-1,0] + 1
         custom_global_coord =(global_coords[0:int(global_coords.shape[0]//nWave),:])[:,1:3]
-
+        startT3 = time.time()
         custom_blurred += scipy_optimize_python_interpolate.interpn( (chan.local_alpha_axis, chan.local_beta_axis), 
                                                                     gridded, 
                                                                     custom_global_coord, 
@@ -307,12 +317,36 @@ for idx, chan in enumerate(spectro.channels):
         endT3 = time.time()
 
 
+
+        print("################################# ")
+        print("########## 2D Cython Cutstom ######### ")
+        print("#################################\n\n ")
+        optimized_global_coords = np.vstack(
+            [
+                alpha_coord.ravel(),
+                beta_coord.ravel()
+            ]
+        ).T
+        startT4 = time.time()
+        cython_2D_blurred = cython_2D_interpolation.interpn( (chan.local_alpha_axis, chan.local_beta_axis), 
+                                                           gridded, 
+                                                           optimized_global_coords, 
+                                                           global_coords.shape, 
+                                                           nWave,
+                                                           bounds_error=False, 
+                                                           fill_value=0,).reshape(out_shape)
+
+        endT4 = time.time()
+
 print("Scipy Transpose Interpolation time is ", endT1 - startT1)
 print("Python Transpose Interpolation time is ", endT2 - startT2)
 print("Custom Transpose Interpolation time is ", endT3 - startT3)
+print("Custom 2D Cython time is", endT4-startT4)
+
 
 print("is Scipy.T and Python Scipy.T the same ? ", np.allclose(scipy_blurred, python_blurred))
-print("is Scipy.T and Custom python.T the same ? ", np.allclose(scipy_blurred, custom_blurred)) """
+print("is Scipy.T and Custom python.T the same ? ", np.allclose(scipy_blurred, custom_blurred))
+print("is Scipy.T and Cython 2D.T the same ? ", np.allclose(scipy_blurred, cython_2D_blurred))
 
 
 
