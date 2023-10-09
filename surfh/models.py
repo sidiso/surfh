@@ -523,9 +523,11 @@ class Channel(LinOp):
                 sliced = self.slicing(gridded, slit_idx)[
                     :, : self.oshape[3] * self.srf : self.srf
                 ]
-                # λ blurring and Σ_β
-                #logger.info(f"{self.name} : wblur {sliced.shape} → {out.shape[2:]}")
-                ] * self.wblur(sliced)
+                
+                out[p_idx, slit_idx, :, :] = self.instr.pce[
+                    ..., np.newaxis
+                ]* self.wblur(sliced).sum(axis=2)
+                                
         return out
 
 
@@ -687,8 +689,9 @@ class Spectro(LinOp):
         for idx, chan in enumerate(self.channels):
             logger.info(f"Channel {chan.name}")
             #out[self._idx[idx] : self._idx[idx + 1]] = chan.forward(blurred_f).ravel()
-            chan.forward(blurred_f)
-        #return out
+            out[self._idx[idx] : self._idx[idx + 1]] = chan.forward(blurred_f).ravel()
+
+        return out
     
     def forward_parallel(self, inarray: array) -> array:
         out = np.zeros(self.oshape)
