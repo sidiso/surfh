@@ -30,7 +30,10 @@ import time
 from . import instru
 from . import cython_2D_interpolation
 from . import cythons_files
+from . import shared_dict
 
+#from .CFAsyncProcessPool import CFAPP
+#from .AsyncProcessPool import APP
 
 array = np.ndarray
 InputShape = namedtuple("InputShape", ["wavel", "alpha", "beta"])
@@ -304,6 +307,12 @@ class Channel(LinOp):
             len(self.local_alpha_axis),
             len(self.local_beta_axis),
         )
+
+        _data = shared_dict.create("data")
+        _data["test"] = np.zeros(oshape)
+        self._data_path = _data.path
+
+
         super().__init__(ishape, oshape, self.instr.name)
 
     @property
@@ -493,19 +502,21 @@ class Channel(LinOp):
         """Returns spectral blurring transpose of inarray"""
         return wblur_t(inarray, self._wpsf(inarray.shape[2], self.beta_step))
 
-    def forward(self, inarray_f: array) -> array:
+    
+    def forward(self, inarray_f: array):
         """inarray is supposed in global coordinate, spatially blurred and in Fourier space.
 
         Output is an array of shape (pointing, slit, wavelength, alpha)."""
         # [pointing, slit, λ', α]
         out = np.empty(self.oshape)
-        #logger.info(f"{self.name} : IDFT2({inarray_f.shape})")
         blurred = self.sblur(inarray_f[self.wslice, ...])
+        #logger.info(f"{self.name} : IDFT2({inarray_f.shape})")
         for p_idx, pointing in enumerate(self.pointings):
             #logger.info(
             #    f"{self.name} : gridding [{p_idx}/{len(self.pointings)}] {blurred.shape} -> {(blurred.shape[0],) + self.local_shape[1:]}"
             #)
             gridded = self.gridding(blurred, pointing)
+            # Slit parallelization
             for slit_idx in range(self.instr.n_slit):
                 # Slicing, weighting and α subsampling for SR
                 #logger.info(f"{self.name} : slicing [{slit_idx+1}/{self.instr.n_slit}]")
@@ -514,12 +525,65 @@ class Channel(LinOp):
                 ]
                 # λ blurring and Σ_β
                 #logger.info(f"{self.name} : wblur {sliced.shape} → {out.shape[2:]}")
-                tmp = self.wblur(sliced).sum(axis=2)
-
-                out[p_idx, slit_idx, :, :] = self.instr.pce[
-                    ..., np.newaxis
-                ] * tmp
+                ] * self.wblur(sliced)
         return out
+
+
+
+    def forward_parallel(self, inarray_f: array, idx: int) -> array:
+        """inarray is supposed in global coordinate, spatially blurred and in Fourier space.
+
+        Output is an array of shape (pointing, slit, wavelength, alpha)."""
+        # [pointing, slit, λ', α]
+        out = np.empty(self.oshape)
+        logger.info(f"{self.name} : IDFT2({inarray_f.shape})")
+        blurred = self.sblur(inarray_f[self.wslice, ...])
+        for p_idx, pointing in enumerate(self.pointings):            
+            APP.runJob("gridding_id:%d.%d" %(idx, p_idx), self._forward_worker, args=(idx, p_idx, blurred, pointing))
+                
+
+    def forward_cf_parallel(self, inarray_f: array, idx: int):
+        """inarray is supposed in global coordinate, spatially blurred and in Fourier space.
+
+        Output is an array of shape (pointing, slit, wavelength, alpha)."""
+        # [pointing, slit, λ', α]
+        out = np.empty(self.oshape)
+        logger.info(f"{self.name} : IDFT2({inarray_f.shape})")
+        blurred = self.sblur(inarray_f[self.wslice, ...])
+        for p_idx, pointing in enumerate(self.pointings):            
+            CFAPP.runJob("gridding_id:%d.%d" %(idx, p_idx), self._cf_forward_worker, args=(idx, p_idx, blurred, pointing))
+                
+
+    def _cf_forward_worker(self, idx, p_idx, blurred, pointing):
+           
+        out = np.empty(self.oshape[1:])
+        gridded = self.gridding(blurred, pointing)
+        for slit_idx in range(self.instr.n_slit):
+            sliced = self.slicing(gridded, slit_idx)[
+                :, : self.oshape[3] * self.srf : self.srf
+            ]
+            # λ blurring and Σ_β
+            out[slit_idx, :, :] = self.instr.pce[
+                    ..., np.newaxis
+                ] * self.wblur(sliced).sum(axis=2)
+
+        return {"idx": idx, "p_idx": p_idx, "out" : out}
+
+    def _forward_worker(self, idx, p_idx, blurred, pointing):
+        
+        out = np.empty(self.oshape[1:])
+        gridded = self.gridding(blurred, pointing)
+        for slit_idx in range(self.instr.n_slit):
+            sliced = self.slicing(gridded, slit_idx)[
+                :, : self.oshape[3] * self.srf : self.srf
+            ]
+            # λ blurring and Σ_β
+            out[slit_idx, :, :] = self.instr.pce[
+                    ..., np.newaxis
+                ] * self.wblur(sliced).sum(axis=2)
+
+        return {"idx": idx, "p_idx": p_idx, "out" : out}
+     
 
     def adjoint(self, measures: array) -> array:
         out = np.zeros(self.ishape, dtype=np.complex128)
@@ -592,6 +656,13 @@ class Spectro(LinOp):
             for srf, instr in zip(srfs, instrs)
         ]
 
+        """ _data = shared_dict.create("data")
+        self._data_path = _data.path
+        print("DATA PATH IS ", self._data_path)
+        for iChan, chan in enumerate(self.channels):
+            _data.addSubdict(iChan)
+            _data[iChan]["data"] = np.zeros(chan.oshape) """
+
         self._idx = np.cumsum([0] + [np.prod(chan.oshape) for chan in self.channels])
         self.imshape = (len(alpha_axis), len(beta_axis))
         ishape = (len(wavel_axis), len(alpha_axis), len(beta_axis))
@@ -615,9 +686,43 @@ class Spectro(LinOp):
         blurred_f = dft(inarray) * self.sotf
         for idx, chan in enumerate(self.channels):
             logger.info(f"Channel {chan.name}")
-            out[self._idx[idx] : self._idx[idx + 1]] = chan.forward(blurred_f).ravel()
+            #out[self._idx[idx] : self._idx[idx + 1]] = chan.forward(blurred_f).ravel()
+            chan.forward(blurred_f)
+        #return out
+    
+    def forward_parallel(self, inarray: array) -> array:
+        out = np.zeros(self.oshape)
+        logger.info(f"Spatial blurring DFT2({inarray.shape})")
+        blurred_f = dft(inarray) * self.sotf
+        for idx, chan in enumerate(self.channels):
+            logger.info(f"Channel {chan.name}")
+            chan.forward_parallel(blurred_f, idx)
+
+        results = APP.awaitJobResults("gridding_id:*")
+        for dicoresults in results:
+            out[self._idx[dicoresults["idx"]] + dicoresults["p_idx"]*np.prod(dicoresults["out"].shape): self._idx[dicoresults["idx"]]+ (dicoresults["p_idx"]+1)*np.prod(dicoresults["out"].shape)] = dicoresults["out"].ravel()
+
         return out
 
+    def forward_cf_parallel(self, inarray: array) -> array:
+        out = np.zeros(self.oshape)
+        logger.info(f"Spatial blurring DFT2({inarray.shape})")
+        blurred_f = dft(inarray) * self.sotf
+        for idx, chan in enumerate(self.channels):
+            logger.info(f"Channel {chan.name}")
+            #out[self._idx[idx] : self._idx[idx + 1]] = chan.forward(blurred_f).ravel()
+            chan.forward_cf_parallel(blurred_f, idx)
+
+        results = CFAPP.awaitJobResults("gridding_id:*")
+        start = time.time()
+        for dicoresults in results:
+            out[self._idx[dicoresults["idx"]] + dicoresults["p_idx"]*np.prod(dicoresults["out"].shape): self._idx[dicoresults["idx"]]+ (dicoresults["p_idx"]+1)*np.prod(dicoresults["out"].shape)] = dicoresults["out"].ravel()
+        end = time.time()
+        print("######## Time array is ", end-start)
+
+        return out
+
+    
     def adjoint(self, inarray: array) -> array:
         tmp = np.zeros(
             self.ishape[:2] + (self.ishape[2] // 2 + 1,), dtype=np.complex128
@@ -627,12 +732,8 @@ class Spectro(LinOp):
             tmp += chan.adjoint(
                 np.reshape(inarray[self._idx[idx] : self._idx[idx + 1]], chan.oshape)
             )
-        #logger.info(f"Spatial blurring^T : IDFT2({tmp.shape})")
-        start = time.time()
-        res = idft(tmp * self.sotf.conj(), self.imshape)
-        end = time.time()
-        print("IDFT TIME IS ", end-start)
-        return res
+        logger.info(f"Spatial blurring^T : IDFT2({tmp.shape})")
+        return idft(tmp * self.sotf.conj(), self.imshape)
 
     def qdcoadd(self, measures: array) -> array:
         out = np.zeros(self.ishape)
@@ -748,6 +849,7 @@ class SpectroLMM(LinOp):
             self.channels[chan_idx].oshape,
         )
 
+    
     def forward(self, inarray: array) -> array:
         out = np.zeros(self.oshape)
         logger.info(f"Cube generation")
@@ -757,10 +859,12 @@ class SpectroLMM(LinOp):
         logger.info(f"Spatial blurring DFT2({inarray.shape})")
         blurred_f = dft(cube) * self.sotf
         for idx, chan in enumerate(self.channels):
+            print("nChan = ", len(self.channels))
             logger.info(f"Channel {chan.name}")
             out[self._idx[idx] : self._idx[idx + 1]] = chan.forward(blurred_f).ravel()
         return out
-
+    
+    
     def adjoint(self, inarray: array) -> array:
         tmp = np.zeros(
             self.ishape[:2] + (self.ishape[2] // 2 + 1,), dtype=np.complex128
