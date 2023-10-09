@@ -25,8 +25,12 @@ import udft
 from aljabr import LinOp
 from loguru import logger
 from numpy import ndarray as array
+import time
 
 from . import instru
+from . import cython_2D_interpolation
+from . import cythons_files
+
 
 array = np.ndarray
 InputShape = namedtuple("InputShape", ["wavel", "alpha", "beta"])
@@ -142,13 +146,8 @@ def wblur(arr: array, wpsf: array) -> array:
     """
     # [λ', α, β] = ∑_λ arr[λ, α, β] wpsf[λ', λ, β]
     # Σ_λ
-    return np.sum(
-        # in [1, λ, α, β]
-        np.expand_dims(arr, axis=0)
-        # wpsf in [λ', λ, 1, β]
-        * np.expand_dims(wpsf, axis=2),
-        axis=1,
-    )
+
+    return cythons_files.c_wblur(arr, wpsf, wpsf.shape[1], arr.shape[1], arr.shape[2], wpsf.shape[0])
 
 
 def wblur_t(arr: array, wpsf: array) -> array:
@@ -168,13 +167,8 @@ def wblur_t(arr: array, wpsf: array) -> array:
     """
     # [λ, α, β] = ∑_λ' arr[λ', α, β] wpsf[λ', λ]
     # Σ_λ'
-    return np.sum(
-        # in [λ', 1, α, β]
-        np.expand_dims(arr, axis=1)
-        # wpsf in [λ', λ, 1, β]
-        * np.expand_dims(wpsf, axis=2),
-        axis=0,
-    )
+
+    return cythons_files.c_wblur_t(arr, wpsf, wpsf.shape[1], arr.shape[1], arr.shape[2], wpsf.shape[0])
 
 
 def diffracted_psf(template, spsf, wpsf) -> List[array]:
@@ -415,6 +409,7 @@ class Channel(LinOp):
         out[:, slices[0], slices[1]] = gridded * weights
         return out
 
+    
     def gridding(self, inarray: array, pointing: instru.Coord) -> array:
         """Returns interpolation of inarray in local referential"""
         # α and β inside the FOV shifted to pointing, in the global ref.
@@ -430,20 +425,16 @@ class Channel(LinOp):
 
         local_coords = np.vstack(
             [
-                np.repeat(
-                    np.repeat(wl_idx.reshape((-1, 1, 1)), out_shape[1], axis=1),
-                    out_shape[2],
-                    axis=2,
-                ).ravel(),
-                np.repeat(alpha_coord[np.newaxis], out_shape[0], axis=0).ravel(),
-                np.repeat(beta_coord[np.newaxis], out_shape[0], axis=0).ravel(),
+                alpha_coord.ravel(),
+                beta_coord.ravel()
             ]
-        ).T
+        ).T          
 
-        # This output can be processed in local ref.
-        return sp.interpolate.interpn(
-            (wl_idx, self.alpha_axis, self.beta_axis), inarray, local_coords
-        ).reshape(out_shape)
+        return cython_2D_interpolation.interpn( (self.alpha_axis, self.beta_axis), 
+                                              inarray, 
+                                              local_coords, 
+                                              len(wl_idx)).reshape(out_shape) 
+    
 
     def gridding_t(self, inarray: array, pointing: instru.Coord) -> array:
         """Returns interpolation of inarray in global referential"""
@@ -460,22 +451,18 @@ class Channel(LinOp):
 
         global_coords = np.vstack(
             [
-                np.tile(
-                    wl_idx.reshape((-1, 1, 1)), (1, out_shape[1], out_shape[2])
-                ).ravel(),
-                np.repeat(alpha_coord[np.newaxis], out_shape[0], axis=0).ravel(),
-                np.repeat(beta_coord[np.newaxis], out_shape[0], axis=0).ravel(),
+                alpha_coord.ravel(),
+                beta_coord.ravel()
             ]
         ).T
 
-        # This output can be processed in local ref.
-        return sp.interpolate.interpn(
-            (wl_idx, self.local_alpha_axis, self.local_beta_axis),
-            inarray,
-            global_coords,
-            bounds_error=False,
-            fill_value=0,
-        ).reshape(out_shape)
+        return cython_2D_interpolation.interpn( (self.local_alpha_axis, self.local_beta_axis), 
+                                              inarray, 
+                                              global_coords, 
+                                              len(wl_idx),
+                                              bounds_error=False, 
+                                              fill_value=0,).reshape(out_shape)
+
 
     def sblur(self, inarray_f: array) -> array:
         """Return spatial blurring of inarray_f in Fourier space for SR"""
@@ -512,41 +499,42 @@ class Channel(LinOp):
         Output is an array of shape (pointing, slit, wavelength, alpha)."""
         # [pointing, slit, λ', α]
         out = np.empty(self.oshape)
-        logger.info(f"{self.name} : IDFT2({inarray_f.shape})")
+        #logger.info(f"{self.name} : IDFT2({inarray_f.shape})")
         blurred = self.sblur(inarray_f[self.wslice, ...])
         for p_idx, pointing in enumerate(self.pointings):
-            logger.info(
-                f"{self.name} : gridding [{p_idx}/{len(self.pointings)}] {blurred.shape} -> {(blurred.shape[0],) + self.local_shape[1:]}"
-            )
+            #logger.info(
+            #    f"{self.name} : gridding [{p_idx}/{len(self.pointings)}] {blurred.shape} -> {(blurred.shape[0],) + self.local_shape[1:]}"
+            #)
             gridded = self.gridding(blurred, pointing)
             for slit_idx in range(self.instr.n_slit):
                 # Slicing, weighting and α subsampling for SR
-                logger.info(f"{self.name} : slicing [{slit_idx+1}/{self.instr.n_slit}]")
+                #logger.info(f"{self.name} : slicing [{slit_idx+1}/{self.instr.n_slit}]")
                 sliced = self.slicing(gridded, slit_idx)[
                     :, : self.oshape[3] * self.srf : self.srf
                 ]
                 # λ blurring and Σ_β
-                logger.info(f"{self.name} : wblur {sliced.shape} → {out.shape[2:]}")
+                #logger.info(f"{self.name} : wblur {sliced.shape} → {out.shape[2:]}")
+                tmp = self.wblur(sliced).sum(axis=2)
+
                 out[p_idx, slit_idx, :, :] = self.instr.pce[
                     ..., np.newaxis
-                ] * self.wblur(sliced).sum(axis=2)
+                ] * tmp
         return out
 
     def adjoint(self, measures: array) -> array:
         out = np.zeros(self.ishape, dtype=np.complex128)
         blurred = np.zeros(self.cshape)
         for p_idx, pointing in enumerate(self.pointings):
-            logger.info(f"{self.name} : pointing [{p_idx+1}/{len(self.pointings)}]")
+            #logger.info(f"{self.name} : pointing [{p_idx+1}/{len(self.pointings)}]")
             gridded = np.zeros(self.local_shape)
             for slit_idx in range(self.instr.n_slit):
-                logger.info(f"{self.name} : slicing [{slit_idx+1}/{self.instr.n_slit}]")
+                #logger.info(f"{self.name} : slicing [{slit_idx+1}/{self.instr.n_slit}]")
                 sliced = np.zeros(self.slit_shape(slit_idx))
                 # α zero-filling, λ blurrling_t, and β duplication
-                logger.info(
-                    f"{self.name} : wblur^T {measures.shape[2:] + (sliced.shape[2],)}"
-                )
-                sliced[:, : self.oshape[3] * self.srf : self.srf] = self.wblur_t(
-                    np.repeat(
+                #logger.info(
+                #    f"{self.name} : wblur^T {measures.shape[2:] + (sliced.shape[2],)}"
+                #)
+                tmp = np.repeat(
                         np.expand_dims(
                             measures[p_idx, slit_idx] * self.instr.pce[..., np.newaxis],
                             axis=2,
@@ -554,13 +542,18 @@ class Channel(LinOp):
                         sliced.shape[2],
                         axis=2,
                     )
-                )
+
+                tmp2 = self.wblur_t(tmp)
+
+                sliced[:, : self.oshape[3] * self.srf : self.srf] = tmp2
+                    
+
                 gridded += self.slicing_t(sliced, slit_idx)
-            logger.info(
-                f"{self.name} : gridding^T [{p_idx+1}/{len(self.pointings)}] {gridded.shape} -> {blurred.shape}"
-            )
+            #logger.info(
+            #    f"{self.name} : gridding^T [{p_idx+1}/{len(self.pointings)}] {gridded.shape} -> {blurred.shape}"
+            #)
             blurred += self.gridding_t(gridded, pointing)
-        logger.info(f"{self.name} : DFT2({blurred.shape})")
+        #logger.info(f"{self.name} : DFT2({blurred.shape})")
         out[self.wslice, ...] = self.sblur_t(blurred)
         return out
 
@@ -618,7 +611,7 @@ class Spectro(LinOp):
 
     def forward(self, inarray: array) -> array:
         out = np.zeros(self.oshape)
-        logger.info(f"Spatial blurring DFT2({inarray.shape})")
+        #logger.info(f"Spatial blurring DFT2({inarray.shape})")
         blurred_f = dft(inarray) * self.sotf
         for idx, chan in enumerate(self.channels):
             logger.info(f"Channel {chan.name}")
@@ -634,8 +627,12 @@ class Spectro(LinOp):
             tmp += chan.adjoint(
                 np.reshape(inarray[self._idx[idx] : self._idx[idx + 1]], chan.oshape)
             )
-        logger.info(f"Spatial blurring^T : IDFT2({tmp.shape})")
-        return idft(tmp * self.sotf.conj(), self.imshape)
+        #logger.info(f"Spatial blurring^T : IDFT2({tmp.shape})")
+        start = time.time()
+        res = idft(tmp * self.sotf.conj(), self.imshape)
+        end = time.time()
+        print("IDFT TIME IS ", end-start)
+        return res
 
     def qdcoadd(self, measures: array) -> array:
         out = np.zeros(self.ishape)

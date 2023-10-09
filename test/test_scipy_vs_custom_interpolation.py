@@ -17,10 +17,7 @@ from surfh import instru, models
 from surfh import smallmiri as miri
 from surfh import utils
 
-import scipy_python_interpolate 
-import scipy_optimize_python_interpolate
-import scipy_optimize_cython_interpolate
-import cython_2D_interpolation
+from surfh import cython_2D_interpolation
 
 
 def orion():
@@ -129,8 +126,6 @@ for idx, chan in enumerate(spectro.channels):
     blurred = chan.sblur(blurred_f[chan.wslice, ...])
     start = time.time()
     for p_idx, pointing in enumerate(chan.pointings):           
-        gridded = chan.gridding(blurred, pointing)
-
         alpha_coord, beta_coord = (chan.instr.fov + pointing).local2global(
             chan.local_alpha_axis, chan.local_beta_axis
         )
@@ -170,48 +165,16 @@ for idx, chan in enumerate(spectro.channels):
         print("\n\n\n")
 
         print("################################# ")
-        print("########## Python SCIPY ######### ")
-        print("################################# ")
-        start2 = time.time()
-        #python_result = scipy_python_interpolate.interpn( (wl_idx, chan.alpha_axis, chan.beta_axis), blurred, local_coords).reshape(out_shape)
-        end2 = time.time()
-        print("\n\n\n")
-
-        print("################################# ")
-        print("########## Python Cutstom ######### ")
-        print("################################# ")
-        start3 = time.time()
-        nWave = local_coords[-1,0] + 1
-        custom_local_coord =(local_coords[0:int(local_coords.shape[0]//nWave),:])[:,1:3]
-        custom_result = scipy_optimize_python_interpolate.interpn( (chan.alpha_axis, chan.beta_axis), blurred, custom_local_coord, local_coords.shape, nWave).reshape(out_shape)
-        end3 = time.time()
-        print("\n\n\n")
-
-        print("################################# ")
-        print("########## Cython Cutstom ######### ")
-        print("################################# ")
-        start4 = time.time()
-        cython_result = scipy_optimize_cython_interpolate.interpn( (chan.alpha_axis, chan.beta_axis), blurred, custom_local_coord, local_coords.shape, nWave).reshape(out_shape)
-        end4 = time.time()
-
-
-        print("################################# ")
         print("########## 2D Cython Cutstom ######### ")
         print("################################# ")
         start5 = time.time()
-        cython_2D_result = cython_2D_interpolation.interpn( (chan.alpha_axis, chan.beta_axis), blurred, optimized_local_coords, local_coords.shape, nWave).reshape(out_shape)
+        cython_2D_result = cython_2D_interpolation.interpn( (chan.alpha_axis, chan.beta_axis), blurred, optimized_local_coords, chan.local_shape[0]).reshape(out_shape)
         end5 = time.time()
 
 
 
 print("Scipy time is", end1-start1)
-print("Scipy python time is", end2-start2)
-print("Custom Scipy python time is", end3-start3)
-print("Custom Cython time is", end4-start4)
 print("Custom 2D Cython time is", end5-start5)
-#print("is Scipy and Python Scipy the same ? ", np.allclose(scipy_result, python_result))
-print("is Scipy and Custom python the same ? ", np.allclose(scipy_result, custom_result))
-print("is Scipy and Cython python the same ? ", np.allclose(scipy_result, cython_result))
 print("is Scipy and 2D Cython python the same ? ", np.allclose(scipy_result, cython_2D_result))
 
 
@@ -287,35 +250,6 @@ for idx, chan in enumerate(spectro.channels):
         ).reshape(out_shape)
         endT1 = time.time()
 
-        print("################################# ")
-        print("########## Python SCIPY ######### ")
-        print("#################################\n\n ")
-        startT2 = time.time()
-        """ python_blurred += scipy_python_interpolate.interpn((wl_idx, chan.local_alpha_axis, chan.local_beta_axis),
-            gridded,
-            global_coords,
-            bounds_error=False,
-            fill_value=0,
-        ).reshape(out_shape) """
-        endT2 = time.time()
-
-
-
-        print("################################# ")
-        print("########## Python Cutstom ######### ")
-        print("#################################\n\n ")
-        nWave = global_coords[-1,0] + 1
-        custom_global_coord =(global_coords[0:int(global_coords.shape[0]//nWave),:])[:,1:3]
-        startT3 = time.time()
-        custom_blurred += scipy_optimize_python_interpolate.interpn( (chan.local_alpha_axis, chan.local_beta_axis), 
-                                                                    gridded, 
-                                                                    custom_global_coord, 
-                                                                    global_coords.shape, 
-                                                                    nWave, 
-                                                                    bounds_error=False, 
-                                                                    fill_value=0,).reshape(out_shape)
-        endT3 = time.time()
-
 
 
         print("################################# ")
@@ -331,21 +265,14 @@ for idx, chan in enumerate(spectro.channels):
         cython_2D_blurred = cython_2D_interpolation.interpn( (chan.local_alpha_axis, chan.local_beta_axis), 
                                                            gridded, 
                                                            optimized_global_coords, 
-                                                           global_coords.shape, 
-                                                           nWave,
+                                                           chan.local_shape[0],
                                                            bounds_error=False, 
                                                            fill_value=0,).reshape(out_shape)
 
         endT4 = time.time()
 
 print("Scipy Transpose Interpolation time is ", endT1 - startT1)
-print("Python Transpose Interpolation time is ", endT2 - startT2)
-print("Custom Transpose Interpolation time is ", endT3 - startT3)
 print("Custom 2D Cython time is", endT4-startT4)
-
-
-print("is Scipy.T and Python Scipy.T the same ? ", np.allclose(scipy_blurred, python_blurred))
-print("is Scipy.T and Custom python.T the same ? ", np.allclose(scipy_blurred, custom_blurred))
 print("is Scipy.T and Cython 2D.T the same ? ", np.allclose(scipy_blurred, cython_2D_blurred))
 
 
