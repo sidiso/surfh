@@ -650,6 +650,9 @@ class IFU:
         """The width of slit"""
         return self.fov.beta_width / self.n_slit
 
+    def get_name_pix(self):
+        return self.name if self.name.endswith('pix') else self.name + '_pix'
+
     def spectral_psf(self, beta, wavel_input_axis, arcsec2micron):
         """Return spectral PSF for monochromatic punctual sources
 

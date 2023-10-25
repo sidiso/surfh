@@ -97,11 +97,13 @@ class AsyncProcessPool (object):
         self.pause_on_start = pause_on_start
 
         if isinstance(self.affinity, int):
+            print("1")
             self.cpustep = abs(self.affinity) or 1
             maxcpu = psutil.cpu_count() // self.cpustep
             self.ncpu = ncpu or maxcpu
             self.parent_affinity = parent_affinity
         elif isinstance(self.affinity, list):
+            print("2")
             if any(map(lambda x: x < 0, self.affinity)):
                 raise RuntimeError("Affinities must be list of positive numbers")
             if psutil.cpu_count() < max(self.affinity):
@@ -115,12 +117,14 @@ class AsyncProcessPool (object):
             maxcpu = max(self.affinity) + 1  # zero indexed list
             self.parent_affinity = parent_affinity
         elif isinstance(self.affinity, str) and str(self.affinity) == "enable_ht":
+            print("3")
             self.affinity = 1
             self.cpustep = 1
             maxcpu = psutil.cpu_count() // self.cpustep
             self.ncpu = ncpu or maxcpu
             self.parent_affinity = parent_affinity
         elif isinstance(self.affinity, str) and str(self.affinity) == "disable_ht":
+            print("4")
             # this works on Ubuntu so possibly Debian-like systems, no guarantees for the rest
             # the mapping on hyperthread-enabled NUMA machines with multiple processors can get very tricky
             # /sys/devices/system/cpu/cpu*/topology/thread_siblings_list should give us a list of siblings
@@ -167,12 +171,14 @@ class AsyncProcessPool (object):
             else:
                 self.parent_affinity = unused[0] # grab the first unused vthread
         elif isinstance(self.affinity, str) and str(self.affinity) == "disable":
+            print("5")
             self.affinity = None
             self.parent_affinity = None
             self.cpustep = 1
             maxcpu = psutil.cpu_count()
             self.ncpu = ncpu or maxcpu
         else:
+            print("6")
             raise RuntimeError("Invalid option for Parallel.Affinity. Expected cpu step (int), list, "
                                "'enable_ht', 'disable_ht', 'disable'")
         if self.parent_affinity is None:
@@ -228,7 +234,9 @@ class AsyncProcessPool (object):
         # This is responsible for spawning, killing, and respawning workers
         self._taras_restart_event = multiprocessing.Event()
         self._taras_exit_event = multiprocessing.Event()
+        print("Before Strat Bulba, ncpu is ", self.ncpu)
         if self.ncpu > 1:
+            print("Going to start Bulba")
             self._taras_bulba = multiprocessing.Process(target=AsyncProcessPool._startBulba, name="TB", args=(self,))
             if pause_on_start:
                 print("Please note that due to your debug settings, worker processes will be paused on startup. Send SIGCONT to all processes to continue.")
@@ -251,6 +259,7 @@ class AsyncProcessPool (object):
 
     def startWorkers(self):
         """Starts worker threads. All job handlers and events must be registered *BEFORE*"""
+        print("Start Workers")
         if self.ncpu > 1:
             self._taras_bulba.start()
         self._started = True
@@ -312,6 +321,7 @@ class AsyncProcessPool (object):
         try:
             # loop until the completion event is raised
             # at this stage the workers are dead (or not started)
+            print("while not self._taras_exit_event.is_set()")
             while not self._taras_exit_event.is_set():
                 if self.verbose:
                     print("(re)creating worker processes")
@@ -340,6 +350,7 @@ class AsyncProcessPool (object):
                 dead_workers = {}
 
                 # set event to indicate workers are started
+                print("START BULBA and _workers_started_event")
                 self._workers_started_event.set()
 
                 # go to sleep until we're told to do the whole thing again
@@ -727,7 +738,7 @@ class AsyncProcessPool (object):
                 try:
                     # Get queue item, or timeout and check if pill perscribed.
                     #print>>log,"%s: calling queue.get()"%AsyncProcessPool.proc_id
-                    jobitem = queue.get(True, 10)
+                    jobitem = queue.get(True, 1)
                     #print>>log,"%s: queue.get() returns %s"%(AsyncProcessPool.proc_id, jobitem)
                 except Queue.Empty:
                     continue
@@ -750,12 +761,12 @@ def _init_default():
     global APP
     if APP is None:
         APP = AsyncProcessPool()
-        APP.init(16, affinity=0, num_io_processes=1, verbose=0)
+        APP.init(psutil.cpu_count(), affinity=0, num_io_processes=1, verbose=0)
 
 _init_default()
 
 def init(ncpu=None, affinity=None, parent_affinity=0, num_io_processes=1, verbose=0, pause_on_start=False):
     global APP
-    APP.init(16, affinity, parent_affinity, num_io_processes, verbose, pause_on_start=pause_on_start)
+    APP.init(psutil.cpu_count(), affinity, parent_affinity, num_io_processes, verbose, pause_on_start=pause_on_start)
 
 
