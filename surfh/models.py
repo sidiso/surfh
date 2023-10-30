@@ -557,6 +557,25 @@ class Channel(LinOp):
                     ..., np.newaxis
                 ]* self.wblur(sliced).sum(axis=2)
 
+    def forward_multiproc(self, inarray_f):
+        """inarray is supposed in global coordinate, spatially blurred and in Fourier space.
+
+        Output is an array of shape (pointing, slit, wavelength, alpha)."""
+        # [pointing, slit, λ', α]
+        out = shared_dict.attach(self._metadata_path)["fw_data"]
+        blurred = self.sblur(inarray_f[self.wslice, ...])
+        for p_idx, pointing in enumerate(self.pointings):
+            gridded = self.gridding(blurred, pointing)
+            for slit_idx in range(self.instr.n_slit):
+                # Slicing, weighting and α subsampling for SR
+                sliced = self.slicing(gridded, slit_idx)[
+                    :, : self.oshape[3] * self.srf : self.srf
+                ]
+                
+                out[p_idx, slit_idx, :, :] = self.instr.pce[
+                    ..., np.newaxis
+                ]* self.wblur(sliced).sum(axis=2)
+
 
     def adjoint(self, measures):
         out = shared_dict.attach(self._metadata_path)["ad_data"]
@@ -583,7 +602,33 @@ class Channel(LinOp):
             blurred += self.gridding_t(gridded, pointing)
         out[self.wslice, ...] = self.sblur_t(blurred)
 
-class Spectro_shared(LinOp):
+    def adjoint_multiproc(self, measures):
+        out = shared_dict.attach(self._metadata_path)["ad_data"]
+        blurred = np.zeros(self.cshape)
+        for p_idx, pointing in enumerate(self.pointings):
+            gridded = np.zeros(self.local_shape)
+            for slit_idx in range(self.instr.n_slit):
+                sliced = np.zeros(self.slit_shape(slit_idx))
+                # α zero-filling, λ blurrling_t, and β duplication
+                tmp = np.repeat(
+                        np.expand_dims(
+                            measures[p_idx, slit_idx] * self.instr.pce[..., np.newaxis],
+                            axis=2,
+                        ),
+                        sliced.shape[2],
+                        axis=2,
+                    )
+
+                tmp2 = self.wblur_t(tmp)
+
+                sliced[:, : self.oshape[3] * self.srf : self.srf] = tmp2
+                    
+                gridded += self.slicing_t(sliced, slit_idx)
+            blurred += self.gridding_t(gridded, pointing)
+        out[self.wslice, ...] = self.sblur_t(blurred)
+
+
+class Spectro(LinOp):
     def __init__(
         self,
         instrs: List[instru.IFU],
@@ -593,14 +638,12 @@ class Spectro_shared(LinOp):
         sotf: array,
         pointings: instru.CoordList,
     ):
-        GD = {}
 
         self.wavel_axis = wavel_axis
         self.alpha_axis = alpha_axis
         self.beta_axis = beta_axis
 
         self.sotf = sotf
-        GD["pointings"] = pointings
         self.pointings = pointings
 
         srfs = instru.get_srf(
@@ -655,7 +698,7 @@ class Spectro_shared(LinOp):
         blurred_f = dft(inarray) * self.sotf
         for idx, chan in enumerate(self.channels):
             logger.info(f"Channel {chan.name}")
-            APPL.runJob("forward_id:%d"%idx, chan.forward_multiproc, args=(blurred_f,), serial=False)
+            APPL.runJob("forward_id:%d"%idx, chan.forward_multiproc, args=(blurred_f,), serial=True)
 
         APPL.awaitJobResult()
         
@@ -673,7 +716,7 @@ class Spectro_shared(LinOp):
         )
         for idx, chan in enumerate(self.channels):
             logger.info(f"Channel {chan.name}")
-            APPL.runJob("adjoint_id:%d"%idx, chan.adjoint_multiproc, args=(np.reshape(inarray[self._idx[idx] : self._idx[idx + 1]], chan.oshape),), serial=False)
+            APPL.runJob("adjoint_id:%d"%idx, chan.adjoint_multiproc, args=(np.reshape(inarray[self._idx[idx] : self._idx[idx + 1]], chan.oshape),), serial=True)
 
 
         APPL.awaitJobResult()
