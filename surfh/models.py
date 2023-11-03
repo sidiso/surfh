@@ -132,28 +132,6 @@ def fov_weight(
 
     return weights
 
-
-def wblur_n(arr: array, wpsf: array) -> array:
-    """Apply blurring in λ axis
-
-    Parameters
-    ----------
-    arr: array-like
-      Input of shape [λ, α, β].
-    wpsf: array-like
-      Wavelength PSF of shape [λ', λ, β]
-
-    Returns
-    -------
-    out: array-like
-      A wavelength blurred array in [λ', α, β].
-    """
-    # [λ', α, β] = ∑_λ arr[λ, α, β] wpsf[λ', λ, β]
-    # Σ_λ
-    arr = np.ascontiguousarray(np.swapaxes(arr, 0, 2))
-    wpsf = np.ascontiguousarray(np.swapaxes(wpsf, 1, 2))
-    return cythons_files.c_wblur(arr, wpsf, wpsf.shape[1], arr.shape[1], arr.shape[2], wpsf.shape[0])
-
 def wblur(arr: array, wpsf: array) -> array:
     """Apply blurring in λ axis
 
@@ -172,9 +150,7 @@ def wblur(arr: array, wpsf: array) -> array:
     # [λ', α, β] = ∑_λ arr[λ, α, β] wpsf[λ', λ, β]
     # Σ_λ
     tmp2 = np.moveaxis(arr, 0, -1)
-    s = time.time()
     tmp = cythons_files.c_wblur(tmp2, wpsf, wpsf.shape[1], arr.shape[1], arr.shape[2], wpsf.shape[0])
-    e = time.time()
     return tmp
 
 def wblur_t(arr: array, wpsf: array) -> array:
@@ -194,7 +170,6 @@ def wblur_t(arr: array, wpsf: array) -> array:
     """
     # [λ, α, β] = ∑_λ' arr[λ', α, β] wpsf[λ', λ]
     # Σ_λ'
-    
     return cythons_files.c_wblur_t(arr, wpsf, wpsf.shape[1], arr.shape[1], arr.shape[2], wpsf.shape[0])
 
 
@@ -570,14 +545,10 @@ class Channel(LinOp):
     def wblur(self, inarray: array, slit_idx: int) -> array:
         """Returns spectral blurring of inarray"""
         return wblur(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx))
-    
-    def wblur_n(self, inarray: array) -> array:
-        """Returns spectral blurring of inarray"""
-        return wblur_n(inarray, self._wpsf(inarray.shape[2], self.beta_step))
 
-    def wblur_t(self, inarray: array) -> array:
+    def wblur_t(self, inarray: array, slit_idx: int) -> array:
         """Returns spectral blurring transpose of inarray"""
-        return wblur_t(inarray, self._wpsf(inarray.shape[2], self.beta_step))
+        return wblur_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx))
 
     
     def forward(self, inarray_f):
@@ -609,23 +580,16 @@ class Channel(LinOp):
         blurred = self.sblur(inarray_f[self.wslice, ...])
         for p_idx, pointing in enumerate(self.pointings):
             gridded = self.gridding(blurred, pointing)
-            t = time.time()
             for slit_idx in range(self.instr.n_slit):
                 # Slicing, weighting and α subsampling for SR
                 sliced = self.slicing(gridded, slit_idx)[
                     :, : self.oshape[3] * self.srf : self.srf
                 ]
                 
-                t1 = time.time()
                 out[p_idx, slit_idx, :, :] = self.instr.pce[
                     ..., np.newaxis
                 ]* self.wblur(sliced, slit_idx).sum(axis=2)
-                tt1 = time.time()
-                #print("     tt1 = ", tt1-t1)
                 
-
-            tt = time.time()
-            print("Time slit is ", tt-t)
 
     def precompute_wpsf(self):
         local_alpha_axis = shared_dict.attach(self._metadata_path)["local_alpha_axis"]
@@ -705,7 +669,7 @@ class Channel(LinOp):
                         axis=2,
                     )
 
-                tmp2 = self.wblur_t(tmp)
+                tmp2 = self.wblur_t(tmp, slit_idx)
 
                 sliced[:, : self.oshape[3] * self.srf : self.srf] = tmp2
                     
@@ -801,7 +765,7 @@ class Spectro(LinOp):
         )
         for idx, chan in enumerate(self.channels):
             logger.info(f"Channel {chan.name}")
-            APPL.runJob("adjoint_id:%d"%idx, chan.adjoint_multiproc, args=(np.reshape(inarray[self._idx[idx] : self._idx[idx + 1]], chan.oshape),), serial=True)
+            APPL.runJob("adjoint_id:%d"%idx, chan.adjoint_multiproc, args=(np.reshape(inarray[self._idx[idx] : self._idx[idx + 1]], chan.oshape),), serial=False)
 
 
         APPL.awaitJobResult()
