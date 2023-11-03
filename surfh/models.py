@@ -52,7 +52,7 @@ def dft(inarray: array) -> array:
     -----
     Use `scipy.fft.rfftn` with `workers=-1`.
     """
-    return sp.fft.rfftn(inarray, axes=range(-2, 0), norm="ortho", workers=-1)
+    return sp.fft.rfftn(inarray, axes=range(-2, 0), norm="ortho", workers=1)
 
 
 def idft(inarray: array, shape: Tuple[int, int]) -> array:
@@ -70,7 +70,7 @@ def idft(inarray: array, shape: Tuple[int, int]) -> array:
     Use `scipy.fft.irfftn` with `workers=-1`.
     """
     return sp.fft.irfftn(
-        inarray, s=shape, axes=range(-len(shape), 0), norm="ortho", workers=-1
+        inarray, s=shape, axes=range(-len(shape), 0), norm="ortho", workers=1
     )
 
 
@@ -133,6 +133,27 @@ def fov_weight(
     return weights
 
 
+def wblur_n(arr: array, wpsf: array) -> array:
+    """Apply blurring in λ axis
+
+    Parameters
+    ----------
+    arr: array-like
+      Input of shape [λ, α, β].
+    wpsf: array-like
+      Wavelength PSF of shape [λ', λ, β]
+
+    Returns
+    -------
+    out: array-like
+      A wavelength blurred array in [λ', α, β].
+    """
+    # [λ', α, β] = ∑_λ arr[λ, α, β] wpsf[λ', λ, β]
+    # Σ_λ
+    arr = np.ascontiguousarray(np.swapaxes(arr, 0, 2))
+    wpsf = np.ascontiguousarray(np.swapaxes(wpsf, 1, 2))
+    return cythons_files.c_wblur(arr, wpsf, wpsf.shape[1], arr.shape[1], arr.shape[2], wpsf.shape[0])
+
 def wblur(arr: array, wpsf: array) -> array:
     """Apply blurring in λ axis
 
@@ -150,9 +171,11 @@ def wblur(arr: array, wpsf: array) -> array:
     """
     # [λ', α, β] = ∑_λ arr[λ, α, β] wpsf[λ', λ, β]
     # Σ_λ
-
-    return cythons_files.c_wblur(arr, wpsf, wpsf.shape[1], arr.shape[1], arr.shape[2], wpsf.shape[0])
-
+    tmp2 = np.moveaxis(arr, 0, -1)
+    s = time.time()
+    tmp = cythons_files.c_wblur(tmp2, wpsf, wpsf.shape[1], arr.shape[1], arr.shape[2], wpsf.shape[0])
+    e = time.time()
+    return tmp
 
 def wblur_t(arr: array, wpsf: array) -> array:
     """Apply transpose of blurring in λ axis
@@ -171,7 +194,7 @@ def wblur_t(arr: array, wpsf: array) -> array:
     """
     # [λ, α, β] = ∑_λ' arr[λ', α, β] wpsf[λ', λ]
     # Σ_λ'
-
+    
     return cythons_files.c_wblur_t(arr, wpsf, wpsf.shape[1], arr.shape[1], arr.shape[2], wpsf.shape[0])
 
 
@@ -327,6 +350,10 @@ class Channel(LinOp):
  
         super().__init__(ishape, oshape, self.instr.name)
 
+        self.save_memory = False
+        if not self.save_memory:
+            self.precompute_wpsf()
+
     @property
     def step(self) -> float:
         alpha_axis = shared_dict.attach(self._metadata_path)["alpha_axis"]
@@ -355,6 +382,12 @@ class Channel(LinOp):
         return int(
             ceil(self.instr.slit_beta_width / (beta_axis[1] - beta_axis[0]))
         )
+
+    @property
+    def wavel_axis(self) -> array:
+        """ """
+        wavel_axis = shared_dict.attach(self._metadata_path)["wavel_axis"]
+        return wavel_axis
 
     def slit_local_fov(self, slit_idx) -> instru.LocalFOV:
         """The FOV of slit `slit_idx` in local ref"""
@@ -450,13 +483,13 @@ class Channel(LinOp):
         alpha_coord, beta_coord = (self.instr.fov + pointing).local2global(
             local_alpha_axis, local_beta_axis
         )
+        
 
         # Necessary for interpn to process 3D array. No interpolation is done
         # along that axis.
         wl_idx = np.arange(inarray.shape[0])
 
         out_shape = (len(wl_idx),) + alpha_coord.shape
-
         local_coords = np.vstack(
             [
                 alpha_coord.ravel(),
@@ -517,21 +550,30 @@ class Channel(LinOp):
         _otf_sr = shared_dict.attach(self._metadata_path)["_otf_sr"]
         return dft(inarray) * _otf_sr.conj()
 
-    def _wpsf(self, length: int, step: float) -> array:
+    def _wpsf(self, length: int, step: float, slit_idx: int) -> array:
         """Return spectral PSF"""
         # ∈ [0, β_s]
         wavel_axis = shared_dict.attach(self._metadata_path)["wavel_axis"]
         beta_in_slit = np.arange(0, length) * step
-        
-        return self.instr.spectral_psf(
-            beta_in_slit - np.mean(beta_in_slit),  # ∈ [-β_s / 2, β_s / 2]
-            wavel_axis[self.wslice],
-            arcsec2micron=self.instr.wavel_step / self.instr.det_pix_size,
-        )
 
-    def wblur(self, inarray: array) -> array:
+        if self.save_memory:
+            wpsf = self.instr.spectral_psf(
+                            beta_in_slit - np.mean(beta_in_slit),  # ∈ [-β_s / 2, β_s / 2]
+                            wavel_axis[self.wslice],
+                            arcsec2micron=self.instr.wavel_step / self.instr.det_pix_size,
+                        )
+        else:
+            wpsf = shared_dict.attach(self._metadata_path)["wpsf"][slit_idx]
+            
+        return wpsf
+
+    def wblur(self, inarray: array, slit_idx: int) -> array:
         """Returns spectral blurring of inarray"""
-        return wblur(inarray, self._wpsf(inarray.shape[2], self.beta_step))
+        return wblur(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx))
+    
+    def wblur_n(self, inarray: array) -> array:
+        """Returns spectral blurring of inarray"""
+        return wblur_n(inarray, self._wpsf(inarray.shape[2], self.beta_step))
 
     def wblur_t(self, inarray: array) -> array:
         """Returns spectral blurring transpose of inarray"""
@@ -556,7 +598,8 @@ class Channel(LinOp):
                 out[p_idx, slit_idx, :, :] = self.instr.pce[
                     ..., np.newaxis
                 ]* self.wblur(sliced).sum(axis=2)
-
+               
+    
     def forward_multiproc(self, inarray_f):
         """inarray is supposed in global coordinate, spatially blurred and in Fourier space.
 
@@ -566,15 +609,57 @@ class Channel(LinOp):
         blurred = self.sblur(inarray_f[self.wslice, ...])
         for p_idx, pointing in enumerate(self.pointings):
             gridded = self.gridding(blurred, pointing)
+            t = time.time()
             for slit_idx in range(self.instr.n_slit):
                 # Slicing, weighting and α subsampling for SR
                 sliced = self.slicing(gridded, slit_idx)[
                     :, : self.oshape[3] * self.srf : self.srf
                 ]
                 
+                t1 = time.time()
                 out[p_idx, slit_idx, :, :] = self.instr.pce[
                     ..., np.newaxis
-                ]* self.wblur(sliced).sum(axis=2)
+                ]* self.wblur(sliced, slit_idx).sum(axis=2)
+                tt1 = time.time()
+                #print("     tt1 = ", tt1-t1)
+                
+
+            tt = time.time()
+            print("Time slit is ", tt-t)
+
+    def precompute_wpsf(self):
+        local_alpha_axis = shared_dict.attach(self._metadata_path)["local_alpha_axis"]
+        local_beta_axis = shared_dict.attach(self._metadata_path)["local_beta_axis"]
+        alpha_axis = shared_dict.attach(self._metadata_path)["alpha_axis"]
+        beta_axis = shared_dict.attach(self._metadata_path)["beta_axis"]
+
+        _metadata = shared_dict.attach(self._metadata_path)
+        _metadata["wpsf"] = {}
+        alpha_coord, beta_coord = (self.instr.fov).local2global(
+            local_alpha_axis, local_beta_axis
+        )
+
+        # Necessary for interpn to process 3D array. No interpolation is done
+        # along that axis.
+        wl_idx = np.arange((self.wslice.stop-self.wslice.start))
+
+        out_shape = (len(wl_idx),) + alpha_coord.shape
+        gridded = np.ones(out_shape)
+       
+        for slit_idx in range(self.instr.n_slit):
+            slices = self.slit_slices(slit_idx)
+            sliced = gridded[:, slices[0], slices[1]]
+            sliced = sliced[
+                    :, : self.oshape[3] * self.srf : self.srf
+                ]
+            
+
+            wavel_axis = shared_dict.attach(self._metadata_path)["wavel_axis"]
+            beta_in_slit = np.arange(0, sliced.shape[2]) * self.beta_step
+            arcsec2micron=self.instr.wavel_step / self.instr.det_pix_size,
+            wpsf = self.instr.w_blur.psfs(self.instr.wavel_axis, beta_in_slit - np.mean(beta_in_slit), wavel_axis[self.wslice], arcsec2micron)
+            
+            _metadata["wpsf"][slit_idx] = wpsf
 
 
     def adjoint(self, measures):
@@ -601,6 +686,7 @@ class Channel(LinOp):
                 gridded += self.slicing_t(sliced, slit_idx)
             blurred += self.gridding_t(gridded, pointing)
         out[self.wslice, ...] = self.sblur_t(blurred)
+
 
     def adjoint_multiproc(self, measures):
         out = shared_dict.attach(self._metadata_path)["ad_data"]
@@ -698,8 +784,7 @@ class Spectro(LinOp):
         blurred_f = dft(inarray) * self.sotf
         for idx, chan in enumerate(self.channels):
             logger.info(f"Channel {chan.name}")
-            APPL.runJob("forward_id:%d"%idx, chan.forward_multiproc, args=(blurred_f,), serial=True)
-
+            APPL.runJob("forward_id:%d"%idx, chan.forward_multiproc, args=(blurred_f,), serial=False)
         APPL.awaitJobResult()
         
         self._shared_metadata.reload()
@@ -709,7 +794,7 @@ class Spectro(LinOp):
 
         return out 
 
-
+    
     def adjoint(self, inarray: array) -> array:
         tmp = np.zeros(
             self.ishape[:2] + (self.ishape[2] // 2 + 1,), dtype=np.complex128
@@ -853,7 +938,6 @@ class SpectroLMM(LinOp):
         logger.info(f"Spatial blurring DFT2({inarray.shape})")
         blurred_f = dft(cube) * self.sotf
         for idx, chan in enumerate(self.channels):
-            print("nChan = ", len(self.channels))
             logger.info(f"Channel {chan.name}")
             out[self._idx[idx] : self._idx[idx + 1]] = chan.forward(blurred_f).ravel()
         return out

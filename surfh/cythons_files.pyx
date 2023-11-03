@@ -6,6 +6,8 @@ from libc.math cimport NAN
 import numpy as np
 cimport numpy as np
 cimport cython
+
+from cython.parallel import prange, parallel
 from libc.stdlib cimport malloc, free, calloc
 
 ctypedef double complex double_complex
@@ -222,12 +224,14 @@ def c_wblur(const double[:,:,:] arr, const double[:,:,:]wpsf,
         int l, a, b, ll = 0
         double tmp = 0.
 
+    #with nogil, parallel(num_threads=1):
+        #local_buf = <double*> malloc(sizeof(double)* )
     for ll in range(sizeLambdaPrime):
         for a in range(sizeAlpha):
             for b in range(sizeBeta):
                 tmp = 0 
                 for l in range(sizeLambda):
-                    tmp += arr[l,a,b]* wpsf[ll,l,b]
+                    tmp = tmp + arr[l,a,b]* wpsf[ll,l,b]
                 c_res[ll,a,b] = tmp 
 
     return np.asarray(c_res)

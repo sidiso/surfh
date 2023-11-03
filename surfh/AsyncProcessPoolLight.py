@@ -13,8 +13,8 @@ class AsyncProcessPoolLight:
 
 
         self._compute_workers = []
-        self._compute_queue   = Queue()
-        self._result_queue    = Queue()
+        #self._compute_queue   = Queue()
+        #self._result_queue    = Queue()
         
 
     def runJob(self,job_id, handler=None, io=None, args=(), kwargs={}, collect_result=True, serial=False):

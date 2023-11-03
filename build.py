@@ -8,8 +8,8 @@ from distutils.core import Distribution, Extension
 from Cython.Build import cythonize
 
 
-compile_args = ["-march=native", "-O3"]
-link_args = []
+compile_args = ["-march=native", "-O3", "-fopenmp"]
+link_args = ['-fopenmp']
 include_dirs = [np.get_include()]
 libraries = []
 
