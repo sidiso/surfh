@@ -201,7 +201,7 @@ def solve_2D_hypercube(const long[:,:] c_indices, const double[:,:]c_norm_distan
 @cython.initializedcheck(False)
 def c_wblur(const double[:,:,:] arr, const double[:,:,:]wpsf, 
                 int sizeLambda, int sizeAlpha, int sizeBeta,
-                int sizeLambdaPrime):
+                int sizeLambdaPrime, int num_threads):
 
     """Apply blurring in λ axis
 
@@ -224,15 +224,14 @@ def c_wblur(const double[:,:,:] arr, const double[:,:,:]wpsf,
         int l, a, b, ll = 0
         double tmp = 0.
 
-    #with nogil, parallel(num_threads=1):
-        #local_buf = <double*> malloc(sizeof(double)* )
-    for ll in range(sizeLambdaPrime):
-        for a in range(sizeAlpha):
-            for b in range(sizeBeta):
-                tmp = 0 
-                for l in range(sizeLambda):
-                    tmp = tmp + arr[l,a,b]* wpsf[ll,l,b]
-                c_res[ll,a,b] = tmp 
+    with nogil, parallel(num_threads=num_threads):
+        for ll in prange(sizeLambdaPrime):
+            for a in range(sizeAlpha):
+                for b in range(sizeBeta):
+                    tmp = 0 
+                    for l in range(sizeLambda):
+                        tmp = tmp + arr[l,a,b]* wpsf[ll,l,b]
+                    c_res[ll,a,b] = tmp 
 
     return np.asarray(c_res)
 
@@ -242,7 +241,7 @@ def c_wblur(const double[:,:,:] arr, const double[:,:,:]wpsf,
 @cython.initializedcheck(False)
 def c_wblur_t(const double[:,:,:] arr, const double[:,:,:]wpsf, 
                 int sizeLambda, int sizeAlpha, int sizeBeta,
-                int sizeLambdaPrime):
+                int sizeLambdaPrime, int num_threads):
     """Apply transpose of blurring in λ axis
 
     Parameters
@@ -264,12 +263,13 @@ def c_wblur_t(const double[:,:,:] arr, const double[:,:,:]wpsf,
         int l, a, b, ll = 0
         double tmp = 0.
 
-    for l in range(sizeLambda):
-        for a in range(sizeAlpha):
-            for b in range(sizeBeta):
-                tmp = 0 
-                for ll in range(sizeLambdaPrime):
-                    tmp += arr[ll,a,b]* wpsf[ll,l,b]
-                c_res[l,a,b] = tmp 
+    with nogil, parallel(num_threads=num_threads):
+        for l in prange(sizeLambda):
+            for a in range(sizeAlpha):
+                for b in range(sizeBeta):
+                    tmp = 0 
+                    for ll in range(sizeLambdaPrime):
+                        tmp = tmp + arr[ll,a,b]* wpsf[ll,l,b]
+                    c_res[l,a,b] = tmp 
 
     return np.asarray(c_res)

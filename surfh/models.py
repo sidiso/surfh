@@ -26,11 +26,16 @@ from aljabr import LinOp
 from loguru import logger
 from numpy import ndarray as array
 import time
+from ctypes import POINTER, c_double, c_uint32
+import os
+from pathlib import Path
+import psutil
 
 from . import instru
 from . import cython_2D_interpolation
 from . import cythons_files
 from . import shared_dict
+from . import utils
 
 from .AsyncProcessPoolLight import APPL
 from multiprocessing import Pool
@@ -52,7 +57,7 @@ def dft(inarray: array) -> array:
     -----
     Use `scipy.fft.rfftn` with `workers=-1`.
     """
-    return sp.fft.rfftn(inarray, axes=range(-2, 0), norm="ortho", workers=1)
+    return sp.fft.rfftn(inarray, axes=range(-2, 0), norm="ortho", workers=-1)
 
 
 def idft(inarray: array, shape: Tuple[int, int]) -> array:
@@ -70,7 +75,7 @@ def idft(inarray: array, shape: Tuple[int, int]) -> array:
     Use `scipy.fft.irfftn` with `workers=-1`.
     """
     return sp.fft.irfftn(
-        inarray, s=shape, axes=range(-len(shape), 0), norm="ortho", workers=1
+        inarray, s=shape, axes=range(-len(shape), 0), norm="ortho", workers=-1
     )
 
 
@@ -132,7 +137,7 @@ def fov_weight(
 
     return weights
 
-def wblur(arr: array, wpsf: array) -> array:
+def wblur(arr: array, wpsf: array, num_threads: int) -> array:
     """Apply blurring in λ axis
 
     Parameters
@@ -149,11 +154,15 @@ def wblur(arr: array, wpsf: array) -> array:
     """
     # [λ', α, β] = ∑_λ arr[λ, α, β] wpsf[λ', λ, β]
     # Σ_λ
-    tmp2 = np.moveaxis(arr, 0, -1)
-    tmp = cythons_files.c_wblur(tmp2, wpsf, wpsf.shape[1], arr.shape[1], arr.shape[2], wpsf.shape[0])
-    return tmp
+    #arr = np.moveaxis(arr, 0, -1)
+    result_array = cythons_files.c_wblur(np.ascontiguousarray(arr), 
+                                         np.ascontiguousarray(wpsf), 
+                                         wpsf.shape[1], arr.shape[1], 
+                                         arr.shape[2], wpsf.shape[0],
+                                         num_threads)
+    return result_array
 
-def wblur_t(arr: array, wpsf: array) -> array:
+def wblur_t(arr: array, wpsf: array, num_threads: int) -> array:
     """Apply transpose of blurring in λ axis
 
     Parameters
@@ -170,7 +179,10 @@ def wblur_t(arr: array, wpsf: array) -> array:
     """
     # [λ, α, β] = ∑_λ' arr[λ', α, β] wpsf[λ', λ]
     # Σ_λ'
-    return cythons_files.c_wblur_t(arr, wpsf, wpsf.shape[1], arr.shape[1], arr.shape[2], wpsf.shape[0])
+    result_array = cythons_files.c_wblur_t(arr, wpsf, wpsf.shape[1], 
+                                           arr.shape[1], arr.shape[2], 
+                                           wpsf.shape[0], num_threads)
+    return result_array
 
 
 def diffracted_psf(template, spsf, wpsf) -> List[array]:
@@ -233,6 +245,8 @@ class Channel(LinOp):
       The input cube shape (after wslice).
     local_shape: tuple of int
       The input cube shape in local referential.
+    num_threads : int
+      Number of threads used for parallel computation inside Channel's methods.
     """
 
     def __init__(
@@ -244,6 +258,7 @@ class Channel(LinOp):
         srf: int,
         pointings: instru.CoordList,
         shared_metadata_path: str,
+        num_threads: int,
     ):
         """Forward model of a Channel
 
@@ -261,7 +276,8 @@ class Channel(LinOp):
           The super resolution factor.
         pointings: `CoordList`
           The list of pointed coordinates.
-
+        num_threads : int
+          Number of threads for multiproc parallelissation.
         Notes
         -----
         alpha and beta axis must have the same step and must be regular. This is
@@ -288,6 +304,8 @@ class Channel(LinOp):
 
         self.pointings = pointings.pix(self.step)
         self.instr = instr.pix(self.step)
+
+        self.num_threads=num_threads
 
         self.srf = srf
         self.imshape = (len(alpha_axis), len(beta_axis))
@@ -544,11 +562,11 @@ class Channel(LinOp):
 
     def wblur(self, inarray: array, slit_idx: int) -> array:
         """Returns spectral blurring of inarray"""
-        return wblur(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx))
+        return wblur(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads)
 
     def wblur_t(self, inarray: array, slit_idx: int) -> array:
         """Returns spectral blurring transpose of inarray"""
-        return wblur_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx))
+        return wblur_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads)
 
     
     def forward(self, inarray_f):
@@ -704,8 +722,9 @@ class Spectro(LinOp):
         _shared_metadata = shared_dict.create("s_metadata")
         self._shared_metadata = _shared_metadata
         for instr in instrs:
-            print("Create Chan shared dict named ", instr.get_name_pix())
             _shared_metadata.addSubdict(instr.get_name_pix())
+
+        num_threads = np.ceil(psutil.cpu_count()/len(instrs))
 
         self.channels = [
             Channel(
@@ -716,6 +735,7 @@ class Spectro(LinOp):
                 srf,
                 pointings,
                 _shared_metadata[instr.get_name_pix()].path,
+                num_threads,
             )
             for srf, instr in zip(srfs, instrs)
         ]
@@ -748,7 +768,9 @@ class Spectro(LinOp):
         blurred_f = dft(inarray) * self.sotf
         for idx, chan in enumerate(self.channels):
             logger.info(f"Channel {chan.name}")
-            APPL.runJob("forward_id:%d"%idx, chan.forward_multiproc, args=(blurred_f,), serial=False)
+            APPL.runJob("forward_id:%d"%idx, chan.forward_multiproc, 
+                        args=(blurred_f,), 
+                        serial=False)
         APPL.awaitJobResult()
         
         self._shared_metadata.reload()
@@ -765,7 +787,9 @@ class Spectro(LinOp):
         )
         for idx, chan in enumerate(self.channels):
             logger.info(f"Channel {chan.name}")
-            APPL.runJob("adjoint_id:%d"%idx, chan.adjoint_multiproc, args=(np.reshape(inarray[self._idx[idx] : self._idx[idx + 1]], chan.oshape),), serial=False)
+            APPL.runJob("adjoint_id:%d"%idx, chan.adjoint_multiproc, 
+                        args=(np.reshape(inarray[self._idx[idx] : self._idx[idx + 1]], chan.oshape),), 
+                        serial=False)
 
 
         APPL.awaitJobResult()
