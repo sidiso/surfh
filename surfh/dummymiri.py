@@ -25,7 +25,7 @@ wavel_4b = np.arange(20.69, 24.48, 0.00669) # 20.69-24.48µm
 wavel_4c = np.arange(24.19, 27.9, 0.00655) # 24.19-27.9µm
 
 
-
+np.random.seed(150)
 pce1a = np.random.rand(wavel_1a.size)/10 + 0.5
 pce1b = np.random.rand(wavel_1b.size)/10 + 0.5
 pce1c = np.random.rand(wavel_1c.size)/10 + 0.5
