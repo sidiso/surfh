@@ -3,7 +3,7 @@ import scipy.misc
 import matplotlib.pyplot as plt
 from matplotlib import transforms
 
-import scipy_python_interpolate 
+from surfh import cython_2D_interpolation 
 from surfh import smallmiri as mrs
 
 im = scipy.misc.ascent()
@@ -59,7 +59,7 @@ xi = np.vstack(
 ).T
 
 # Interpolate 
-nim = scipy_python_interpolate.interpn((xa, xb), im, xi).reshape(na.shape)
+nim = cython_2D_interpolation.interpn((xa, xb), im, xi).reshape(na.shape)
 
 plt.figure(1)
 plt.clf()

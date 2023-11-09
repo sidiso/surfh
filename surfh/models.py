@@ -757,10 +757,6 @@ class Spectro(LinOp):
             self.channels[chan_idx].oshape,
         )
 
-    def set_general_dic(self):
-
-        return
-  
 
     def forward(self, inarray: array) -> array:
         out = np.zeros(self.oshape)
@@ -860,6 +856,46 @@ class Spectro(LinOp):
                 chan,
             )
         return out / nhit, nhit
+    
+
+
+    def check_observation(self):
+        """ Check if channels FoV for all pointing match the observed image FoV"""
+
+        # Get the coordinates of the observed object 
+        grid = (self.alpha_axis, self.beta_axis)
+
+        for idx, chan in enumerate(self.channels):
+            # Get local alpha and beta coordinates for the channel
+            local_alpha_axis = shared_dict.attach(chan._metadata_path)["local_alpha_axis"]
+            local_beta_axis = shared_dict.attach(chan._metadata_path)["local_beta_axis"]
+
+            for p_idx, pointing in enumerate(chan.pointings):
+                # Get the global alpha and beta coordinates regarding the pointing for specific IFU
+                alpha_coord, beta_coord = (chan.instr.fov + pointing).local2global(
+                    local_alpha_axis, local_beta_axis
+                )
+                local_coords = np.vstack(
+                            [
+                                alpha_coord.ravel(),
+                                beta_coord.ravel()
+                            ]
+                        ).T  
+                
+                # Check if IFU FoV anf image FoV match
+                for i, p in enumerate(local_coords.T):
+                    if not np.logical_and(np.all(grid[i][0] <= p),
+                                        np.all(p <= grid[i][-1])):
+                        logger.debug(f"Out of bound for Chan {chan.name} - Pointing {pointing}")
+
+
+
+    def close(self):
+        """ Shut down all allocated memory e.g. shared arrays and dictionnaries"""
+        if self._shared_metadata is not None:
+            dico = shared_dict.attach(self._shared_metadata.path)
+            dico.delete() 
+
 
 
 class SpectroLMM(LinOp):
