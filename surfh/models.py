@@ -746,6 +746,8 @@ class Spectro(LinOp):
         oshape = (self._idx[-1],)
 
         super().__init__(ishape, oshape, "Spectro")
+        self.check_observation()
+
 
     @property
     def step(self) -> float:
@@ -869,8 +871,9 @@ class Spectro(LinOp):
             # Get local alpha and beta coordinates for the channel
             local_alpha_axis = shared_dict.attach(chan._metadata_path)["local_alpha_axis"]
             local_beta_axis = shared_dict.attach(chan._metadata_path)["local_beta_axis"]
-
+            
             for p_idx, pointing in enumerate(chan.pointings):
+                out_of_bound = False
                 # Get the global alpha and beta coordinates regarding the pointing for specific IFU
                 alpha_coord, beta_coord = (chan.instr.fov + pointing).local2global(
                     local_alpha_axis, local_beta_axis
@@ -886,7 +889,10 @@ class Spectro(LinOp):
                 for i, p in enumerate(local_coords.T):
                     if not np.logical_and(np.all(grid[i][0] <= p),
                                         np.all(p <= grid[i][-1])):
-                        logger.debug(f"Out of bound for Chan {chan.name} - Pointing {pointing}")
+                        out_of_bound = True
+
+                if out_of_bound:
+                    logger.debug(f"Out of bound for Chan {chan.name} - Pointing n°{p_idx}")
 
 
 
