@@ -24,7 +24,7 @@ def mrs_wavel_axis(filename):
         return blob[1].data["WAVELENGTH"]
 
 
-logger.debug("THIS IS THE SMALL RMS !")
+logger.debug(f"THIS IS THE SMALL RMS !")
 
 logger.info("Load PCE")
 
@@ -117,7 +117,7 @@ ch1c = instru.IFU(
     "1C",
 )
 ch2a = instru.IFU(
-    instru.FOV(4.0, 4.8, origin=instru.Coord(-503.636, -319.091), angle=8.1),
+    instru.FOV(4.0, 4.8, origin=instru.Coord(-503.636, -319.091), angle=8.2),
     0.196,
     17,
     spec_blur_2a,
@@ -126,7 +126,7 @@ ch2a = instru.IFU(
     "2A",
 )
 ch2b = instru.IFU(
-    instru.FOV(4.0, 4.8, origin=instru.Coord(-503.636, -319.091), angle=8.1),
+    instru.FOV(4.0, 4.8, origin=instru.Coord(-503.636, -319.091), angle=8.2),
     0.196,
     17,
     spec_blur_2b,
@@ -135,7 +135,7 @@ ch2b = instru.IFU(
     "2B",
 )
 ch2c = instru.IFU(
-    instru.FOV(4.0, 4.8, origin=instru.Coord(-503.636, -319.091), angle=8.1),
+    instru.FOV(4.0, 4.8, origin=instru.Coord(-503.636, -319.091), angle=8.2),
     0.196,
     17,
     spec_blur_2c,
@@ -144,7 +144,7 @@ ch2c = instru.IFU(
     "2C",
 )
 ch3a = instru.IFU(
-    instru.FOV(5.5, 6.2, origin=instru.Coord(-504.372, -318.798), angle=7.7),
+    instru.FOV(5.5, 6.2, origin=instru.Coord(-504.372, -318.798), angle=7.5),
     0.245,
     16,
     spec_blur_3a,
@@ -153,7 +153,7 @@ ch3a = instru.IFU(
     "3A",
 )
 ch3b = instru.IFU(
-    instru.FOV(5.5, 6.2, origin=instru.Coord(-504.372, -318.798), angle=7.7),
+    instru.FOV(5.5, 6.2, origin=instru.Coord(-504.372, -318.798), angle=7.5),
     0.245,
     16,
     spec_blur_3b,
@@ -162,7 +162,7 @@ ch3b = instru.IFU(
     "3B",
 )
 ch3c = instru.IFU(
-    instru.FOV(5.5, 6.2, origin=instru.Coord(-504.372, -318.798), angle=7.7),
+    instru.FOV(5.5, 6.2, origin=instru.Coord(-504.372, -318.798), angle=7.5),
     0.245,
     16,
     spec_blur_3c,
@@ -171,7 +171,7 @@ ch3c = instru.IFU(
     "3C",
 )
 ch4a = instru.IFU(
-    instru.FOV(6.9, 7.9, origin=instru.Coord(-503.129, -319.488), angle=8.3),
+    instru.FOV(6.9, 7.9, origin=instru.Coord(-503.129, -319.488), angle=0),
     0.273,
     12,
     spec_blur_4a,
