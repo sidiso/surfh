@@ -137,7 +137,7 @@ class Coord:
         ------
         A new `Coord` with rotation applied.
         """
-        tmp = rotmatrix(degree) @ self
+        tmp = rotmatrix(-degree) @ self
         return Coord(float(tmp[0]), float(tmp[1]))
 
     def pix(self, step: float) -> "Coord":
