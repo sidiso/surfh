@@ -5,7 +5,7 @@ import itertools
 import numpy as np
 import time
 
-import cythons_files
+from surfh import cythons_files
 
 # OLD Cython
 

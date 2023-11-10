@@ -1,8 +1,10 @@
 from multiprocessing import Process, Queue
+from collections import OrderedDict
 import numpy as np
 import fnmatch
 import inspect
 
+import progressbar
 
 class AsyncProcessPoolLight:
 
@@ -10,11 +12,8 @@ class AsyncProcessPoolLight:
         pass
 
     def init(self):
-
-
         self._compute_workers = []
-        #self._compute_queue   = Queue()
-        #self._result_queue    = Queue()
+        self._jobs  = []
         
 
     def runJob(self,job_id, handler=None, io=None, args=(), kwargs={}, collect_result=True, serial=False):
@@ -35,8 +34,10 @@ class AsyncProcessPoolLight:
         if serial:
             self._dispatch_job(jobitem)
         else:
-            self._compute_workers.append(Process(target=self._dispatch_job, args=(jobitem,)))
-            self._compute_workers[-1].start()
+            process = Process(target=self._dispatch_job, args=(jobitem,))
+            process.start()
+            self._compute_workers.append(process)
+            self._jobs.append((job_id, process))
 
     def _dispatch_job(self, jobitem):
         
@@ -58,9 +59,59 @@ class AsyncProcessPoolLight:
             raise
         
         
-    def awaitJobResult(self):
-        for job in self._compute_workers:
-            job.join()
+    def awaitJobResult(self, jobspecs, progress=None, timing=None):
+        if type(jobspecs) is str:
+            jobspecs = [jobspecs]
+
+        fs = []
+        result_values = []
+        job_results = OrderedDict()
+        #print("Iter on jobspecs")
+        for jobspec in jobspecs:
+            for job_id, f in self._jobs:
+                if fnmatch.fnmatch(job_id, jobspec):
+                    fs.append(f)
+                    job_results[jobspec] = (1, [])
+
+
+        total_jobs = complete_jobs = 0
+        total_jobs = len(fs)
+      
+        if progress:
+
+            widgets = [
+                    f'\x1b[34;49;1m{jobspecs[0]} : \x1b[0m',
+                    progressbar.Percentage(),
+                    progressbar.Bar(marker='\x1b[32m#\x1b[39m'),
+                    progressbar.widgets.Timer(),
+                ]
+
+            with progressbar.ProgressBar(widgets=widgets, max_value=total_jobs) as bar:
+                while ((complete_jobs != total_jobs)):
+                    #print("Total fs jobs are ", fs)
+                    complete_jobs = 0
+                    for i in fs:
+                        if not i.is_alive():
+                            complete_jobs +=1
+                    bar.update(complete_jobs)
+                    #pBAR.render(complete_jobs,(total_jobs or 1))
+        else:
+            for job in fs:
+                job.join()
+
+
+
+
+        self._compute_workers = [x for x in self._compute_workers if x.is_alive()]
+        for jobspec in jobspecs:
+            self._jobs  = [(job_id, f) for (job_id, f) in self._jobs if not fnmatch.fnmatch(job_id, jobspec) ]
+
+        
+
+
+
+
+        
 
 
 
