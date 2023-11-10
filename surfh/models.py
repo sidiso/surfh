@@ -33,7 +33,7 @@ import psutil
 
 from . import instru
 from . import cython_2D_interpolation
-from . import cythons_files
+from surfh import cythons_files
 from . import shared_dict
 from . import utils
 
@@ -766,10 +766,11 @@ class Spectro(LinOp):
         blurred_f = dft(inarray) * self.sotf
         for idx, chan in enumerate(self.channels):
             logger.info(f"Channel {chan.name}")
-            APPL.runJob("forward_id:%d"%idx, chan.forward_multiproc, 
+            APPL.runJob("Forward_id:%d"%idx, chan.forward_multiproc, 
                         args=(blurred_f,), 
                         serial=False)
-        APPL.awaitJobResult()
+            
+        APPL.awaitJobResult("Forward*", progress=True)
         
         self._shared_metadata.reload()
         for idx, chan in enumerate(self.channels):
@@ -785,12 +786,12 @@ class Spectro(LinOp):
         )
         for idx, chan in enumerate(self.channels):
             logger.info(f"Channel {chan.name}")
-            APPL.runJob("adjoint_id:%d"%idx, chan.adjoint_multiproc, 
+            APPL.runJob("Adjoint_id:%d"%idx, chan.adjoint_multiproc, 
                         args=(np.reshape(inarray[self._idx[idx] : self._idx[idx + 1]], chan.oshape),), 
                         serial=False)
 
+        APPL.awaitJobResult("Adjoint*", progress=True)
 
-        APPL.awaitJobResult()
         self._shared_metadata.reload()
         for idx, chan in enumerate(self.channels):
             ad_data = self._shared_metadata[chan.name]["ad_data"]
