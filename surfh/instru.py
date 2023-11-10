@@ -137,7 +137,7 @@ class Coord:
         ------
         A new `Coord` with rotation applied.
         """
-        tmp = rotmatrix(degree) @ self
+        tmp = rotmatrix(-degree) @ self
         return Coord(float(tmp[0]), float(tmp[1]))
 
     def pix(self, step: float) -> "Coord":
@@ -147,7 +147,7 @@ class Coord:
     def __array__(self, dtype=None):
         """return as a 2x1 numpy array"""
         if dtype is None:
-            dtype = np.float
+            dtype = np.float32
         return np.array([self.alpha, self.beta]).astype(dtype).reshape((2, 1))
 
 
@@ -649,6 +649,9 @@ class IFU:
     def slit_beta_width(self):
         """The width of slit"""
         return self.fov.beta_width / self.n_slit
+
+    def get_name_pix(self):
+        return self.name if self.name.endswith('pix') else self.name + '_pix'
 
     def spectral_psf(self, beta, wavel_input_axis, arcsec2micron):
         """Return spectral PSF for monochromatic punctual sources

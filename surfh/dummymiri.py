@@ -1,19 +1,4 @@
-# SURFH - SUper Resolution and Fusion for Hyperspectral images
-#
-# Copyright (C) 2022 François Orieux <francois.orieux@universite-paris-saclay.fr>
-# Copyright (C) 2018-2021 Ralph Abirizk <ralph.abirizk@universite-paris-saclay.fr>
-#
-# This program is free software: you can redistribute it and/or modify it under
-# the terms of the GNU General Public License as published by the Free Software
-# Foundation, either version 3 of the License, or (at your option) any later
-# version.
-#
-# This program is distributed in the hope that it will be useful, but WITHOUT
-# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License along with
-# this program. If not, see <http://www.gnu.org/licenses/>.
+#!/usr/bin/env python3
 
 from importlib import resources
 
@@ -23,53 +8,37 @@ from loguru import logger
 
 from . import instru
 
-def mrs_pce(filename):
-    """Load PCE of a detector from FITS file"""
-    with resources.path("surfh.data", filename) as path:
-        blob = fits.open(path)
-        return blob[1].data["EFFICIENCY"]
+logger.debug("THIS IS THE DUMMY REAL SIZE RMS !")
+
+logger.info("Make wavelength axis")
+wavel_1a = np.arange(4.9, 5.7, 0.00073) # 4.9-5.74µm  Delta = 1146
+wavel_1b = np.arange(5.66, 6.63, 0.00084) # 5.66-6.63 µm
+wavel_1c = np.arange(6.53, 7.65, 0.00097) # 6.53-7.65 µm
+wavel_2a = np.arange(7.51, 8.77, 0.00117) # 7.51-8.77 µm Delta = 1074
+wavel_2b = np.arange(8.67, 10.13, 0.00135) # 8.67-10.13µm 
+wavel_2c = np.arange(10.02, 11.70, 0.00155) # 10.02-11.70µm
+wavel_3a = np.arange(11.55, 13.47, 0.00224) # 11.55-13.47µm Delta = 857
+wavel_3b = np.arange(13.34, 15.57, 0.00260) # 13.34-15.57µm
+wavel_3c = np.arange(15.41, 17.98, 0.00299) # 15.41-17.98µm
+wavel_4a = np.arange(17.70, 20.95, 0.00574) # 17.70-20.95µm Delta = 566
+wavel_4b = np.arange(20.69, 24.48, 0.00669) # 20.69-24.48µm
+wavel_4c = np.arange(24.19, 27.9, 0.00655) # 24.19-27.9µm
 
 
-def mrs_wavel_axis(filename):
-    """Load wavelength axis of a detector from FITS file"""
-    with resources.path("surfh.data", filename) as path:
-        blob = fits.open(path)
-        return blob[1].data["WAVELENGTH"]
+np.random.seed(150)
+pce1a = np.random.rand(wavel_1a.size)/10 + 0.5
+pce1b = np.random.rand(wavel_1b.size)/10 + 0.5
+pce1c = np.random.rand(wavel_1c.size)/10 + 0.5
+pce2a = np.random.rand(wavel_2a.size)/10 + 0.5
+pce2b = np.random.rand(wavel_2b.size)/10 + 0.5
+pce2c = np.random.rand(wavel_2c.size)/10 + 0.5
+pce3a = np.random.rand(wavel_3a.size)/10 + 0.5
+pce3b = np.random.rand(wavel_3b.size)/10 + 0.5
+pce3c = np.random.rand(wavel_3c.size)/10 + 0.5
+pce4a = np.random.rand(wavel_4a.size)/10 + 0.5
+pce4b = np.random.rand(wavel_4b.size)/10 + 0.5
+pce4c = np.random.rand(wavel_4c.size)/10 + 0.5
 
-
-logger.debug("The parameters in this module ARE NOT VALID.")
-
-logger.info("Load pce")
-
-pce1a = mrs_pce("MIRI_FM_MIRIFUSHORT_1SHORT_PCE_07.00.00.fits")
-pce1b = mrs_pce("MIRI_FM_MIRIFUSHORT_1MEDIUM_PCE_07.00.00.fits")
-pce1c = mrs_pce("MIRI_FM_MIRIFUSHORT_1LONG_PCE_07.00.00.fits")
-pce2a = mrs_pce("MIRI_FM_MIRIFUSHORT_2SHORT_PCE_07.00.00.fits")
-pce2b = mrs_pce("MIRI_FM_MIRIFUSHORT_2MEDIUM_PCE_07.00.00.fits")
-pce2c = mrs_pce("MIRI_FM_MIRIFUSHORT_2LONG_PCE_07.00.00.fits")
-pce3a = mrs_pce("MIRI_FM_MIRIFULONG_3SHORT_PCE_07.00.00.fits")
-pce3b = mrs_pce("MIRI_FM_MIRIFULONG_3MEDIUM_PCE_07.00.00.fits")
-pce3c = mrs_pce("MIRI_FM_MIRIFULONG_3LONG_PCE_07.00.00.fits")
-pce4a = mrs_pce("MIRI_FM_MIRIFULONG_4SHORT_PCE_07.00.00.fits")
-pce4b = mrs_pce("MIRI_FM_MIRIFULONG_4MEDIUM_PCE_07.00.00.fits")
-pce4c = mrs_pce("MIRI_FM_MIRIFULONG_4LONG_PCE_07.00.00.fits")
-
-logger.info("Load wavelength axis")
-wavel_1a = mrs_wavel_axis("MIRI_FM_MIRIFUSHORT_1SHORT_PCE_07.00.00.fits")
-wavel_1b = mrs_wavel_axis("MIRI_FM_MIRIFUSHORT_1MEDIUM_PCE_07.00.00.fits")
-wavel_1c = mrs_wavel_axis("MIRI_FM_MIRIFUSHORT_1LONG_PCE_07.00.00.fits")
-wavel_2a = mrs_wavel_axis("MIRI_FM_MIRIFUSHORT_2SHORT_PCE_07.00.00.fits")
-wavel_2b = mrs_wavel_axis("MIRI_FM_MIRIFUSHORT_2MEDIUM_PCE_07.00.00.fits")
-wavel_2c = mrs_wavel_axis("MIRI_FM_MIRIFUSHORT_2LONG_PCE_07.00.00.fits")
-wavel_3a = mrs_wavel_axis("MIRI_FM_MIRIFULONG_3SHORT_PCE_07.00.00.fits")
-wavel_3b = mrs_wavel_axis("MIRI_FM_MIRIFULONG_3MEDIUM_PCE_07.00.00.fits")
-wavel_3c = mrs_wavel_axis("MIRI_FM_MIRIFULONG_3LONG_PCE_07.00.00.fits")
-wavel_4a = mrs_wavel_axis("MIRI_FM_MIRIFULONG_4SHORT_PCE_07.00.00.fits")
-wavel_4b = mrs_wavel_axis("MIRI_FM_MIRIFULONG_4MEDIUM_PCE_07.00.00.fits")
-wavel_4c = mrs_wavel_axis("MIRI_FM_MIRIFULONG_4LONG_PCE_07.00.00.fits")
-
-# https://jwst-docs.stsci.edu/jwst-observatory-characteristics/jwst-observatory-coordinate-system-and-field-of-regard
-# https://jwst-docs.stsci.edu/jwst-mid-infrared-instrument/miri-instrumentation/miri-mrs-field-and-coordinates
 
 res1a = np.mean([3320, 3710])
 res1b = np.mean([3190, 3750])
@@ -99,8 +68,6 @@ spec_blur_4a = instru.SpectralBlur(res4a)
 spec_blur_4b = instru.SpectralBlur(res4b)
 spec_blur_4c = instru.SpectralBlur(res4c)
 
-#%% MRS channel
-logger.debug("IFU. CH3 seems wrong.")
 ch1a = instru.IFU(
     instru.FOV(3.2, 3.7, origin=instru.Coord(-503.654, -318.742), angle=8.4),
     0.196,
@@ -233,8 +200,3 @@ ch1_dither = instru.CoordList.from_array(dithering[:8, :])
 ch2_dither = instru.CoordList.from_array(dithering[8:16, :])
 ch3_dither = instru.CoordList.from_array(dithering[16:24, :])
 ch4_dither = instru.CoordList.from_array(dithering[24:, :])
-
-
-### Local Variables:
-### ispell-local-dictionary: "english"
-### End:
