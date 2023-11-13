@@ -109,13 +109,6 @@ class AsyncProcessPoolLight:
         
 
 
-
-
-        
-
-
-
-
 APPL = None
 
 def _init_default():

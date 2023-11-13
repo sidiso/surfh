@@ -33,6 +33,8 @@ astropy = "^5.0.1"
 loguru = "^0.6.0"
 matplotlib = "^3.5.1"
 xarray = "^0.21.1"
+progressbar2 = "^4.2.0"
+sharedarray = "^3.2.3"
 
 [tool.poetry.dev-dependencies]
 ipython = "^8.0.1"
