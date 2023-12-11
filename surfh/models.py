@@ -970,9 +970,19 @@ class SpectroLMM(LinOp):
         blurred_f = dft(cube) * self.sotf
         for idx, chan in enumerate(self.channels):
             logger.info(f"Channel {chan.name}")
-            out[self._idx[idx] : self._idx[idx + 1]] = chan.forward(blurred_f).ravel()
-        return out
-    
+            APPL.runJob("Forward_id:%d"%idx, chan.forward_multiproc, 
+                        args=(blurred_f,), 
+                        serial=False)
+            
+        APPL.awaitJobResult("Forward*", progress=True)
+        
+        self._shared_metadata.reload()
+        for idx, chan in enumerate(self.channels):
+            fw_data = self._shared_metadata[chan.name]["fw_data"]
+            out[self._idx[idx] : self._idx[idx + 1]] = fw_data.ravel()
+
+        return out 
+
     
     def adjoint(self, inarray: array) -> array:
         tmp = np.zeros(
@@ -980,12 +990,19 @@ class SpectroLMM(LinOp):
         )
         for idx, chan in enumerate(self.channels):
             logger.info(f"Channel {chan.name}")
-            tmp += chan.adjoint(
-                np.reshape(inarray[self._idx[idx] : self._idx[idx + 1]], chan.oshape)
-            )
+            APPL.runJob("Adjoint_id:%d"%idx, chan.adjoint_multiproc, 
+                        args=(np.reshape(inarray[self._idx[idx] : self._idx[idx + 1]], chan.oshape),), 
+                        serial=False)
+
+        APPL.awaitJobResult("Adjoint*", progress=True)
+
+        self._shared_metadata.reload()
+        for idx, chan in enumerate(self.channels):
+            ad_data = self._shared_metadata[chan.name]["ad_data"]
+            tmp += ad_data
+        
         logger.info(f"Spatial blurring^T : IDFT2({tmp.shape})")
         cube = idft(tmp * self.sotf.conj(), self.imshape)
-        logger.info(f"Maps summation generation")
         return np.concatenate(
             [
                 np.sum(cube * tpl[..., np.newaxis, np.newaxis], axis=0)[np.newaxis, ...]
@@ -993,3 +1010,45 @@ class SpectroLMM(LinOp):
             ],
             axis=0,
         )
+
+
+
+    def check_observation(self):
+        """ Check if channels FoV for all pointing match the observed image FoV"""
+
+        # Get the coordinates of the observed object 
+        grid = (self.alpha_axis, self.beta_axis)
+
+        for idx, chan in enumerate(self.channels):
+            # Get local alpha and beta coordinates for the channel
+            local_alpha_axis = shared_dict.attach(chan._metadata_path)["local_alpha_axis"]
+            local_beta_axis = shared_dict.attach(chan._metadata_path)["local_beta_axis"]
+            
+            for p_idx, pointing in enumerate(chan.pointings):
+                out_of_bound = False
+                # Get the global alpha and beta coordinates regarding the pointing for specific IFU
+                alpha_coord, beta_coord = (chan.instr.fov + pointing).local2global(
+                    local_alpha_axis, local_beta_axis
+                )
+                local_coords = np.vstack(
+                            [
+                                alpha_coord.ravel(),
+                                beta_coord.ravel()
+                            ]
+                        ).T  
+                
+                # Check if IFU FoV anf image FoV match
+                for i, p in enumerate(local_coords.T):
+                    if not np.logical_and(np.all(grid[i][0] <= p),
+                                        np.all(p <= grid[i][-1])):
+                        out_of_bound = True
+
+                if out_of_bound:
+                    logger.debug(f"Out of bound for Chan {chan.name} - Pointing n°{p_idx}")
+
+
+    def close(self):
+        """ Shut down all allocated memory e.g. shared arrays and dictionnaries"""
+        if self._shared_metadata is not None:
+            dico = shared_dict.attach(self._shared_metadata.path)
+            dico.delete() 
