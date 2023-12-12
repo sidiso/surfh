@@ -948,6 +948,7 @@ class SpectroLMM(LinOp):
         oshape = (self._idx[-1],)
 
         super().__init__(ishape, oshape, "SpectroLMM")
+        self.check_observation()
 
     @property
     def step(self) -> float:
