@@ -259,6 +259,7 @@ class Channel(LinOp):
         pointings: instru.CoordList,
         shared_metadata_path: str,
         num_threads: int,
+        serial: bool,
     ):
         """Forward model of a Channel
 
@@ -305,7 +306,8 @@ class Channel(LinOp):
         self.pointings = pointings.pix(self.step)
         self.instr = instr.pix(self.step)
 
-        self.num_threads=num_threads
+        self.num_threads = num_threads
+        self.serial = serial
 
         self.srf = srf
         self.imshape = (len(alpha_axis), len(beta_axis))
@@ -562,11 +564,11 @@ class Channel(LinOp):
 
     def wblur(self, inarray: array, slit_idx: int) -> array:
         """Returns spectral blurring of inarray"""
-        return wblur(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads)
+        return wblur(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads if not self.serial else 1)
 
     def wblur_t(self, inarray: array, slit_idx: int) -> array:
         """Returns spectral blurring transpose of inarray"""
-        return wblur_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads)
+        return wblur_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads if not self.serial else 1)
 
     
     def forward(self, inarray_f):
@@ -740,6 +742,7 @@ class Spectro(LinOp):
                 pointings,
                 _shared_metadata[instr.get_name_pix()].path,
                 num_threads,
+                self.serial,
             )
             for srf, instr in zip(srfs, instrs)
         ]
