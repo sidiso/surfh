@@ -705,7 +705,8 @@ class Spectro(LinOp):
         wavel_axis: array,
         sotf: array,
         pointings: instru.CoordList,
-        verbose: bool =True,
+        verbose: bool = True,
+        serial: bool = False,
     ):
 
         self.wavel_axis = wavel_axis
@@ -715,6 +716,7 @@ class Spectro(LinOp):
         self.sotf = sotf
         self.pointings = pointings
         self.verbose = verbose
+        self.serial = serial
 
         srfs = instru.get_srf(
             [chan.det_pix_size for chan in instrs],
@@ -772,7 +774,7 @@ class Spectro(LinOp):
                 logger.info(f"Channel {chan.name}")
             APPL.runJob("Forward_id:%d"%idx, chan.forward_multiproc, 
                         args=(blurred_f,), 
-                        serial=False)
+                        serial=self.serial)
             
         APPL.awaitJobResult("Forward*", progress=self.verbose)
         
@@ -793,7 +795,7 @@ class Spectro(LinOp):
                 logger.info(f"Channel {chan.name}")
             APPL.runJob("Adjoint_id:%d"%idx, chan.adjoint_multiproc, 
                         args=(np.reshape(inarray[self._idx[idx] : self._idx[idx + 1]], chan.oshape),), 
-                        serial=False)
+                        serial=self.serial)
 
         APPL.awaitJobResult("Adjoint*", progress=self.verbose)
 
