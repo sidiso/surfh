@@ -705,6 +705,7 @@ class Spectro(LinOp):
         wavel_axis: array,
         sotf: array,
         pointings: instru.CoordList,
+        verbose: bool =True,
     ):
 
         self.wavel_axis = wavel_axis
@@ -713,6 +714,7 @@ class Spectro(LinOp):
 
         self.sotf = sotf
         self.pointings = pointings
+        self.verbose = verbose
 
         srfs = instru.get_srf(
             [chan.det_pix_size for chan in instrs],
@@ -762,15 +764,17 @@ class Spectro(LinOp):
 
     def forward(self, inarray: array) -> array:
         out = np.zeros(self.oshape)
-        logger.info(f"Spatial blurring DFT2({inarray.shape})")
+        if self.verbose:
+            logger.info(f"Spatial blurring DFT2({inarray.shape})")
         blurred_f = dft(inarray) * self.sotf
         for idx, chan in enumerate(self.channels):
-            logger.info(f"Channel {chan.name}")
+            if self.verbose:
+                logger.info(f"Channel {chan.name}")
             APPL.runJob("Forward_id:%d"%idx, chan.forward_multiproc, 
                         args=(blurred_f,), 
                         serial=False)
             
-        APPL.awaitJobResult("Forward*", progress=True)
+        APPL.awaitJobResult("Forward*", progress=self.verbose)
         
         self._shared_metadata.reload()
         for idx, chan in enumerate(self.channels):
@@ -785,19 +789,21 @@ class Spectro(LinOp):
             self.ishape[:2] + (self.ishape[2] // 2 + 1,), dtype=np.complex128
         )
         for idx, chan in enumerate(self.channels):
-            logger.info(f"Channel {chan.name}")
+            if self.verbose:
+                logger.info(f"Channel {chan.name}")
             APPL.runJob("Adjoint_id:%d"%idx, chan.adjoint_multiproc, 
                         args=(np.reshape(inarray[self._idx[idx] : self._idx[idx + 1]], chan.oshape),), 
                         serial=False)
 
-        APPL.awaitJobResult("Adjoint*", progress=True)
+        APPL.awaitJobResult("Adjoint*", progress=self.verbose)
 
         self._shared_metadata.reload()
         for idx, chan in enumerate(self.channels):
             ad_data = self._shared_metadata[chan.name]["ad_data"]
             tmp += ad_data
         
-        logger.info(f"Spatial blurring^T : IDFT2({tmp.shape})")
+        if self.verbose:
+            logger.info(f"Spatial blurring^T : IDFT2({tmp.shape})")
         return idft(tmp * self.sotf.conj(), self.imshape)
 
 
@@ -915,6 +921,7 @@ class SpectroLMM(LinOp):
         sotf: array,
         pointings: instru.CoordList,
         templates: array,
+        verbose: bool = True,
     ):
         self.wavel_axis = wavel_axis
         self.alpha_axis = alpha_axis
@@ -922,6 +929,7 @@ class SpectroLMM(LinOp):
 
         self.sotf = sotf
         self.pointings = pointings
+        self.verbose = verbose
 
         self.tpls = templates
 
@@ -963,19 +971,22 @@ class SpectroLMM(LinOp):
     
     def forward(self, inarray: array) -> array:
         out = np.zeros(self.oshape)
-        logger.info(f"Cube generation")
+        if self.verbose:
+            logger.info(f"Cube generation")
         cube = np.sum(
             np.expand_dims(inarray, 1) * self.tpls[..., np.newaxis, np.newaxis], axis=0
         )
-        logger.info(f"Spatial blurring DFT2({inarray.shape})")
+        if self.verbose:
+            logger.info(f"Spatial blurring DFT2({inarray.shape})")
         blurred_f = dft(cube) * self.sotf
         for idx, chan in enumerate(self.channels):
-            logger.info(f"Channel {chan.name}")
+            if self.verbose:
+                logger.info(f"Channel {chan.name}")
             APPL.runJob("Forward_id:%d"%idx, chan.forward_multiproc, 
                         args=(blurred_f,), 
                         serial=False)
             
-        APPL.awaitJobResult("Forward*", progress=True)
+        APPL.awaitJobResult("Forward*", progress=self.verbose)
         
         self._shared_metadata.reload()
         for idx, chan in enumerate(self.channels):
@@ -990,19 +1001,21 @@ class SpectroLMM(LinOp):
             self.ishape[:2] + (self.ishape[2] // 2 + 1,), dtype=np.complex128
         )
         for idx, chan in enumerate(self.channels):
-            logger.info(f"Channel {chan.name}")
+            if self.verbose:
+                logger.info(f"Channel {chan.name}")
             APPL.runJob("Adjoint_id:%d"%idx, chan.adjoint_multiproc, 
                         args=(np.reshape(inarray[self._idx[idx] : self._idx[idx + 1]], chan.oshape),), 
                         serial=False)
 
-        APPL.awaitJobResult("Adjoint*", progress=True)
+        APPL.awaitJobResult("Adjoint*", progress=self.verbose)
 
         self._shared_metadata.reload()
         for idx, chan in enumerate(self.channels):
             ad_data = self._shared_metadata[chan.name]["ad_data"]
             tmp += ad_data
         
-        logger.info(f"Spatial blurring^T : IDFT2({tmp.shape})")
+        if self.verbose:
+            logger.info(f"Spatial blurring^T : IDFT2({tmp.shape})")
         cube = idft(tmp * self.sotf.conj(), self.imshape)
         return np.concatenate(
             [
