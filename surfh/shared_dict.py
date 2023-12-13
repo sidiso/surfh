@@ -86,6 +86,14 @@ class SharedDict (collections.OrderedDict):
         SharedDict.basepath = os.path.join(SHM_PREFIX, name)
         if not os.path.exists(SharedDict.basepath):
             os.mkdir(SharedDict.basepath)
+            
+    @staticmethod
+    def clearAllSD():
+        shared_dirs = [fn for fn in os.listdir(SHM_PREFIX) if 'mrs' in fn]
+        for fn in shared_dirs:
+            os.system("rm -fr %s" % os.path.join(SHM_PREFIX+fn))
+            
+
 
     def __init__ (self, path, reset=True, load=True, readwrite=True):
         collections.OrderedDict.__init__(self)
@@ -133,6 +141,7 @@ class SharedDict (collections.OrderedDict):
         collections.OrderedDict.clear(self)
         if os.path.exists(self.path):
             os.system("rm -fr %s" % self.path)
+            print(f"Delete shared dict with path {self.path}")
         try:
             os.mkdir(self.path)
         except FileNotFoundError:
@@ -304,8 +313,6 @@ class SharedDict (collections.OrderedDict):
         collections.OrderedDict.__setitem__(self, item, array)
         return array
 
-SharedDict.setBaseName("shared_dict:"+str(os.getpid()))
-
 def testSharedDict ():
     dic = SharedDict("foo")
     dic['a'] = 'a'
@@ -321,5 +328,5 @@ def testSharedDict ():
     other_view = SharedDict("foo", reset=False)
     print(other_view)
 
-
+SharedDict.clearAllSD()
 SharedDict.setBaseName("mrs."+str(os.getpid()))
