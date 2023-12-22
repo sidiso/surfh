@@ -943,6 +943,13 @@ class SpectroLMM(LinOp):
             self.step,
         )
 
+        _shared_metadata = shared_dict.create("s_metadata")
+        self._shared_metadata = _shared_metadata
+        for instr in instrs:
+            _shared_metadata.addSubdict(instr.get_name_pix())
+
+        num_threads = np.ceil(psutil.cpu_count()/len(instrs))
+
         self.channels = [
             Channel(
                 instr,
@@ -951,6 +958,9 @@ class SpectroLMM(LinOp):
                 wavel_axis,
                 srf,
                 pointings,
+                _shared_metadata[instr.get_name_pix()].path,
+                num_threads,
+                self.serial,
             )
             for srf, instr in zip(srfs, instrs)
         ]
