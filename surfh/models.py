@@ -259,6 +259,7 @@ class Channel(LinOp):
         pointings: instru.CoordList,
         shared_metadata_path: str,
         num_threads: int,
+        serial: bool,
     ):
         """Forward model of a Channel
 
@@ -305,7 +306,8 @@ class Channel(LinOp):
         self.pointings = pointings.pix(self.step)
         self.instr = instr.pix(self.step)
 
-        self.num_threads=num_threads
+        self.num_threads = num_threads
+        self.serial = serial
 
         self.srf = srf
         self.imshape = (len(alpha_axis), len(beta_axis))
@@ -562,11 +564,11 @@ class Channel(LinOp):
 
     def wblur(self, inarray: array, slit_idx: int) -> array:
         """Returns spectral blurring of inarray"""
-        return wblur(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads)
+        return wblur(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads if not self.serial else 1)
 
     def wblur_t(self, inarray: array, slit_idx: int) -> array:
         """Returns spectral blurring transpose of inarray"""
-        return wblur_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads)
+        return wblur_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads if not self.serial else 1)
 
     
     def forward(self, inarray_f):
@@ -705,6 +707,8 @@ class Spectro(LinOp):
         wavel_axis: array,
         sotf: array,
         pointings: instru.CoordList,
+        verbose: bool = True,
+        serial: bool = False,
     ):
 
         self.wavel_axis = wavel_axis
@@ -713,6 +717,8 @@ class Spectro(LinOp):
 
         self.sotf = sotf
         self.pointings = pointings
+        self.verbose = verbose
+        self.serial = serial
 
         srfs = instru.get_srf(
             [chan.det_pix_size for chan in instrs],
@@ -736,6 +742,7 @@ class Spectro(LinOp):
                 pointings,
                 _shared_metadata[instr.get_name_pix()].path,
                 num_threads,
+                self.serial,
             )
             for srf, instr in zip(srfs, instrs)
         ]
@@ -762,15 +769,17 @@ class Spectro(LinOp):
 
     def forward(self, inarray: array) -> array:
         out = np.zeros(self.oshape)
-        logger.info(f"Spatial blurring DFT2({inarray.shape})")
+        if self.verbose:
+            logger.info(f"Spatial blurring DFT2({inarray.shape})")
         blurred_f = dft(inarray) * self.sotf
         for idx, chan in enumerate(self.channels):
-            logger.info(f"Channel {chan.name}")
+            if self.verbose:
+                logger.info(f"Channel {chan.name}")
             APPL.runJob("Forward_id:%d"%idx, chan.forward_multiproc, 
                         args=(blurred_f,), 
-                        serial=False)
+                        serial=self.serial)
             
-        APPL.awaitJobResult("Forward*", progress=True)
+        APPL.awaitJobResult("Forward*", progress=self.verbose)
         
         self._shared_metadata.reload()
         for idx, chan in enumerate(self.channels):
@@ -785,19 +794,21 @@ class Spectro(LinOp):
             self.ishape[:2] + (self.ishape[2] // 2 + 1,), dtype=np.complex128
         )
         for idx, chan in enumerate(self.channels):
-            logger.info(f"Channel {chan.name}")
+            if self.verbose:
+                logger.info(f"Channel {chan.name}")
             APPL.runJob("Adjoint_id:%d"%idx, chan.adjoint_multiproc, 
                         args=(np.reshape(inarray[self._idx[idx] : self._idx[idx + 1]], chan.oshape),), 
-                        serial=False)
+                        serial=self.serial)
 
-        APPL.awaitJobResult("Adjoint*", progress=True)
+        APPL.awaitJobResult("Adjoint*", progress=self.verbose)
 
         self._shared_metadata.reload()
         for idx, chan in enumerate(self.channels):
             ad_data = self._shared_metadata[chan.name]["ad_data"]
             tmp += ad_data
         
-        logger.info(f"Spatial blurring^T : IDFT2({tmp.shape})")
+        if self.verbose:
+            logger.info(f"Spatial blurring^T : IDFT2({tmp.shape})")
         return idft(tmp * self.sotf.conj(), self.imshape)
 
 
@@ -915,6 +926,8 @@ class SpectroLMM(LinOp):
         sotf: array,
         pointings: instru.CoordList,
         templates: array,
+        verbose: bool = True,
+        serial: bool = False,
     ):
         self.wavel_axis = wavel_axis
         self.alpha_axis = alpha_axis
@@ -922,6 +935,8 @@ class SpectroLMM(LinOp):
 
         self.sotf = sotf
         self.pointings = pointings
+        self.verbose = verbose
+        self.serial = serial
 
         self.tpls = templates
 
@@ -929,6 +944,13 @@ class SpectroLMM(LinOp):
             [chan.det_pix_size for chan in instrs],
             self.step,
         )
+
+        _shared_metadata = shared_dict.create("s_metadata")
+        self._shared_metadata = _shared_metadata
+        for instr in instrs:
+            _shared_metadata.addSubdict(instr.get_name_pix())
+
+        num_threads = np.ceil(psutil.cpu_count()/len(instrs))
 
         self.channels = [
             Channel(
@@ -938,16 +960,23 @@ class SpectroLMM(LinOp):
                 wavel_axis,
                 srf,
                 pointings,
+                _shared_metadata[instr.get_name_pix()].path,
+                num_threads,
+                self.serial,
             )
             for srf, instr in zip(srfs, instrs)
         ]
 
         self._idx = np.cumsum([0] + [np.prod(chan.oshape) for chan in self.channels])
         self.imshape = (len(alpha_axis), len(beta_axis))
-        ishape = (len(wavel_axis), len(alpha_axis), len(beta_axis))
+        self.tpls_shape = self.tpls.shape
+
+        # For LMM, ishape is (n_maps, n_alpha, n_beta)
+        ishape = (self.tpls_shape[0], len(alpha_axis), len(beta_axis))
         oshape = (self._idx[-1],)
 
         super().__init__(ishape, oshape, "SpectroLMM")
+        self.check_observation()
 
     @property
     def step(self) -> float:
@@ -962,30 +991,52 @@ class SpectroLMM(LinOp):
     
     def forward(self, inarray: array) -> array:
         out = np.zeros(self.oshape)
-        logger.info(f"Cube generation")
+        if self.verbose:
+            logger.info(f"Cube generation")
         cube = np.sum(
             np.expand_dims(inarray, 1) * self.tpls[..., np.newaxis, np.newaxis], axis=0
         )
-        logger.info(f"Spatial blurring DFT2({inarray.shape})")
+        if self.verbose:
+            logger.info(f"Spatial blurring DFT2({inarray.shape})")
         blurred_f = dft(cube) * self.sotf
         for idx, chan in enumerate(self.channels):
-            logger.info(f"Channel {chan.name}")
-            out[self._idx[idx] : self._idx[idx + 1]] = chan.forward(blurred_f).ravel()
-        return out
-    
+            if self.verbose:
+                logger.info(f"Channel {chan.name}")
+            APPL.runJob("Forward_id:%d"%idx, chan.forward_multiproc, 
+                        args=(blurred_f,), 
+                        serial=False)
+            
+        APPL.awaitJobResult("Forward*", progress=self.verbose)
+        
+        self._shared_metadata.reload()
+        for idx, chan in enumerate(self.channels):
+            fw_data = self._shared_metadata[chan.name]["fw_data"]
+            out[self._idx[idx] : self._idx[idx + 1]] = fw_data.ravel()
+
+        return out 
+
     
     def adjoint(self, inarray: array) -> array:
         tmp = np.zeros(
-            self.ishape[:2] + (self.ishape[2] // 2 + 1,), dtype=np.complex128
+            (self.wavel_axis.shape[0], self.ishape[1], self.ishape[2] // 2 + 1), dtype=np.complex128
         )
         for idx, chan in enumerate(self.channels):
-            logger.info(f"Channel {chan.name}")
-            tmp += chan.adjoint(
-                np.reshape(inarray[self._idx[idx] : self._idx[idx + 1]], chan.oshape)
-            )
-        logger.info(f"Spatial blurring^T : IDFT2({tmp.shape})")
+            if self.verbose:
+                logger.info(f"Channel {chan.name}")
+            APPL.runJob("Adjoint_id:%d"%idx, chan.adjoint_multiproc, 
+                        args=(np.reshape(inarray[self._idx[idx] : self._idx[idx + 1]], chan.oshape),), 
+                        serial=False)
+
+        APPL.awaitJobResult("Adjoint*", progress=self.verbose)
+
+        self._shared_metadata.reload()
+        for idx, chan in enumerate(self.channels):
+            ad_data = self._shared_metadata[chan.name]["ad_data"]
+            tmp += ad_data
+        
+        if self.verbose:
+            logger.info(f"Spatial blurring^T : IDFT2({tmp.shape})")
         cube = idft(tmp * self.sotf.conj(), self.imshape)
-        logger.info(f"Maps summation generation")
         return np.concatenate(
             [
                 np.sum(cube * tpl[..., np.newaxis, np.newaxis], axis=0)[np.newaxis, ...]
@@ -993,3 +1044,45 @@ class SpectroLMM(LinOp):
             ],
             axis=0,
         )
+
+
+
+    def check_observation(self):
+        """ Check if channels FoV for all pointing match the observed image FoV"""
+
+        # Get the coordinates of the observed object 
+        grid = (self.alpha_axis, self.beta_axis)
+
+        for idx, chan in enumerate(self.channels):
+            # Get local alpha and beta coordinates for the channel
+            local_alpha_axis = shared_dict.attach(chan._metadata_path)["local_alpha_axis"]
+            local_beta_axis = shared_dict.attach(chan._metadata_path)["local_beta_axis"]
+            
+            for p_idx, pointing in enumerate(chan.pointings):
+                out_of_bound = False
+                # Get the global alpha and beta coordinates regarding the pointing for specific IFU
+                alpha_coord, beta_coord = (chan.instr.fov + pointing).local2global(
+                    local_alpha_axis, local_beta_axis
+                )
+                local_coords = np.vstack(
+                            [
+                                alpha_coord.ravel(),
+                                beta_coord.ravel()
+                            ]
+                        ).T  
+                
+                # Check if IFU FoV anf image FoV match
+                for i, p in enumerate(local_coords.T):
+                    if not np.logical_and(np.all(grid[i][0] <= p),
+                                        np.all(p <= grid[i][-1])):
+                        out_of_bound = True
+
+                if out_of_bound:
+                    logger.debug(f"Out of bound for Chan {chan.name} - Pointing n°{p_idx}")
+
+
+    def close(self):
+        """ Shut down all allocated memory e.g. shared arrays and dictionnaries"""
+        if self._shared_metadata is not None:
+            dico = shared_dict.attach(self._shared_metadata.path)
+            dico.delete() 
