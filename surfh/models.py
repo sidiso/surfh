@@ -927,6 +927,7 @@ class SpectroLMM(LinOp):
         pointings: instru.CoordList,
         templates: array,
         verbose: bool = True,
+        serial: bool = False,
     ):
         self.wavel_axis = wavel_axis
         self.alpha_axis = alpha_axis
@@ -935,6 +936,7 @@ class SpectroLMM(LinOp):
         self.sotf = sotf
         self.pointings = pointings
         self.verbose = verbose
+        self.serial = serial
 
         self.tpls = templates
 
@@ -967,7 +969,10 @@ class SpectroLMM(LinOp):
 
         self._idx = np.cumsum([0] + [np.prod(chan.oshape) for chan in self.channels])
         self.imshape = (len(alpha_axis), len(beta_axis))
-        ishape = (len(wavel_axis), len(alpha_axis), len(beta_axis))
+        self.tpls_shape = self.tpls.shape
+
+        # For LMM, ishape is (n_maps, n_alpha, n_beta)
+        ishape = (self.tpls_shape[0], len(alpha_axis), len(beta_axis))
         oshape = (self._idx[-1],)
 
         super().__init__(ishape, oshape, "SpectroLMM")
@@ -1013,7 +1018,7 @@ class SpectroLMM(LinOp):
     
     def adjoint(self, inarray: array) -> array:
         tmp = np.zeros(
-            self.ishape[:2] + (self.ishape[2] // 2 + 1,), dtype=np.complex128
+            (self.wavel_axis.shape[0], self.ishape[1], self.ishape[2] // 2 + 1), dtype=np.complex128
         )
         for idx, chan in enumerate(self.channels):
             if self.verbose:
