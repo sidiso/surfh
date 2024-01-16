@@ -273,3 +273,40 @@ def c_wblur_t(const double[:,:,:] arr, const double[:,:,:]wpsf,
                     c_res[l,a,b] = tmp 
 
     return np.asarray(c_res)
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+@cython.cdivision(True)
+@cython.initializedcheck(False)
+def c_sliceToCube_t(const double[:,:,:] arr, slit_idx, 
+                int sizeLambda, int sizeAlpha, int sizeBeta,
+                int sizeLambdaPrime, int num_threads):
+    """Apply transpose of blurring in λ axis
+
+    Parameters
+    ----------
+    arr: array-like
+      Input of shape [λ', α, β].
+
+    Returns
+    -------
+    c_res: array-like
+      A wavelength blurred array in [λ, α, β].
+    """
+    # [λ, α, β] = ∑_λ' arr[λ', α, β] wpsf[λ', λ]
+    # Σ_λ'
+    cdef:
+        double[:,:,:] c_res = np.zeros((sizeLambda, sizeAlpha, sizeBeta))
+        int l, a, b, ll = 0
+        double tmp = 0.
+
+    with nogil, parallel(num_threads=num_threads):
+        for l in prange(sizeLambda):
+            for a in range(sizeAlpha):
+                for b in range(sizeBeta):
+                    tmp = 0 
+                    for ll in range(sizeLambdaPrime):
+                        tmp = tmp + arr[ll,a,b]
+                    c_res[l,a,b] = tmp 
+
+    return np.asarray(c_res)

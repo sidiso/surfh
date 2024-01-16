@@ -40,6 +40,7 @@ from . import utils
 from .AsyncProcessPoolLight import APPL
 from multiprocessing import Pool
 from multiprocessing import Process, Queue, connection
+import matplotlib.pyplot as plt
 
 array = np.ndarray
 InputShape = namedtuple("InputShape", ["wavel", "alpha", "beta"])
@@ -180,6 +181,26 @@ def wblur_t(arr: array, wpsf: array, num_threads: int) -> array:
     # [λ, α, β] = ∑_λ' arr[λ', α, β] wpsf[λ', λ]
     # Σ_λ'
     result_array = cythons_files.c_wblur_t(arr, wpsf, wpsf.shape[1], 
+                                           arr.shape[1], arr.shape[2], 
+                                           wpsf.shape[0], num_threads)
+    return result_array
+
+
+def functionName(arr: array,slit_idx,  wpsf: array, num_threads: int) -> array:
+    """Apply transpose of blurring in λ axis
+
+    Parameters
+    ----------
+    arr: array-like
+      Input of shape [λ', α, β].
+    Returns
+    -------
+    out: array-like
+      A wavelength blurred array in [λ, α, β].
+    """
+    # [λ, α, β] = ∑_λ' arr[λ', α, β] wpsf[λ', λ]
+    # Σ_λ'
+    result_array = cythons_files.c_sliceToCube_t(arr, slit_idx, wpsf.shape[1], 
                                            arr.shape[1], arr.shape[2], 
                                            wpsf.shape[0], num_threads)
     return result_array
@@ -466,6 +487,17 @@ class Channel(LinOp):
         out[:, slices[0], slices[1]] = gridded * weights
         return out
 
+    def slicing_Fente2Cube_t(
+        self,
+        gridded: array,
+        slit_idx: int,
+    ) -> array:
+        """Return a weighted slice of gridded. `slit_idx` start at 0."""
+        out = np.zeros(self.local_shape)
+        slices = self.slit_slices(slit_idx)
+        weights = self.slit_weights(slit_idx)
+        out[:, slices[0], slices[1]] = gridded
+        return out
     
     def gridding(self, inarray: array, pointing: instru.Coord) -> array:
         """Returns interpolation of inarray in local referential"""
@@ -570,7 +602,9 @@ class Channel(LinOp):
         """Returns spectral blurring transpose of inarray"""
         return wblur_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads if not self.serial else 1)
 
-    
+    def functionName(self, inarray: array, slit_idx: int) -> array:
+        return functionName(inarray, slit_idx, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads if not self.serial else 1)    
+
     def forward(self, inarray_f):
         """inarray is supposed in global coordinate, spatially blurred and in Fourier space.
 
@@ -697,6 +731,29 @@ class Channel(LinOp):
             blurred += self.gridding_t(gridded, pointing)
         out[self.wslice, ...] = self.sblur_t(blurred)
 
+    def sliceToCube(self, slices):
+        out = out = np.zeros(self.ishape, dtype=np.complex128)
+        blurred = np.zeros(self.cshape)
+        for p_idx, pointing in enumerate(self.pointings):
+            gridded = np.zeros(self.local_shape)
+            for slit_idx in range(self.instr.n_slit):
+                sliced = np.zeros(self.slit_shape(slit_idx))
+                tmp = np.repeat(
+                        np.expand_dims(
+                            slices[p_idx, slit_idx],
+                            axis=2,
+                        ),
+                        sliced.shape[2],
+                        axis=2,
+                    )
+                tmp2 = self.functionName(tmp, slit_idx)
+                sliced[:, : self.oshape[3] * self.srf : self.srf] = tmp2
+                gridded += self.slicing_Fente2Cube_t(sliced, slit_idx)
+            blurred += self.gridding_t(gridded, pointing)
+        out[self.wslice, ...] = self.sblur_t(blurred)
+
+        return out
+
 
 class Spectro(LinOp):
     def __init__(
@@ -812,6 +869,14 @@ class Spectro(LinOp):
         return idft(tmp * self.sotf.conj(), self.imshape)
 
 
+    def sliceToCube(self, slices):
+        tmp = np.zeros(
+            self.ishape[:2] + (self.ishape[2] // 2 + 1,), dtype=np.complex128
+        )
+        for idx, chan in enumerate(self.channels):
+            tmp += chan.sliceToCube(np.reshape(slices[self._idx[idx] : self._idx[idx + 1]], chan.oshape),)
+        return idft(tmp, self.imshape)
+
     def qdcoadd(self, measures: array) -> array:
         out = np.zeros(self.ishape)
         nhit = np.zeros(self.ishape)
@@ -905,6 +970,47 @@ class Spectro(LinOp):
 
                 if out_of_bound:
                     logger.debug(f"Out of bound for Chan {chan.name} - Pointing n°{p_idx}")
+
+    def get_slits_data(self):
+        """
+        Return result of Forward operator in the right shape 
+        [band, obs, slices, lambda, alpha]
+        """
+        slits = []
+        for idx, chan in enumerate(self.channels):
+            fw_data = self._shared_metadata[chan.name]["fw_data"]
+            slits.append(fw_data)
+
+        return slits
+
+    def plot_slits_data(self, chan: int, obs : int):
+
+        ifu = self.channels[chan]
+        slices_data = self._shared_metadata[ifu.name]["fw_data"]
+
+        ifu_metadata = shared_dict.attach(ifu._metadata_path)
+
+        local_alpha_axis = ifu_metadata["local_alpha_axis"] 
+        local_beta_axis = ifu_metadata["local_beta_axis"]
+
+        n_alpha = ifu.n_alpha
+
+        columns = ifu.instr.n_slit
+        fig, axs = plt.subplots(nrows=1, ncols=columns, figsize=(8, 8), tight_layout=True)
+
+        axs[0].imshow(slices_data[obs,0,:,:])
+        #axs[0].set_yticks(ifu.instr.wavel_axis[::23])
+        nx = ifu.instr.wavel_axis.shape[0]
+        no_labels = 7 # how many labels to see on axis x
+        step_x = int(nx / (no_labels - 1)) # step between consecutive labels
+        x_positions = np.arange(0,nx,step_x)
+        x_labels = np.around(ifu.instr.wavel_axis[::step_x], 2)
+        axs[0].set_yticks(x_positions, x_labels)
+
+        for i in range(1, columns):
+            axs[i].imshow(slices_data[obs,i, :,:])
+            axs[i].axis("off")
+        plt.show()
 
 
 
