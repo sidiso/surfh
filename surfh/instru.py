@@ -559,6 +559,12 @@ class SpectralBlur:
         # from "1" spread in the input spectrum). Sum must be on the input axis.
         out /= np.sum(out, axis=1, keepdims=True)
 
+        tmp = np.zeros_like(out)
+        for i in range(out.shape[2]):
+            for k in range(out.shape[0]):
+                tmp[k, np.where(out[k,:,i] == np.max(out[k,:,i])),i] = 1
+
+        out = tmp
         return out[:, self._n_margin - 1 : -self._n_margin + 1, :]
 
 

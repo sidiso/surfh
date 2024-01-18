@@ -198,7 +198,7 @@ def functionName(arr: array,slit_idx,  wpsf: array, num_threads: int) -> array:
     out: array-like
       A wavelength blurred array in [λ, α, β].
     """
-    # [λ, α, β] = ∑_λ' arr[λ', α, β] wpsf[λ', λ]
+    # [λ, α, β] = ∑_λ' arr[λ', α, β]
     # Σ_λ'
     result_array = cythons_files.c_sliceToCube_t(arr, slit_idx, wpsf.shape[1], 
                                            arr.shape[1], arr.shape[2], 
@@ -703,6 +703,7 @@ class Channel(LinOp):
                     
                 gridded += self.slicing_t(sliced, slit_idx)
             blurred += self.gridding_t(gridded, pointing)
+        
         out[self.wslice, ...] = self.sblur_t(blurred)
 
 
@@ -726,13 +727,42 @@ class Channel(LinOp):
                 tmp2 = self.wblur_t(tmp, slit_idx)
 
                 sliced[:, : self.oshape[3] * self.srf : self.srf] = tmp2
-                    
+                
+
+                gridded += self.slicing_t(sliced, slit_idx)
+            blurred += self.gridding_t(gridded, pointing)
+        print(f"####### {self.wslice}")
+        out[self.wslice, ...] = self.sblur_t(blurred)
+
+    def sliceToCube(self, measures):
+        out = np.zeros(self.ishape, dtype=np.complex128)
+        blurred = np.zeros(self.cshape)
+        for p_idx, pointing in enumerate(self.pointings):
+            gridded = np.zeros(self.local_shape)
+            for slit_idx in range(self.instr.n_slit):
+                sliced = np.zeros(self.slit_shape(slit_idx))
+                # α zero-filling, λ blurrling_t, and β duplication
+                tmp = np.repeat(
+                        np.expand_dims(
+                            measures[p_idx, slit_idx],
+                            axis=2,
+                        ),
+                        sliced.shape[2],
+                        axis=2,
+                    )
+
+                tmp2 = self.wblur_t(tmp, slit_idx)
+
+                sliced[:, : self.oshape[3] * self.srf : self.srf] = tmp2
+                
+
                 gridded += self.slicing_t(sliced, slit_idx)
             blurred += self.gridding_t(gridded, pointing)
         out[self.wslice, ...] = self.sblur_t(blurred)
+        return out
 
-    def sliceToCube(self, slices):
-        out = out = np.zeros(self.ishape, dtype=np.complex128)
+    def old_sliceToCube(self, slices):
+        out = np.zeros(self.ishape, dtype=np.complex128)
         blurred = np.zeros(self.cshape)
         for p_idx, pointing in enumerate(self.pointings):
             gridded = np.zeros(self.local_shape)
@@ -746,7 +776,8 @@ class Channel(LinOp):
                         sliced.shape[2],
                         axis=2,
                     )
-                tmp2 = self.functionName(tmp, slit_idx)
+                
+                tmp2 = self.wblur_t(tmp, slit_idx)
                 sliced[:, : self.oshape[3] * self.srf : self.srf] = tmp2
                 gridded += self.slicing_Fente2Cube_t(sliced, slit_idx)
             blurred += self.gridding_t(gridded, pointing)
@@ -812,6 +843,11 @@ class Spectro(LinOp):
         super().__init__(ishape, oshape, "Spectro")
         self.check_observation()
 
+    def __del__(self):
+        """ Shut down all allocated memory e.g. shared arrays and dictionnaries"""
+        if self._shared_metadata is not None:
+            dico = shared_dict.attach(self._shared_metadata.path)
+            dico.delete() 
 
     @property
     def step(self) -> float:
@@ -870,12 +906,34 @@ class Spectro(LinOp):
 
 
     def sliceToCube(self, slices):
-        tmp = np.zeros(
-            self.ishape[:2] + (self.ishape[2] // 2 + 1,), dtype=np.complex128
-        )
+        cubes = []
+        print("Hello")
+        for i in range(len(self.channels)):
+            cubes.append(np.zeros( self.ishape[:2] + (self.ishape[2] // 2 + 1,), dtype=np.complex128
+                                
+            ))
+        
+        print("test")
+            
+           
         for idx, chan in enumerate(self.channels):
-            tmp += chan.sliceToCube(np.reshape(slices[self._idx[idx] : self._idx[idx + 1]], chan.oshape),)
-        return idft(tmp, self.imshape)
+            print(f"Chan Idx is {idx}")
+            res = chan.sliceToCube(np.reshape(slices[self._idx[idx] : self._idx[idx + 1]], chan.oshape),)
+            cubes[idx] = idft(res, self.imshape)
+            print(f"Slice start is {chan.wslice.start}, Stop is {chan.wslice.stop}")
+
+            """ for i in range(cubes[idx].shape[1]):
+                for j in range(cubes[idx].shape[2]):
+
+                
+                    for l in range(chan.wslice.start, chan.wslice.stop):
+                        if cubes[idx][l,i,j] <1e-2:
+                            
+                            #print(f"Before cube is {cubes[idx][l,i,j]}")
+                            cubes[idx][l,i,j] = (cubes[idx][l-1,i,j] + cubes[idx][l+1,i,j])/2
+                            #print(f"After cube is {cubes[idx][l,i,j]}") """
+            
+        return cubes
 
     def qdcoadd(self, measures: array) -> array:
         out = np.zeros(self.ishape)
@@ -984,7 +1042,10 @@ class Spectro(LinOp):
         return slits
 
     def plot_slits_data(self, chan: int, obs : int):
-
+        """
+        Plot the data of each slit generated by the Forward operator for
+        a specific band and a specific observation (one dithering). 
+        """
         ifu = self.channels[chan]
         slices_data = self._shared_metadata[ifu.name]["fw_data"]
 
@@ -1013,6 +1074,27 @@ class Spectro(LinOp):
         plt.show()
 
 
+    def plot_local_projected_data(self, chan: int, obs : int, freq : int = 0):
+        """
+        Plot the projection of each slit, for a specific band and observation, 
+        onto a local cube.
+        """
+        ifu = self.channels[chan]
+        out = shared_dict.attach(ifu._metadata_path)["fw_data"]
+
+        local_cube = np.zeros((201, 17, 21)) # Shape [Lamda, alpha, beta] --> beta = n_slit, alpha = alpha_resolution
+
+        test = out[obs, :, :, :]
+        test = test[..., np.newaxis]
+
+        for l in range(test.shape[1]):
+            for s in range(test.shape[0]):
+                for a in range(test.shape[2]):
+                    local_cube[l, a, s] = test[s, l, a, 0]
+
+        plt.imshow(local_cube[freq, :, :])
+        plt.legend()
+        plt.show()
 
     def close(self):
         """ Shut down all allocated memory e.g. shared arrays and dictionnaries"""
@@ -1083,6 +1165,13 @@ class SpectroLMM(LinOp):
 
         super().__init__(ishape, oshape, "SpectroLMM")
         self.check_observation()
+
+    def __del__(self):
+        """ Shut down all allocated memory e.g. shared arrays and dictionnaries"""
+        if self._shared_metadata is not None:
+            dico = shared_dict.attach(self._shared_metadata.path)
+            dico.delete() 
+
 
     @property
     def step(self) -> float:
