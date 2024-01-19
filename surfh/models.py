@@ -572,8 +572,13 @@ class Channel(LinOp):
         )
 
 
-    def sblur_t(self, inarray: array) -> array:
-        """Return spatial blurring transpose of inarray for SR. Returns in Fourier space"""
+    def fourier_duplicate_t(self, inarray: array) -> array:
+        """Return spatial blurring transpose of inarray for SR. Returns in Fourier space.
+        inarray :   5. | 0. | 0. | 0. | 0. | 7. | 0. | 0. | 0. | 0. | 2. | 0. | 0. | 0. | 0. 
+        _otf_sr :   1. | 1. | 1. | 1. | 1.
+        
+        output  :   5. | 5. | 5. | 7. | 7. | 7. | 7. | 7. | 2. | 2. | 2. | 2. | 2. | 0. | 0.
+        """
         _otf_sr = shared_dict.attach(self._metadata_path)["_otf_sr"]
         return dft(inarray) * _otf_sr.conj()
 
@@ -704,7 +709,7 @@ class Channel(LinOp):
                 gridded += self.slicing_t(sliced, slit_idx)
             blurred += self.gridding_t(gridded, pointing)
         
-        out[self.wslice, ...] = self.sblur_t(blurred)
+        out[self.wslice, ...] = self.fourier_duplicate_t(blurred)
 
 
     def adjoint_multiproc(self, measures):
@@ -732,7 +737,7 @@ class Channel(LinOp):
                 gridded += self.slicing_t(sliced, slit_idx)
             blurred += self.gridding_t(gridded, pointing)
         print(f"####### {self.wslice}")
-        out[self.wslice, ...] = self.sblur_t(blurred)
+        out[self.wslice, ...] = self.fourier_duplicate_t(blurred)
 
     def sliceToCube(self, measures):
         out = np.zeros(self.ishape, dtype=np.complex128)
@@ -758,31 +763,7 @@ class Channel(LinOp):
 
                 gridded += self.slicing_t(sliced, slit_idx)
             blurred += self.gridding_t(gridded, pointing)
-        out[self.wslice, ...] = self.sblur_t(blurred)
-        return out
-
-    def old_sliceToCube(self, slices):
-        out = np.zeros(self.ishape, dtype=np.complex128)
-        blurred = np.zeros(self.cshape)
-        for p_idx, pointing in enumerate(self.pointings):
-            gridded = np.zeros(self.local_shape)
-            for slit_idx in range(self.instr.n_slit):
-                sliced = np.zeros(self.slit_shape(slit_idx))
-                tmp = np.repeat(
-                        np.expand_dims(
-                            slices[p_idx, slit_idx],
-                            axis=2,
-                        ),
-                        sliced.shape[2],
-                        axis=2,
-                    )
-                
-                tmp2 = self.wblur_t(tmp, slit_idx)
-                sliced[:, : self.oshape[3] * self.srf : self.srf] = tmp2
-                gridded += self.slicing_Fente2Cube_t(sliced, slit_idx)
-            blurred += self.gridding_t(gridded, pointing)
-        out[self.wslice, ...] = self.sblur_t(blurred)
-
+        out[self.wslice, ...] = self.fourier_duplicate_t(blurred)
         return out
 
 
@@ -1133,7 +1114,7 @@ class SpectroLMM(LinOp):
             self.step,
         )
 
-        _shared_metadata = shared_dict.create("s_metadata")
+        _shared_metadata = shared_dict.create("s_metadata0")
         self._shared_metadata = _shared_metadata
         for instr in instrs:
             _shared_metadata.addSubdict(instr.get_name_pix())
