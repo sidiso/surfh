@@ -186,7 +186,7 @@ def wblur_t(arr: array, wpsf: array, num_threads: int) -> array:
     return result_array
 
 
-def functionName(arr: array,slit_idx,  wpsf: array, num_threads: int) -> array:
+def sliceToCube_t(arr: array,slit_idx,  wpsf: array, num_threads: int) -> array:
     """Apply transpose of blurring in λ axis
 
     Parameters
@@ -619,7 +619,7 @@ class Channel(LinOp):
     def wdirac_blur_t(self, inarray: array, slit_idx: int) -> array:
         """Returns spectral blurring transpose of inarray using a dirac function.
            Only used to create generate cube from Forward data with applying Adjoint operator. """    
-        return wblur_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx,'dirac'), self.num_threads if not self.serial else 1)
+        return sliceToCube_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx,'dirac'), self.num_threads if not self.serial else 1)
 
     def forward(self, inarray_f):
         """inarray is supposed in global coordinate, spatially blurred and in Fourier space.

@@ -270,15 +270,7 @@ def c_wblur_t(const double[:,:,:] arr, const double[:,:,:]wpsf,
                     tmp = 0 
                     for ll in range(sizeLambdaPrime):
                         tmp = tmp + arr[ll,a,b]* wpsf[ll,l,b]
-                    c_res[l,a,b] = tmp 
-
-    for a in range(sizeAlpha):
-        for b in range(sizeBeta):
-            for l in range(1, sizeLambda-1):
-                if c_res[l,a,b] <1e-2:
-                    c_res[l,a,b] = (c_res[l-1,a,b] + c_res[l+1,a,b])/2
-
-    
+                    c_res[l,a,b] = tmp   
         
     return np.asarray(c_res)
 
@@ -286,7 +278,7 @@ def c_wblur_t(const double[:,:,:] arr, const double[:,:,:]wpsf,
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.initializedcheck(False)
-def c_sliceToCube_t(const double[:,:,:] arr, slit_idx, 
+def c_sliceToCube_t(const double[:,:,:] arr, const double[:,:,:]dirac, 
                 int sizeLambda, int sizeAlpha, int sizeBeta,
                 int sizeLambdaPrime, int num_threads):
     """Apply transpose of blurring in λ axis
@@ -301,7 +293,7 @@ def c_sliceToCube_t(const double[:,:,:] arr, slit_idx,
     c_res: array-like
       A wavelength blurred array in [λ, α, β].
     """
-    # [λ, α, β] = ∑_λ' arr[λ', α, β] wpsf[λ', λ]
+    # [λ, α, β] = ∑_λ' arr[λ', α, β] dirac[λ', λ]
     # Σ_λ'
     cdef:
         double[:,:,:] c_res = np.zeros((sizeLambda, sizeAlpha, sizeBeta))
@@ -314,7 +306,13 @@ def c_sliceToCube_t(const double[:,:,:] arr, slit_idx,
                 for b in range(sizeBeta):
                     tmp = 0 
                     for ll in range(sizeLambdaPrime):
-                        tmp = tmp + arr[ll,a,b]
+                        tmp = tmp + arr[ll,a,b]* dirac[ll,l,b]
                     c_res[l,a,b] = tmp 
+
+    for a in range(sizeAlpha):
+        for b in range(sizeBeta):
+            for l in range(1, sizeLambda-1):
+                if c_res[l,a,b] <1e-2:
+                    c_res[l,a,b] = (c_res[l-1,a,b] + c_res[l+1,a,b])/2
 
     return np.asarray(c_res)
