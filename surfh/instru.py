@@ -497,7 +497,7 @@ class SpectralBlur:
         return 2 * 0.44245 / np.pi * self.grating_resolution
 
     def psfs(
-        self, out_axis: array, beta: array, wavelength: array, scale: float = 1
+        self, out_axis: array, beta: array, wavelength: array, scale: float = 1, type: str = 'mrs'
     ) -> array:
         """Normalized discretized spetral PSF
 
@@ -511,6 +511,8 @@ class SpectralBlur:
           The input axis (on sky) in μm.
         scale: float
           The scale or conversion factor in μm / arcsec.
+        type: int
+          Type of psfs selected. mrs : MRS spectral psfs. dirac : Dirac. 
 
         Returns
         -------
@@ -559,6 +561,14 @@ class SpectralBlur:
         # from "1" spread in the input spectrum). Sum must be on the input axis.
         out /= np.sum(out, axis=1, keepdims=True)
 
+        if type == 'dirac':
+            tmp = np.zeros_like(out)
+            for i in range(out.shape[2]):
+                for k in range(out.shape[0]):
+                    tmp[k, np.where(out[k,:,i] == np.max(out[k,:,i])),i] = 1
+
+            out = tmp
+            
         return out[:, self._n_margin - 1 : -self._n_margin + 1, :]
 
 
@@ -653,7 +663,7 @@ class IFU:
     def get_name_pix(self):
         return self.name if self.name.endswith('pix') else self.name + '_pix'
 
-    def spectral_psf(self, beta, wavel_input_axis, arcsec2micron):
+    def spectral_psf(self, beta, wavel_input_axis, arcsec2micron, type):
         """Return spectral PSF for monochromatic punctual sources
 
         - The number of spatial positions inside a slit can be determined given
@@ -664,7 +674,7 @@ class IFU:
         maximum of spectral psf at correct value of lambda for beta=0
 
         """
-        return self.w_blur.psfs(self.wavel_axis, beta, wavel_input_axis, arcsec2micron)
+        return self.w_blur.psfs(self.wavel_axis, beta, wavel_input_axis, arcsec2micron, type)
 
     def pix(self, step):
         """Return an equivalent with rounded `origin` coordinate."""
