@@ -685,7 +685,7 @@ class Channel(LinOp):
                 gridded += self.slicing_t(sliced, slit_idx)
             blurred += self.gridding_t(gridded, pointing)
         
-        out[self.wslice, ...] = self.fourier_duplicate_t(blurred)
+        out[self.wslice, ...] += self.fourier_duplicate_t(blurred)
 
 
     def adjoint_multiproc(self, measures):
@@ -710,7 +710,7 @@ class Channel(LinOp):
                 
                 gridded += self.slicing_t(sliced, slit_idx)
             blurred += self.gridding_t(gridded, pointing)
-        out[self.wslice, ...] = self.fourier_duplicate_t(blurred)
+        out[self.wslice, ...] += self.fourier_duplicate_t(blurred)
 
 
     def sliceToCube(self, measures):
