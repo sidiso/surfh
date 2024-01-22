@@ -312,7 +312,7 @@ def c_sliceToCube_t(const double[:,:,:] arr, const double[:,:,:]dirac,
     for a in range(sizeAlpha):
         for b in range(sizeBeta):
             for l in range(1, sizeLambda-1):
-                if c_res[l,a,b] <1e-2:
+                if c_res[l,a,b] <1e-2: # Threshold to 1e-2 instead of 0
                     c_res[l,a,b] = (c_res[l-1,a,b] + c_res[l+1,a,b])/2
 
     return np.asarray(c_res)

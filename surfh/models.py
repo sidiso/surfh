@@ -186,7 +186,7 @@ def wblur_t(arr: array, wpsf: array, num_threads: int) -> array:
     return result_array
 
 
-def sliceToCube_t(arr: array,slit_idx,  wpsf: array, num_threads: int) -> array:
+def sliceToCube_t(arr: array, dirac: array, num_threads: int) -> array:
     """Apply transpose of blurring in λ axis
 
     Parameters
@@ -200,9 +200,9 @@ def sliceToCube_t(arr: array,slit_idx,  wpsf: array, num_threads: int) -> array:
     """
     # [λ, α, β] = ∑_λ' arr[λ', α, β]
     # Σ_λ'
-    result_array = cythons_files.c_sliceToCube_t(arr, slit_idx, wpsf.shape[1], 
+    result_array = cythons_files.c_sliceToCube_t(arr, dirac, dirac.shape[1], 
                                            arr.shape[1], arr.shape[2], 
-                                           wpsf.shape[0], num_threads)
+                                           dirac.shape[0], num_threads)
     return result_array
 
 
@@ -619,7 +619,7 @@ class Channel(LinOp):
     def wdirac_blur_t(self, inarray: array, slit_idx: int) -> array:
         """Returns spectral blurring transpose of inarray using a dirac function.
            Only used to create generate cube from Forward data with applying Adjoint operator. """    
-        return sliceToCube_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx,'dirac'), self.num_threads if not self.serial else 1)
+        return sliceToCube_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx, 'dirac'), self.num_threads if not self.serial else 1)
 
     def forward(self, inarray_f):
         """inarray is supposed in global coordinate, spatially blurred and in Fourier space.
@@ -716,8 +716,10 @@ class Channel(LinOp):
     def sliceToCube(self, measures):
         out = np.zeros(self.ishape, dtype=np.complex128)
         blurred = np.zeros(self.cshape)
+        print("1")
         for p_idx, pointing in enumerate(self.pointings):
             gridded = np.zeros(self.local_shape)
+            print("2")
             for slit_idx in range(self.instr.n_slit):
                 sliced = np.zeros(self.slit_shape(slit_idx))
                 # α zero-filling, λ blurrling_t, and β duplication
@@ -735,7 +737,9 @@ class Channel(LinOp):
             
                 gridded += self.slicing_t(sliced, slit_idx)
             blurred += self.gridding_t(gridded, pointing)
+        print("3")
         out[self.wslice, ...] = self.fourier_duplicate_t(blurred)
+        print("4")
         return out
 
 
@@ -917,15 +921,15 @@ class Spectro(LinOp):
                 list of hyperspectral cube. One cube per frequency band.  
         """
         cubes = []
-        for i in range(len(self.channels)):
-            cubes.append(np.zeros( self.ishape[:2] + (self.ishape[2] // 2 + 1,), dtype=np.complex128
-                                
-            ))        
-           
+
         for idx, chan in enumerate(self.channels):
+            print("Start")
             res = chan.sliceToCube(np.reshape(slices[self._idx[idx] : self._idx[idx + 1]], chan.oshape),)
-            cubes[idx] = idft(res, self.imshape)
-            
+            print("5")
+            cube = idft(res, self.imshape)
+            print("6")
+            cubes.append(cube[chan.wslice,...])
+            print("End")
         return cubes
 
 
