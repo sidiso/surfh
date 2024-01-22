@@ -716,10 +716,8 @@ class Channel(LinOp):
     def sliceToCube(self, measures):
         out = np.zeros(self.ishape, dtype=np.complex128)
         blurred = np.zeros(self.cshape)
-        print("1")
         for p_idx, pointing in enumerate(self.pointings):
             gridded = np.zeros(self.local_shape)
-            print("2")
             for slit_idx in range(self.instr.n_slit):
                 sliced = np.zeros(self.slit_shape(slit_idx))
                 # α zero-filling, λ blurrling_t, and β duplication
@@ -737,9 +735,7 @@ class Channel(LinOp):
             
                 gridded += self.slicing_t(sliced, slit_idx)
             blurred += self.gridding_t(gridded, pointing)
-        print("3")
         out[self.wslice, ...] = self.fourier_duplicate_t(blurred)
-        print("4")
         return out
 
 
@@ -923,13 +919,9 @@ class Spectro(LinOp):
         cubes = []
 
         for idx, chan in enumerate(self.channels):
-            print("Start")
             res = chan.sliceToCube(np.reshape(slices[self._idx[idx] : self._idx[idx + 1]], chan.oshape),)
-            print("5")
             cube = idft(res, self.imshape)
-            print("6")
             cubes.append(cube[chan.wslice,...])
-            print("End")
         return cubes
 
 
@@ -1246,15 +1238,11 @@ class SpectroLMM(LinOp):
                 list of hyperspectral cube. One cube per frequency band.  
         """
         cubes = []
-        for i in range(len(self.channels)):
-            cubes.append(np.zeros( self.ishape[:2] + (self.ishape[2] // 2 + 1,), dtype=np.complex128
-                                
-            ))        
-           
+
         for idx, chan in enumerate(self.channels):
             res = chan.sliceToCube(np.reshape(slices[self._idx[idx] : self._idx[idx + 1]], chan.oshape),)
-            cubes[idx] = idft(res, self.imshape)
-            
+            cube = idft(res, self.imshape)
+            cubes.append(cube[chan.wslice,...])
         return cubes
 
 
