@@ -582,17 +582,26 @@ class Channel(LinOp):
         _otf_sr = shared_dict.attach(self._metadata_path)["_otf_sr"]
         return dft(inarray) * _otf_sr.conj()
 
-    def _wpsf(self, length: int, step: float, slit_idx: int) -> array:
+    def _wpsf(self, length: int, step: float, slit_idx: int, type: str = 'mrs') -> array:
         """Return spectral PSF"""
         # ∈ [0, β_s]
         wavel_axis = shared_dict.attach(self._metadata_path)["wavel_axis"]
         beta_in_slit = np.arange(0, length) * step
+
+        if type == 'dirac':
+            return self.instr.spectral_psf(
+                            beta_in_slit - np.mean(beta_in_slit),  # ∈ [-β_s / 2, β_s / 2]
+                            wavel_axis[self.wslice],
+                            arcsec2micron=self.instr.wavel_step / self.instr.det_pix_size,
+                            type='dirac',
+                        )
 
         if self.save_memory:
             wpsf = self.instr.spectral_psf(
                             beta_in_slit - np.mean(beta_in_slit),  # ∈ [-β_s / 2, β_s / 2]
                             wavel_axis[self.wslice],
                             arcsec2micron=self.instr.wavel_step / self.instr.det_pix_size,
+                            type='mrs',
                         )
         else:
             wpsf = shared_dict.attach(self._metadata_path)["wpsf"][slit_idx]
@@ -607,8 +616,10 @@ class Channel(LinOp):
         """Returns spectral blurring transpose of inarray"""
         return wblur_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads if not self.serial else 1)
 
-    def functionName(self, inarray: array, slit_idx: int) -> array:
-        return functionName(inarray, slit_idx, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads if not self.serial else 1)    
+    def wdirac_blur_t(self, inarray: array, slit_idx: int) -> array:
+        """Returns spectral blurring transpose of inarray using a dirac function.
+           Only used to create generate cube from Forward data with applying Adjoint operator. """    
+        return wblur_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx,'dirac'), self.num_threads if not self.serial else 1)
 
     def forward(self, inarray_f):
         """inarray is supposed in global coordinate, spatially blurred and in Fourier space.
@@ -730,10 +741,8 @@ class Channel(LinOp):
                     )
 
                 tmp2 = self.wblur_t(tmp, slit_idx)
-
                 sliced[:, : self.oshape[3] * self.srf : self.srf] = tmp2
                 
-
                 gridded += self.slicing_t(sliced, slit_idx)
             blurred += self.gridding_t(gridded, pointing)
         print(f"####### {self.wslice}")
@@ -756,11 +765,9 @@ class Channel(LinOp):
                         axis=2,
                     )
 
-                tmp2 = self.wblur_t(tmp, slit_idx)
-
+                tmp2 = self.wdirac_blur_t(tmp, slit_idx)
                 sliced[:, : self.oshape[3] * self.srf : self.srf] = tmp2
-                
-
+            
                 gridded += self.slicing_t(sliced, slit_idx)
             blurred += self.gridding_t(gridded, pointing)
         out[self.wslice, ...] = self.fourier_duplicate_t(blurred)
