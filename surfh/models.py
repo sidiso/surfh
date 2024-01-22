@@ -661,41 +661,6 @@ class Channel(LinOp):
                 ]* self.wblur(sliced, slit_idx).sum(axis=2)
                 
 
-    def precompute_wpsf(self):
-        local_alpha_axis = shared_dict.attach(self._metadata_path)["local_alpha_axis"]
-        local_beta_axis = shared_dict.attach(self._metadata_path)["local_beta_axis"]
-        alpha_axis = shared_dict.attach(self._metadata_path)["alpha_axis"]
-        beta_axis = shared_dict.attach(self._metadata_path)["beta_axis"]
-
-        _metadata = shared_dict.attach(self._metadata_path)
-        _metadata["wpsf"] = {}
-        alpha_coord, beta_coord = (self.instr.fov).local2global(
-            local_alpha_axis, local_beta_axis
-        )
-
-        # Necessary for interpn to process 3D array. No interpolation is done
-        # along that axis.
-        wl_idx = np.arange((self.wslice.stop-self.wslice.start))
-
-        out_shape = (len(wl_idx),) + alpha_coord.shape
-        gridded = np.ones(out_shape)
-       
-        for slit_idx in range(self.instr.n_slit):
-            slices = self.slit_slices(slit_idx)
-            sliced = gridded[:, slices[0], slices[1]]
-            sliced = sliced[
-                    :, : self.oshape[3] * self.srf : self.srf
-                ]
-            
-
-            wavel_axis = shared_dict.attach(self._metadata_path)["wavel_axis"]
-            beta_in_slit = np.arange(0, sliced.shape[2]) * self.beta_step
-            arcsec2micron=self.instr.wavel_step / self.instr.det_pix_size,
-            wpsf = self.instr.w_blur.psfs(self.instr.wavel_axis, beta_in_slit - np.mean(beta_in_slit), wavel_axis[self.wslice], arcsec2micron)
-            
-            _metadata["wpsf"][slit_idx] = wpsf
-
-
     def adjoint(self, measures):
         out = shared_dict.attach(self._metadata_path)["ad_data"]
         blurred = np.zeros(self.cshape)
@@ -745,8 +710,8 @@ class Channel(LinOp):
                 
                 gridded += self.slicing_t(sliced, slit_idx)
             blurred += self.gridding_t(gridded, pointing)
-        print(f"####### {self.wslice}")
         out[self.wslice, ...] = self.fourier_duplicate_t(blurred)
+
 
     def sliceToCube(self, measures):
         out = np.zeros(self.ishape, dtype=np.complex128)
@@ -773,6 +738,37 @@ class Channel(LinOp):
         out[self.wslice, ...] = self.fourier_duplicate_t(blurred)
         return out
 
+
+    def precompute_wpsf(self):
+        local_alpha_axis = shared_dict.attach(self._metadata_path)["local_alpha_axis"]
+        local_beta_axis = shared_dict.attach(self._metadata_path)["local_beta_axis"]
+
+        _metadata = shared_dict.attach(self._metadata_path)
+        _metadata["wpsf"] = {}
+        alpha_coord, beta_coord = (self.instr.fov).local2global(
+            local_alpha_axis, local_beta_axis
+        )
+
+        # Necessary for interpn to process 3D array. No interpolation is done
+        # along that axis.
+        wl_idx = np.arange((self.wslice.stop-self.wslice.start))
+
+        out_shape = (len(wl_idx),) + alpha_coord.shape
+        gridded = np.ones(out_shape)
+       
+        for slit_idx in range(self.instr.n_slit):
+            slices = self.slit_slices(slit_idx)
+            sliced = gridded[:, slices[0], slices[1]]
+            sliced = sliced[
+                    :, : self.oshape[3] * self.srf : self.srf
+                ]
+            
+            wavel_axis = shared_dict.attach(self._metadata_path)["wavel_axis"]
+            beta_in_slit = np.arange(0, sliced.shape[2]) * self.beta_step
+            arcsec2micron=self.instr.wavel_step / self.instr.det_pix_size,
+            wpsf = self.instr.w_blur.psfs(self.instr.wavel_axis, beta_in_slit - np.mean(beta_in_slit), wavel_axis[self.wslice], arcsec2micron)
+            
+            _metadata["wpsf"][slit_idx] = wpsf
 
 class Spectro(LinOp):
     def __init__(
@@ -849,6 +845,14 @@ class Spectro(LinOp):
 
 
     def forward(self, inarray: array) -> array:
+        """
+            MRS forward operator.
+            Apply H
+
+            inarray : 
+
+            output :  
+        """
         out = np.zeros(self.oshape)
         if self.verbose:
             logger.info(f"Spatial blurring DFT2({inarray.shape})")
@@ -871,6 +875,14 @@ class Spectro(LinOp):
 
     
     def adjoint(self, inarray: array) -> array:
+        """
+            MRS adjoint operator.
+            Apply H^t 
+
+            inarray : 
+
+            output :  
+        """
         tmp = np.zeros(
             self.ishape[:2] + (self.ishape[2] // 2 + 1,), dtype=np.complex128
         )
@@ -894,34 +906,30 @@ class Spectro(LinOp):
 
 
     def sliceToCube(self, slices):
+        """
+            Convert MRS data (in slices shape) onto a list of hyperspectral cube.
+            Similar to adjoint operator, without spatial and spectral blurring. 
+
+            Slices : 
+                MRS Forward data. 
+
+            output : 
+                list of hyperspectral cube. One cube per frequency band.  
+        """
         cubes = []
-        print("Hello")
         for i in range(len(self.channels)):
             cubes.append(np.zeros( self.ishape[:2] + (self.ishape[2] // 2 + 1,), dtype=np.complex128
                                 
-            ))
-        
-        print("test")
-            
+            ))        
            
         for idx, chan in enumerate(self.channels):
             print(f"Chan Idx is {idx}")
             res = chan.sliceToCube(np.reshape(slices[self._idx[idx] : self._idx[idx + 1]], chan.oshape),)
             cubes[idx] = idft(res, self.imshape)
             print(f"Slice start is {chan.wslice.start}, Stop is {chan.wslice.stop}")
-
-            """ for i in range(cubes[idx].shape[1]):
-                for j in range(cubes[idx].shape[2]):
-
-                
-                    for l in range(chan.wslice.start, chan.wslice.stop):
-                        if cubes[idx][l,i,j] <1e-2:
-                            
-                            #print(f"Before cube is {cubes[idx][l,i,j]}")
-                            cubes[idx][l,i,j] = (cubes[idx][l-1,i,j] + cubes[idx][l+1,i,j])/2
-                            #print(f"After cube is {cubes[idx][l,i,j]}") """
             
         return cubes
+
 
     def qdcoadd(self, measures: array) -> array:
         out = np.zeros(self.ishape)
