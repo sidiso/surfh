@@ -801,7 +801,7 @@ class Spectro(LinOp):
             self.step,
         )
 
-        _shared_metadata = shared_dict.create("s_metadata")
+        _shared_metadata = shared_dict.create("s_metadata_" + str(time.time()))
         self._shared_metadata = _shared_metadata
         for instr in instrs:
             _shared_metadata.addSubdict(instr.get_name_pix())
@@ -1121,7 +1121,7 @@ class SpectroLMM(LinOp):
             self.step,
         )
 
-        _shared_metadata = shared_dict.create("s_metadata0")
+        _shared_metadata = shared_dict.create("s_metadata_" + str(time.time()))
         self._shared_metadata = _shared_metadata
         for instr in instrs:
             _shared_metadata.addSubdict(instr.get_name_pix())
