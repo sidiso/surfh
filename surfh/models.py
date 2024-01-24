@@ -319,7 +319,7 @@ class Channel(LinOp):
 
         
 
-        if alpha_axis[1] - alpha_axis[0] != beta_axis[1] - beta_axis[0]:
+        if not np.allclose(alpha_axis[1] - alpha_axis[0], beta_axis[1] - beta_axis[0]):
             logger.warning(
                 "α and β step for input axis must be equals. Here α={da} and β={db}",
             )
