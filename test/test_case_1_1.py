@@ -8,9 +8,8 @@ Created on Wed Jan 24 16:43:08 2024
 
 
 import os
-os.chdir("/home/dpineau/mycode/test_fusion")
 
-import input_templates
+
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.io import fits
@@ -18,14 +17,13 @@ from udft import ir2fr
 from scipy.signal import convolve2d as conv2
 from scipy.ndimage import gaussian_filter
 
-os.chdir("/home/dpineau/mycode/surfh/surfh")
-import smallmiri as miri
-import instru
-import utils
+from surfh import smallmiri as miri
+from surfh import instru
+from surfh import utils
 
 # %% 1) INPUTS FOR MODELS
 
-file = "/home/dpineau/Bureau/data/mycube"
+file = "/home/nmonnier/Projects/JWST/MRS/surfh/surfh/data/simulation_data"
 
 def min_not_zero(data):
     Ni, Nj = data.shape
@@ -44,11 +42,10 @@ def rescale_0_1(data):
     return (data - data_min) / (data_max - data_min)
 
 def retrieve_spectra_lmm():
-    os.chdir(file)
     
     # import des spectres LMM
     L_specs = (
-        np.load("lmm_specs.npy") / 1e3
+        np.load(file+"/lmm_specs.npy") / 1e3
     )  # CHANGEMENT PAR RAPPORT À inputs_for_models_1_1
     # conversion de µJy/arcsec-2 à mJy/arcsec-2
     # print("spectres en mJy/arcsec-2 (nouveau)")
@@ -65,10 +62,9 @@ def retrieve_spectra_lmm():
 
 
 def abundance_maps_inputs_1_3(a=0, b=5):
-    os.chdir(file)
 
     # import true abundance maps
-    fname_true_maps = "decimated_abundance_maps_orion.fits"
+    fname_true_maps = file +"/decimated_abundance_maps_orion.fits"
     fits_cube = fits.open(fname_true_maps)
     true_maps = np.asarray(fits_cube[0].data, dtype=np.float32)[a:b, :250, :]
     true_maps.shape
@@ -124,14 +120,13 @@ def abundance_maps_inputs_1_3(a=0, b=5):
 
 class Simulation_Inputs():
     def __init__(self, n_wavelength = 300):
-        os.chdir(file)
-        true_maps, shape_target = input_templates.abundance_maps_inputs_1_3()
+        true_maps, shape_target = abundance_maps_inputs_1_3()
         
         
         # paramètres liés à l'objet à reconstruire x
         
         maps = np.copy(true_maps)
-        marge = 50
+        marge = 80
         maps = np.pad(maps, ((0, 0), (marge, marge), (marge, marge)), "reflect")
         shape_target = maps.shape[1:]
         spat_ss = 1
