@@ -163,6 +163,25 @@ def wblur(arr: array, wpsf: array, num_threads: int) -> array:
                                          num_threads)
     return result_array
 
+def cubeToSlice(arr: array, dirac: array, num_threads: int) -> array:
+    """Apply transpose of blurring in λ axis
+
+    Parameters
+    ----------
+    arr: array-like
+      Input of shape [λ', α, β].
+    Returns
+    -------
+    out: array-like
+      A wavelength blurred array in [λ, α, β].
+    """
+    # [λ, α, β] = ∑_λ' arr[λ', α, β]
+    # Σ_λ'
+    result_array = cythons_files.c_cubeToSlice(arr, dirac, dirac.shape[1],
+                                         arr.shape[1], arr.shape[2], 
+                                         dirac.shape[0], num_threads)
+    return result_array
+
 def wblur_t(arr: array, wpsf: array, num_threads: int) -> array:
     """Apply transpose of blurring in λ axis
 
@@ -184,6 +203,7 @@ def wblur_t(arr: array, wpsf: array, num_threads: int) -> array:
                                            arr.shape[1], arr.shape[2], 
                                            wpsf.shape[0], num_threads)
     return result_array
+
 
 
 def sliceToCube_t(arr: array, dirac: array, num_threads: int) -> array:
@@ -475,6 +495,18 @@ class Channel(LinOp):
         weights = self.slit_weights(slit_idx)
         return gridded[:, slices[0], slices[1]] * weights
 
+    def slicing_cube2Fente(
+        self,
+        gridded: array,
+        slit_idx: int,
+    ) -> array:
+        """Return a weighted slice of gridded. `slit_idx` start at 0."""
+        slices = self.slit_slices(slit_idx)
+        print("slices shape is", slices)
+        weights = self.slit_weights(slit_idx)
+        print(gridded[:, slices[0], slices[1]].shape)
+        return gridded[:, slices[0], slices[1]]
+
     def slicing_t(
         self,
         gridded: array,
@@ -498,7 +530,7 @@ class Channel(LinOp):
         weights = self.slit_weights(slit_idx)
         out[:, slices[0], slices[1]] = gridded
         return out
-    
+        
     def gridding(self, inarray: array, pointing: instru.Coord) -> array:
         """Returns interpolation of inarray in local referential"""
         # α and β inside the FOV shifted to pointing, in the global ref.
@@ -610,8 +642,17 @@ class Channel(LinOp):
 
     def wblur(self, inarray: array, slit_idx: int) -> array:
         """Returns spectral blurring of inarray"""
+        print(self._wpsf(inarray.shape[2], self.beta_step, slit_idx).shape)
+        print(inarray.shape)
         return wblur(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads if not self.serial else 1)
 
+    def wdirac_blur(self, inarray: array, slit_idx: int) -> array:
+        """Returns spectral blurring transpose of inarray using a dirac function.
+           Only used to create generate cube from Forward data with applying Adjoint operator. """    
+        print(self._wpsf(inarray.shape[2], self.beta_step, slit_idx, 'dirac').shape)
+        print(inarray.shape)
+        return cubeToSlice(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx, 'dirac'), self.num_threads if not self.serial else 1)
+   
     def wblur_t(self, inarray: array, slit_idx: int) -> array:
         """Returns spectral blurring transpose of inarray"""
         return wblur_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads if not self.serial else 1)
@@ -655,11 +696,30 @@ class Channel(LinOp):
                 sliced = self.slicing(gridded, slit_idx)[
                     :, : self.oshape[3] * self.srf : self.srf
                 ]
-                
                 out[p_idx, slit_idx, :, :] = self.instr.pce[
                     ..., np.newaxis
                 ]* self.wblur(sliced, slit_idx).sum(axis=2)
+
+    def cubeToSlice(self, cube):
+        """cube is supposed in global coordinate in Fourier space for a specific Channel and band.
+        slices is an array of shape (pointing, slit, wavelength, alpha).
+        Reshape input cube into slices without spatial and spectral blurring 
+        done in Forward operator.
+        """
+        # [pointing, slit, λ', α]
+        slices = np.zeros(self.oshape)
+        blurred = self.sblur(cube[self.wslice, ...]) # TODO : Change that
+        for p_idx, pointing in enumerate(self.pointings):
+            gridded = self.gridding(blurred, pointing)
+            for slit_idx in range(self.instr.n_slit):
+                # Slicing, weighting and α subsampling for SR
+                sliced = self.slicing_cube2Fente(gridded, slit_idx)[
+                    :, : self.oshape[3] * self.srf : self.srf
+                ]
+                slices[p_idx, slit_idx, :, :] = self.wdirac_blur(sliced, slit_idx).sum(axis=2) #TODO Change: That
                 
+
+        return slices                
 
     def adjoint(self, measures):
         out = shared_dict.attach(self._metadata_path)["ad_data"]
@@ -733,31 +793,10 @@ class Channel(LinOp):
                 tmp2 = self.wdirac_blur_t(tmp, slit_idx)
                 sliced[:, : self.oshape[3] * self.srf : self.srf] = tmp2
             
-                gridded += self.slicing_t(sliced, slit_idx)
+                gridded += self.slicing_Fente2Cube_t(sliced, slit_idx)
             blurred += self.gridding_t(gridded, pointing)
         out[self.wslice, ...] = self.fourier_duplicate_t(blurred)
         return out
-    
-    def cubeToSlice(self, cube):
-        """cube is supposed in global coordinate in Fourier space for a specific Channel and band.
-        slices is an array of shape (pointing, slit, wavelength, alpha).
-        Reshape input cube into slices without spatial and spectral blurring 
-        done in Forward operator.
-        """
-        # [pointing, slit, λ', α]
-        out = shared_dict.attach(self._metadata_path)["fw_data"]
-        blurred = self.sblur(cube) # TODO : Change that
-        for p_idx, pointing in enumerate(self.pointings):
-            gridded = self.gridding(blurred, pointing)
-            for slit_idx in range(self.instr.n_slit):
-                # Slicing, weighting and α subsampling for SR
-                sliced = self.slicing(gridded, slit_idx)[
-                    :, : self.oshape[3] * self.srf : self.srf
-                ]
-                
-                out[p_idx, slit_idx, :, :] = self.wblur(sliced).sum(axis=2) #TODO Change: That
-
-        return slices
 
 
     def precompute_wpsf(self):
@@ -925,6 +964,25 @@ class Spectro(LinOp):
             logger.info(f"Spatial blurring^T : IDFT2({tmp.shape})")
         return idft(tmp * self.sotf.conj(), self.imshape)
 
+
+    def cubeToSlice(self, cube):
+        """
+            Convert hyperspectral cube into MRS data (in slices shape).
+            Similar to forward operator, without spatial and spectral blurring. 
+
+            cube : 
+                hyperspectral cube. 
+
+            output : 
+                list of MRS slices.  
+        """
+        slices = []
+        blurred_f = dft(cube)
+        for idx, chan in enumerate(self.channels):
+            
+            slice = chan.cubeToSlice(blurred_f)
+            slices.append(slice)
+        return slices
 
     def sliceToCube(self, slices):
         """
