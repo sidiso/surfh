@@ -737,6 +737,27 @@ class Channel(LinOp):
             blurred += self.gridding_t(gridded, pointing)
         out[self.wslice, ...] = self.fourier_duplicate_t(blurred)
         return out
+    
+    def cubeToSlice(self, cube):
+        """cube is supposed in global coordinate in Fourier space for a specific Channel and band.
+        slices is an array of shape (pointing, slit, wavelength, alpha).
+        Reshape input cube into slices without spatial and spectral blurring 
+        done in Forward operator.
+        """
+        # [pointing, slit, λ', α]
+        out = shared_dict.attach(self._metadata_path)["fw_data"]
+        blurred = self.sblur(cube) # TODO : Change that
+        for p_idx, pointing in enumerate(self.pointings):
+            gridded = self.gridding(blurred, pointing)
+            for slit_idx in range(self.instr.n_slit):
+                # Slicing, weighting and α subsampling for SR
+                sliced = self.slicing(gridded, slit_idx)[
+                    :, : self.oshape[3] * self.srf : self.srf
+                ]
+                
+                out[p_idx, slit_idx, :, :] = self.wblur(sliced).sum(axis=2) #TODO Change: That
+
+        return slices
 
 
     def precompute_wpsf(self):
