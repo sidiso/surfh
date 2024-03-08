@@ -124,7 +124,7 @@ pointings = instru.CoordList(c + main_pointing for c in ch1_dither).pix(step)
 import os
 directory = os.fsencode('/home/nmonnier/Data/JWST/Orion_bar/single_file/')
 res_dict = {}
-for of in range(2,4):
+for of in range(2,5):
     res_dict[of] = 0
     for file in os.listdir(directory):
 
@@ -159,6 +159,7 @@ for of in range(2,4):
         # Oversample im with 0 padding
         # Then dupplicate value to 0 values
         of_im = np.zeros((im.shape[0], im.shape[1]*of, im.shape[2]*of), dtype=im.dtype)
+        print("Shape of_im is ", of_im.shape)
         of_im[:, ::of, ::of] = im
         n_of_im = np.zeros((of_im.shape[0], (of_im.shape[1]-2*of)*of, (of_im.shape[2]-2*of)*of), dtype=im.dtype)
         n_of_im = of_im[:, of:-of, of:-of]
@@ -255,7 +256,8 @@ for of in range(2,4):
 
         print(f"Relative Difference min is {(np.nanmin(im[0])-np.nanmin(interpolated_im))/np.nanmin(im[0]) *100} %")
         print(f"Relative Difference max is {(np.nanmax(im[0])-np.nanmax(interpolated_im))/np.nanmax(im[0]) *100} %")
-        res_dict[of] += (np.nanmin(im[0])-np.nanmin(interpolated_im))/np.nanmin(im[0]) *100
+        #res_dict[of] += (np.nanmin(im[0])-np.nanmin(interpolated_im))/np.nanmin(im[0]) *100
+        res_dict[of] += (np.nanmax(im[0])-np.nanmax(interpolated_im))/np.nanmax(im[0]) *100
         print("\n\n")
         hdul.close()
 

@@ -502,10 +502,9 @@ class Channel(LinOp):
     ) -> array:
         """Return a weighted slice of gridded. `slit_idx` start at 0."""
         slices = self.slit_slices(slit_idx)
-        print("slices shape is", slices)
         weights = self.slit_weights(slit_idx)
-        print(gridded[:, slices[0], slices[1]].shape)
-        return gridded[:, slices[0], slices[1]]
+        return gridded[:, slices[0], slices[1]] * weights
+
 
     def slicing_t(
         self,
@@ -528,7 +527,7 @@ class Channel(LinOp):
         out = np.zeros(self.local_shape)
         slices = self.slit_slices(slit_idx)
         weights = self.slit_weights(slit_idx)
-        out[:, slices[0], slices[1]] = gridded
+        out[:, slices[0], slices[1]] = gridded* weights
         return out
         
     def gridding(self, inarray: array, pointing: instru.Coord) -> array:
@@ -599,7 +598,7 @@ class Channel(LinOp):
         """Return spatial blurring of inarray_f in Fourier space for SR"""
         _otf_sr = shared_dict.attach(self._metadata_path)["_otf_sr"]
         return idft(
-            inarray_f * _otf_sr,
+            inarray_f,# * _otf_sr,
             self.imshape,
         )
 
@@ -642,15 +641,11 @@ class Channel(LinOp):
 
     def wblur(self, inarray: array, slit_idx: int) -> array:
         """Returns spectral blurring of inarray"""
-        print(self._wpsf(inarray.shape[2], self.beta_step, slit_idx).shape)
-        print(inarray.shape)
         return wblur(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads if not self.serial else 1)
 
     def wdirac_blur(self, inarray: array, slit_idx: int) -> array:
         """Returns spectral blurring transpose of inarray using a dirac function.
            Only used to create generate cube from Forward data with applying Adjoint operator. """    
-        print(self._wpsf(inarray.shape[2], self.beta_step, slit_idx, 'dirac').shape)
-        print(inarray.shape)
         return cubeToSlice(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx, 'dirac'), self.num_threads if not self.serial else 1)
    
     def wblur_t(self, inarray: array, slit_idx: int) -> array:
@@ -717,8 +712,6 @@ class Channel(LinOp):
                     :, : self.oshape[3] * self.srf : self.srf
                 ]
                 slices[p_idx, slit_idx, :, :] = self.wdirac_blur(sliced, slit_idx).sum(axis=2) #TODO Change: That
-                
-
         return slices                
 
     def adjoint(self, measures):
@@ -788,7 +781,9 @@ class Channel(LinOp):
                         ),
                         sliced.shape[2],
                         axis=2,
-                    )
+                    )/sliced.shape[2] #TODO : Véririfier si diviser par la taille de beta est correct ?
+                                      # Car dans le modèle direct/Adjoint c'est faux. Mais ici on fait que de la transformation
+                                      # pas du modèle...
 
                 tmp2 = self.wdirac_blur_t(tmp, slit_idx)
                 sliced[:, : self.oshape[3] * self.srf : self.srf] = tmp2

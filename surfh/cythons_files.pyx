@@ -270,11 +270,11 @@ def c_cubeToSlice(const double[:,:,:] arr, const double[:,:,:]dirac,
                         tmp = tmp + arr[l,a,b]* dirac[ll,l,b]
                     c_res[ll,a,b] = tmp 
 
-    """ for a in range(sizeAlpha):
+    for a in range(sizeAlpha):
         for b in range(sizeBeta):
             for l in range(1, sizeLambdaPrime-1):
                 if c_res[l,a,b] <1e-2: # Threshold to 1e-2 instead of 0
-                    c_res[l,a,b] = (c_res[l-1,a,b] + c_res[l+1,a,b])/2 """
+                    c_res[l,a,b] = (c_res[l-1,a,b] + c_res[l+1,a,b])/2
 
     return np.asarray(c_res)
 

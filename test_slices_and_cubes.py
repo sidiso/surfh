@@ -15,7 +15,7 @@ from astropy.io import fits
 from scipy.signal import convolve as conv
 from scipy.signal import convolve2d as conv2
 
-from surfh import instru, models
+from surfh import instru, models, old_model
 from surfh import smallmiri as miri
 #from surfh import dummymiri as miri
 #from surfh import miri
@@ -113,22 +113,47 @@ spectro = models.Spectro(
     serial=False,
 )
 
+old_spectro = old_model.Spectro(
+    [miri.ch1a],#, miri.ch1b, miri.ch1c, miri.ch2a],#, miri.ch2b, miri.ch2c],#, miri.ch3a, miri.ch3b, miri.ch3c, miri.ch4a, miri.ch4b, miri.ch4c],
+    alpha_axis,
+    beta_axis,
+    wavel_axis,
+    sotf,
+    pointings,
+    verbose=True,
+    serial=False,
+)
+
+# data = spectro.forward(cube)
+# adcube = spectro.adjoint(data)
+# plt.title("Fw + Ad Cube")
+# plt.imshow(adcube[100])
+# plt.colorbar()
+# plt.figure()
+
+# old_cube = cube.copy()
+# old_data = old_spectro.forward(old_cube)
+# old_adcube = old_spectro.adjoint(old_data)
+# plt.title("OLD (develop branch model.py) Fw + Ad Cube")
+# plt.imshow(old_adcube[100])
+# plt.colorbar()
 
 slices = spectro.cubeToSlice(cube)
 ncube = spectro.sliceToCube(slices[0])
-
-data = spectro.forward(cube)
-adcube = spectro.adjoint(data)
-
 plt.figure()
+plt.title("TODO cube")
 plt.imshow(ncube[0][100])
 plt.colorbar()
+
+
+
 plt.figure()
-plt.imshow(cube[100])
+plt.title("Original Cube")
+plt.imshow(cube[100,40:150, 90:190])
 plt.colorbar()
 plt.figure()
-plt.imshow(adcube[100])
-plt.colorbar()
+
 plt.show()
+
 
 
