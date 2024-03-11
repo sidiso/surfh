@@ -598,7 +598,7 @@ class Channel(LinOp):
         """Return spatial blurring of inarray_f in Fourier space for SR"""
         _otf_sr = shared_dict.attach(self._metadata_path)["_otf_sr"]
         return idft(
-            inarray_f,# * _otf_sr,
+            inarray_f * _otf_sr,
             self.imshape,
         )
 
@@ -703,7 +703,8 @@ class Channel(LinOp):
         """
         # [pointing, slit, λ', α]
         slices = np.zeros(self.oshape)
-        blurred = self.sblur(cube[self.wslice, ...]) # TODO : Change that
+        blurred = idft(cube[self.wslice, ...], self.imshape) # Replace sblur
+
         for p_idx, pointing in enumerate(self.pointings):
             gridded = self.gridding(blurred, pointing)
             for slit_idx in range(self.instr.n_slit):
