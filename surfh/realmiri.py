@@ -73,7 +73,8 @@ def get_IFU(filename):
     else:
         band = 2 
 
-    spec_blur = instru.SpectralBlur(res[channel*3 + band])
+    print((channel-1)*3 + band)
+    spec_blur = instru.SpectralBlur(res[(channel-1)*3 + band])
     targ_ra  = hdr['TARG_RA']
     targ_dec = hdr['TARG_DEC']
 
@@ -83,6 +84,7 @@ def get_IFU(filename):
     if (str(channel) + chr(65 + band)) not in pce:
         pce[str(channel) + chr(65 + band)] = np.random.rand(wavel.size)/10 + 0.5
 
+    hdul.close()
     return instru.IFU(
                         instru.FOV(alpha_width, beta_width, origin=instru.Coord(targ_ra, targ_dec), angle=rotation),
                         pix_size,
