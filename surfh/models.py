@@ -713,7 +713,19 @@ class Channel(LinOp):
                     :, : self.oshape[3] * self.srf : self.srf
                 ]
                 slices[p_idx, slit_idx, :, :] = self.wdirac_blur(sliced, slit_idx).sum(axis=2) #TODO Change: That
-        return slices                
+        return slices      
+
+    def realData_cubeToSlice(self, cube):
+        slices = np.zeros(self.oshape[1:]) # Remove pointing dimension
+        gridded = self.gridding(cube, instru.Coord(0, 0))
+        for slit_idx in range(self.instr.n_slit):
+            sliced = self.slicing_cube2Fente(gridded, slit_idx)[
+                    :, : self.oshape[3] * self.srf : self.srf
+                ]
+            slices[slit_idx, :, :] = sliced.sum(axis=2) # Only sum on the Beta axis
+        return slices      
+
+          
 
     def adjoint(self, measures):
         out = shared_dict.attach(self._metadata_path)["ad_data"]
@@ -793,6 +805,28 @@ class Channel(LinOp):
             blurred += self.gridding_t(gridded, pointing)
         out[self.wslice, ...] = self.fourier_duplicate_t(blurred)
         return out
+
+    def realData_sliceToCube(self, slices, cube_dim):
+        out = np.zeros(cube_dim)
+        blurred = np.zeros(cube_dim)
+        gridded = np.zeros((cube_dim[0] , self.local_shape[1], self.local_shape[2]))
+        for slit_idx in range(self.instr.n_slit):
+            sliced = np.zeros(self.slit_shape(slit_idx))
+            tmp = np.repeat(
+                            np.expand_dims(
+                                slices[slit_idx],
+                                axis=2,
+                                ),
+                                sliced.shape[2],
+                                axis=2,
+                            )/sliced.shape[2]
+            tmp2 = tmp
+            sliced[:, : self.oshape[3] * self.srf : self.srf] = tmp2
+            gridded += self.slicing_Fente2Cube_t(sliced, slit_idx)
+
+        blurred += self.gridding_t(gridded, instru.Coord(0, 0))
+        out = self.fourier_duplicate_t(blurred)
+        return idft(out)
 
 
     def precompute_wpsf(self):
@@ -979,6 +1013,12 @@ class Spectro(LinOp):
             slice = chan.cubeToSlice(blurred_f)
             slices.append(slice)
         return slices
+    
+    def realData_cubeToSlice(self, chan_name, cube):
+
+        return 
+    
+
 
     def sliceToCube(self, slices):
         """
