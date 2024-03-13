@@ -297,7 +297,6 @@ class FOV:
             step,
         )
 
-        print("ALPHA_AXIS = ", alpha_axis.shape)
 
         beta_axis = axis(
             -self.beta_width / 2 - beta_margin, self.beta_width + 2 * beta_margin, step
@@ -309,10 +308,6 @@ class FOV:
         """Returns regular Cartesian local coordinates in global referential"""
         n_alpha = len(alpha_coords)
         n_beta = len(beta_coords)
-        print("n_alpha ", n_alpha)
-        print("n_beta ", n_beta)
-        print("alpha_coords ", alpha_coords)
-        print("beta_coords ", beta_coords)
 
         alpha_coords = np.tile(alpha_coords.reshape((-1, 1)), [1, n_beta])
         beta_coords = np.tile(beta_coords.reshape((1, -1)), [n_alpha, 1])
@@ -337,11 +332,9 @@ class FOV:
         alpha_coords = np.tile(alpha_coords.reshape((-1, 1)), [1, n_beta])
         beta_coords = np.tile(beta_coords.reshape((1, -1)), [n_alpha, 1])
 
-        print("HEY")
         coords = rotmatrix(-self.angle) @ np.vstack(
             (alpha_coords.ravel(), beta_coords.ravel())
         )
-        print("HOOO")
         return (
             coords[0].reshape((n_alpha, n_beta)),
             coords[1].reshape((n_alpha, n_beta)),
@@ -435,7 +428,7 @@ class LocalFOV(FOV):
 
     @property
     def beta_start(self):
-        return round(self.origin.beta - self.beta_width / 2, 3)
+        return round(self.origin.beta - self.beta_width / 2, 9)
 
     @property
     def beta_end(self):
@@ -454,18 +447,7 @@ class LocalFOV(FOV):
 
         alpha_step = alpha_axis[1] - alpha_axis[0]
         beta_step = beta_axis[1] - beta_axis[0]
-        print("-----")
-        print("beta_step = ", beta_step)
-        print("self.beta_start = ", self.beta_start)
-        print("self.beta_end = ", self.beta_end)
-        print("beta_axis = ", beta_axis)
-        print(np.flatnonzero(self.beta_start < beta_axis + beta_step / 2)[0])
-        print(np.flatnonzero(beta_axis - beta_step / 2 < self.beta_end)[-1] + 1)
-
-        print(slice(
-                np.flatnonzero(self.beta_start < beta_axis + beta_step / 2)[0],
-                np.flatnonzero(beta_axis - beta_step / 2 < self.beta_end)[-1] + 1,
-            ))
+        print("BETA START = ", self.beta_start)
         return (
             slice(
                 np.flatnonzero(self.alpha_start < alpha_axis + alpha_step / 2)[0],
