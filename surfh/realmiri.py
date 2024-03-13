@@ -9,6 +9,7 @@ from loguru import logger
 
 from . import instru
 
+ARCSEC_TO_DEGREE = 3600
 
 """
     Load PCE from reference file.
@@ -43,27 +44,27 @@ def get_IFU(filename):
 
     if channel == 1:
         slices = 21
-        pix_size = 0.196
-        alpha_width = 3.2
-        beta_width = 3.7
+        pix_size = 0.196/ARCSEC_TO_DEGREE
+        alpha_width = 3.2/ARCSEC_TO_DEGREE
+        beta_width = 3.7/ARCSEC_TO_DEGREE
         rotation = 8.4
     elif channel == 2:
         slices = 17
-        pix_size = 0.196
-        alpha_width = 4.0
-        beta_width = 4.8
+        pix_size = 0.196/ARCSEC_TO_DEGREE
+        alpha_width = 4.0/ARCSEC_TO_DEGREE
+        beta_width = 4.8/ARCSEC_TO_DEGREE
         rotation = 8.1
     elif channel == 3:
         slices = 16
-        pix_size = 0.245
-        alpha_width = 5.5
-        beta_width = 6.2
+        pix_size = 0.245/ARCSEC_TO_DEGREE
+        alpha_width = 5.5/ARCSEC_TO_DEGREE
+        beta_width = 6.2/ARCSEC_TO_DEGREE
         rotation = 7.7
     else:
         slices = 12
-        pix_size = 0.273
-        alpha_width = 6.9
-        beta_width = 7.9
+        pix_size = 0.273/ARCSEC_TO_DEGREE
+        alpha_width = 6.9/ARCSEC_TO_DEGREE
+        beta_width = 7.9/ARCSEC_TO_DEGREE
         rotation = 8.3
 
     if hdr['BAND'] == 'SHORT':
