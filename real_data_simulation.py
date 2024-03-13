@@ -15,6 +15,7 @@ from scipy.signal import convolve2d as conv2
 from surfh import instru, models
 from surfh import utils
 from surfh import realmiri
+from surfh import cython_2D_interpolation
 
 
 def orion():
@@ -46,16 +47,17 @@ maps, tpl, step, wavel_axis = orion()
 spatial_subsampling = 4
 impulse_response = np.ones((spatial_subsampling, spatial_subsampling)) / spatial_subsampling ** 2
 maps = np.asarray([conv2(arr, impulse_response)[::spatial_subsampling, ::spatial_subsampling] for arr in maps])
+step_Angle = Angle(step, u.arcsec)
 
 tpl_ss = 3
 wavel_axis = wavel_axis[::tpl_ss]
-spsf = utils.gaussian_psf(wavel_axis, step)
+spsf = utils.gaussian_psf(wavel_axis, step_Angle.degree)
 
 if "sotf" not in globals():
     print("Compute SPSF")
     sotf = udft.ir2fr(spsf, maps.shape[1:])
 
-fits_directory = '/home/nmonnier/Data/JWST/Orion_bar/All_bands'
+fits_directory = '/home/nmonnier/Data/JWST/Orion_bar/real_data_testdir'
 
 """
 Set Cube coordinate.
@@ -73,7 +75,7 @@ origin_beta_axis -= np.mean(origin_beta_axis)
 Process Metadata for all Fits in directory
 """
 main_pointing = instru.Coord(0, 0) # Set the main pointing from the instrument FoV
-pointings = instru.CoordList([main_pointing]).pix(step) # We do not use dithering for first tests
+pointings = instru.CoordList([main_pointing])#.pix(step_Angle.degree) # We do not use dithering for first tests
 channels = []
 for file in os.listdir(fits_directory):
     split_file  = file.split('_')
@@ -128,7 +130,7 @@ for file in os.listdir(fits_directory):
 
 
     for i in range(ra_map.shape[0]-2):
-        for j in range(ra_map.shape[1]-2):
+        for j in range(ra_map.shape[1]-2): 
             of_ra_map[i*of, j*of] = ra_map[i+1,j+1]
 
     for i in range(dec_map.shape[0]-2):
@@ -155,14 +157,48 @@ for file in os.listdir(fits_directory):
 
 
 
+    # 2D Interpolation for each wavelength 
+    #of_im = of_im[:-1]
+    from scipy.interpolate import griddata
+    interpolated_cube = np.zeros((of_im.shape[0],maps_shape[1],maps_shape[2]))
+    for wave in range(of_im.shape[0]):
+        # print("Wave %d"%wave)
+        TwoD_of_im = of_im[wave].ravel()
+        points = np.vstack(
+            [
+                of_ra_map.ravel(),
+                of_dec_map.ravel()         
+            ]
+            ).T
 
-    of_im = of_im[:-1]
+        alpha_axis = origin_alpha_axis + hdul[1].header['CRVAL1']
+        beta_axis = origin_beta_axis + hdul[1].header['CRVAL2']
+        xi = np.vstack(
+            [
+                np.tile(alpha_axis.reshape((1, -1)), (len(beta_axis), 1)).ravel(), 
+                np.tile(beta_axis.reshape((-1, 1)), (1, len(alpha_axis))).ravel()
+            ]
+            ).T
+
+        
+        # interpolated_cube[wave] = griddata(points, 
+        #                                    TwoD_of_im, 
+        #                                    xi, 
+        #                                    method='linear').reshape(maps_shape[1],maps_shape[2])
+
+    of_im[np.where(np.isnan(of_im))] = 0
+    # fast_insterpolated_cube = cython_2D_interpolation.interpn( (alpha_axis, beta_axis), 
+    #                                           np.float64(of_im.newbyteorder('<')),#.byteswap, 
+    #                                           xi, 
+    #                                           of_im.shape[0],
+    #                                           bounds_error=False,
+    #                                           fill_value=0).reshape(of_im.shape[0], maps_shape[1],maps_shape[2])
 
 
 
 
-origin_alpha_axis += +channels[0].fov.origin.alpha
-origin_beta_axis += +channels[0].fov.origin.beta
+origin_alpha_axis += channels[0].fov.origin.alpha
+origin_beta_axis += channels[0].fov.origin.beta
 
 
 """
@@ -178,3 +214,15 @@ spectro = models.Spectro(
     verbose=True,
     serial=False,
 )
+
+cube = np.load('cube.npy')
+slices = spectro.channels[0].realData_cubeToSlice(cube)
+ncube = spectro.channels[0].realData_sliceToCube(slices, cube.shape)
+
+plt.figure()
+plt.imshow(cube[50])
+plt.colorbar()
+plt.figure()
+plt.imshow(ncube[50])
+plt.colorbar()
+plt.show()
