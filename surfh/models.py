@@ -99,12 +99,6 @@ def fov_weight(
     selected_alpha = alpha_axis[slice_alpha]
     selected_beta = beta_axis[slice_beta]
 
-    print("-----")
-    print("slice_alpha.stop = ", slice_alpha.stop)
-    print("slice_alpha.start = ", slice_alpha.start)
-    print("slice_beta.stop = ", slice_beta.stop)
-    print("slice_beta.start = ", slice_beta.start)
-
     weights = np.ones(
         (slice_alpha.stop - slice_alpha.start, slice_beta.stop - slice_beta.start)
     )
@@ -359,11 +353,9 @@ class Channel(LinOp):
         self.srf = srf
         self.imshape = (len(alpha_axis), len(beta_axis))
 
-        print(self.imshape, self.imshape, self.imshape, self.imshape)
-        #_metadata["_otf_sr"] = udft.ir2fr(np.ones((srf, 1)), self.imshape)[np.newaxis, ...]
-        #self._otf_sr = udft.ir2fr(np.ones((srf, 1)), self.imshape)[np.newaxis, ...]
+        _metadata["_otf_sr"] = udft.ir2fr(np.ones((srf, 1)), self.imshape)[np.newaxis, ...]
+        self._otf_sr = udft.ir2fr(np.ones((srf, 1)), self.imshape)[np.newaxis, ...]
 
-        print("STEP = ", self.step)
         _metadata["local_alpha_axis"], _metadata["local_beta_axis"] = self.instr.fov.local_coords(
             self.step,
             alpha_margin=5 * self.step,
@@ -445,7 +437,6 @@ class Channel(LinOp):
         slices = self.slit_local_fov(slit_idx).to_slices(
             local_alpha_axis, local_beta_axis
         )
-        print("PRE SLICES = ", slices)
         # If slice to long, remove one pixel at the beginning or the end
         if (slices[1].stop - slices[1].start) > self.npix_slit:
             if abs(
@@ -536,7 +527,6 @@ class Channel(LinOp):
         out = np.zeros(self.local_shape)
         slices = self.slit_slices(slit_idx)
         weights = self.slit_weights(slit_idx)
-        print("WEIGHT SHAPE = ", weights.shape)
         out[:, slices[0], slices[1]] = gridded* weights
         return out
         
@@ -846,7 +836,6 @@ class Channel(LinOp):
         blurred += self.gridding_t(gridded, instru.Coord(0, 0))
 
         # Replace Fourier dupplicate to match the right shape
-        print("Shape np.ones((self.srf, 1)) = ", np.ones((self.srf, 1)).shape )
         _otf_sr = udft.ir2fr(np.ones((self.srf, 1)), cube_dim[1:])[np.newaxis, ...]
         out = dft(blurred) * _otf_sr.conj() 
         return idft(out, cube_dim[1:])
@@ -858,8 +847,6 @@ class Channel(LinOp):
 
         _metadata = shared_dict.attach(self._metadata_path)
         _metadata["wpsf"] = {}
-        print("local_alpha_axis ", local_alpha_axis.shape)
-        print("local_beta_axis ", local_beta_axis.shape)
         alpha_coord, beta_coord = (self.instr.fov).local2global(
             local_alpha_axis, local_beta_axis
         )

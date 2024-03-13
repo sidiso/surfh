@@ -447,7 +447,6 @@ class LocalFOV(FOV):
 
         alpha_step = alpha_axis[1] - alpha_axis[0]
         beta_step = beta_axis[1] - beta_axis[0]
-        print("BETA START = ", self.beta_start)
         return (
             slice(
                 np.flatnonzero(self.alpha_start < alpha_axis + alpha_step / 2)[0],
