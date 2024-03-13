@@ -296,6 +296,8 @@ class FOV:
             self.alpha_width + 2 * alpha_margin,
             step,
         )
+
+
         beta_axis = axis(
             -self.beta_width / 2 - beta_margin, self.beta_width + 2 * beta_margin, step
         )
@@ -333,7 +335,6 @@ class FOV:
         coords = rotmatrix(-self.angle) @ np.vstack(
             (alpha_coords.ravel(), beta_coords.ravel())
         )
-
         return (
             coords[0].reshape((n_alpha, n_beta)),
             coords[1].reshape((n_alpha, n_beta)),
@@ -427,11 +428,11 @@ class LocalFOV(FOV):
 
     @property
     def beta_start(self):
-        return round(self.origin.beta - self.beta_width / 2, 3)
+        return round(self.origin.beta - self.beta_width / 2, 9)
 
     @property
     def beta_end(self):
-        return round(self.origin.beta + self.beta_width / 2, 3)
+        return round(self.origin.beta + self.beta_width / 2, 9)
 
     def to_slices(self, alpha_axis: array, beta_axis: array) -> Tuple[slice, slice]:
         """Return slices of axis that contains the slice
@@ -446,7 +447,6 @@ class LocalFOV(FOV):
 
         alpha_step = alpha_axis[1] - alpha_axis[0]
         beta_step = beta_axis[1] - beta_axis[0]
-
         return (
             slice(
                 np.flatnonzero(self.alpha_start < alpha_axis + alpha_step / 2)[0],

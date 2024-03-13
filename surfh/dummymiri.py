@@ -11,7 +11,7 @@ from . import instru
 logger.debug("THIS IS THE DUMMY REAL SIZE RMS !")
 
 logger.info("Make wavelength axis")
-wavel_1a = np.arange(4.9, 5.7, 0.00073) # 4.9-5.74µm  Delta = 1146
+wavel_1a = np.arange(4.9, 5.7388, 0.0007999) # 4.9-5.74µm  Delta = 1146
 wavel_1b = np.arange(5.66, 6.63, 0.00084) # 5.66-6.63 µm
 wavel_1c = np.arange(6.53, 7.65, 0.00097) # 6.53-7.65 µm
 wavel_2a = np.arange(7.51, 8.77, 0.00117) # 7.51-8.77 µm Delta = 1074
