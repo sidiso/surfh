@@ -775,8 +775,15 @@ class Channel(LinOp):
                 sliced[:, : self.oshape[3] * self.srf : self.srf] = tmp2
                 
                 gridded += self.slicing_t(sliced, slit_idx)
-            blurred += self.gridding_t(gridded, pointing)
-        out[self.wslice, ...] += self.fourier_duplicate_t(blurred)
+           
+            _otf_sr = udft.ir2fr(np.ones((1, self.srf)), self.local_shape[1:])[np.newaxis, ...]
+            tmp = dft(gridded) * _otf_sr.conj() 
+            tmp2 = idft(tmp, self.local_shape[1:])
+            blurred += self.gridding_t(tmp2, pointing)
+            # blurred += self.gridding_t(gridded, pointing)
+
+        # out[self.wslice, ...] += self.fourier_duplicate_t(blurred)
+        out[self.wslice, ...] += blurred
 
 
     def sliceToCube(self, measures):
@@ -830,13 +837,22 @@ class Channel(LinOp):
             out_slice[:, nslices[0], nslices[1]] = sliced* weights
             gridded += out_slice
 
-        blurred += self.gridding_t(gridded, instru.Coord(0, 0))
+        _otf_sr = udft.ir2fr(np.ones((1, self.srf)), self.local_shape[1:])[np.newaxis, ...]
+        tmp = dft(gridded) * _otf_sr.conj() 
+
+        # blurred += self.gridding_t(gridded, instru.Coord(0, 0))
+        tmp2 = idft(tmp, self.local_shape[1:])
+        
+        plt.imshow(tmp2[0].real)
+        plt.colorbar()
+        plt.show()
+        blurred += self.gridding_t(tmp2, instru.Coord(0, 0))
 
         # Replace Fourier dupplicate to match the right shape
-        _otf_sr = udft.ir2fr(np.ones((self.srf, 1)), cube_dim[1:])[np.newaxis, ...]
-        out = dft(blurred) * _otf_sr.conj() 
-        return idft(out, cube_dim[1:])
-
+        # _otf_sr = udft.ir2fr(np.ones((1, self.srf)), cube_dim[1:])[np.newaxis, ...]
+        # out = dft(blurred) * _otf_sr.conj() 
+        # return idft(out, cube_dim[1:])
+        return blurred
 
     def precompute_wpsf(self):
         local_alpha_axis = shared_dict.attach(self._metadata_path)["local_alpha_axis"]
@@ -1280,7 +1296,7 @@ class SpectroLMM(LinOp):
         if self._shared_metadata is not None:
             dico = shared_dict.attach(self._shared_metadata.path)
             dico.delete() 
-
+    
 
     @property
     def step(self) -> float:
