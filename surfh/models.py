@@ -585,7 +585,6 @@ class Channel(LinOp):
                 beta_coord.ravel()
             ]
         ).T
-
         return cython_2D_interpolation.interpn( (local_alpha_axis, local_beta_axis), 
                                               inarray, 
                                               global_coords, 
@@ -814,7 +813,6 @@ class Channel(LinOp):
         for slit_idx in range(self.instr.n_slit):
             dlt = self.slit_slices(slit_idx)
             sliced = np.zeros((cube_dim[0], dlt[0].stop - dlt[0].start, dlt[1].stop - dlt[1].start,))
-
             tmp = np.repeat(
                             np.expand_dims(
                                 slices[slit_idx],
@@ -825,7 +823,6 @@ class Channel(LinOp):
                             )/sliced.shape[2]
             tmp2 = tmp
             sliced[:, : cube_dim[0] * self.srf : self.srf] = tmp2
-
             # Replace slicing_Fente2Cube_t to match the right shape
             out_slice = np.zeros((cube_dim[0], self.local_shape[1], self.local_shape[2]))
             nslices = self.slit_slices(slit_idx)

@@ -118,7 +118,7 @@ with resources.path("surfh.data", "mrs_recommended_dither.dat") as path:
     dithering = np.loadtxt(path, delimiter=",")
 ch1_dither = instru.CoordList.from_array(dithering[:1, :])
 main_pointing = instru.Coord(0, 0)
-pointings = instru.CoordList(c + main_pointing for c in ch1_dither).pix²x(step)
+pointings = instru.CoordList(c + main_pointing for c in ch1_dither).pix(step)
 
 
 import os

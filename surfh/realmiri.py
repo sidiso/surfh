@@ -6,10 +6,12 @@ from importlib import resources
 import numpy as np
 from astropy.io import fits
 from loguru import logger
+from pathlib import Path
 
 from . import instru
 
 ARCSEC_TO_DEGREE = 3600
+PCE_PATH = '/home/nmonnier/Data/JWST/Orion_bar/All_bands_pce/'
 
 """
     Load PCE from reference file.
@@ -40,6 +42,8 @@ def get_IFU(filename):
     hdul = fits.open(filename)
     hdr = hdul[0].header
 
+    rotation_ref = hdul[1].header['PA_V3']
+
     channel = int(hdr['CHANNEL'])
 
     if channel == 1:
@@ -47,7 +51,7 @@ def get_IFU(filename):
         pix_size = 0.196/ARCSEC_TO_DEGREE
         alpha_width = 3.2/ARCSEC_TO_DEGREE
         beta_width = 3.7/ARCSEC_TO_DEGREE
-        rotation = 8.4
+        rotation = 8.4 + rotation_ref
     elif channel == 2:
         slices = 17
         pix_size = 0.196/ARCSEC_TO_DEGREE
@@ -59,13 +63,13 @@ def get_IFU(filename):
         pix_size = 0.245/ARCSEC_TO_DEGREE
         alpha_width = 5.5/ARCSEC_TO_DEGREE
         beta_width = 6.2/ARCSEC_TO_DEGREE
-        rotation = 7.5
+        rotation = 7.5 + rotation_ref
     else:
         slices = 12
         pix_size = 0.273/ARCSEC_TO_DEGREE
         alpha_width = 6.9/ARCSEC_TO_DEGREE
         beta_width = 7.9/ARCSEC_TO_DEGREE
-        rotation = 8.3
+        rotation = 8.3 + rotation_ref
 
     if hdr['BAND'] == 'SHORT':
         band = 0
@@ -74,7 +78,6 @@ def get_IFU(filename):
     else:
         band = 2 
 
-    print((channel-1)*3 + band)
     spec_blur = instru.SpectralBlur(res[(channel-1)*3 + band])
     targ_ra  = hdr['TARG_RA']
     targ_dec = hdr['TARG_DEC']
@@ -83,7 +86,8 @@ def get_IFU(filename):
     wavel = (np.arange(hdr['NAXIS3']) +hdr['CRPIX3'] - 1) * hdr['CDELT3'] + hdr['CRVAL3']
 
     if (str(channel) + chr(65 + band)) not in pce:
-        pce[str(channel) + chr(65 + band)] = np.random.rand(wavel.size)/10 + 0.5
+        #pce[str(channel) + chr(65 + band)] = np.random.rand(wavel.size)/10 + 0.5
+        pce[str(channel) + chr(65 + band)] = np.load(PCE_PATH + Path(filename).stem + '.pce.npy')
 
     hdul.close()
     return instru.IFU(
