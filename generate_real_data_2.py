@@ -118,11 +118,11 @@ with resources.path("surfh.data", "mrs_recommended_dither.dat") as path:
     dithering = np.loadtxt(path, delimiter=",")
 ch1_dither = instru.CoordList.from_array(dithering[:1, :])
 main_pointing = instru.Coord(0, 0)
-pointings = instru.CoordList(c + main_pointing for c in ch1_dither).pix(step)
+pointings = instru.CoordList(c + main_pointing for c in ch1_dither).pix²x(step)
 
 
 import os
-directory = os.fsencode('/home/nmonnier/Data/JWST/Orion_bar/single_file/')
+directory = os.fsencode('/home/nmonnier/Data/JWST/Orion_bar/real_data_testdir/')
 res_dict = {}
 for of in range(2,5):
     res_dict[of] = 0
