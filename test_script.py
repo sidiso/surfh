@@ -113,16 +113,9 @@ slices[np.where(np.isnan(slices))] = 0
 #slices = spectro.channels[0].realData_cubeToSlice(cube)
 ncube = spectro.channels[0].realData_sliceToCube(slices, cube.shape)
 
-#ad_cube = spectro.adjoint(slices)
-
-
 plt.figure()
 plt.title("Original")
 plt.imshow(cube[0])
-plt.colorbar()
-plt.figure()
-plt.title("flip + rot")
-plt.imshow(np.rot90(np.fliplr(cube), 1, (1,2))[0])
 plt.colorbar()
 plt.figure()
 plt.imshow(ncube[0])
