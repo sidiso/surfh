@@ -19,6 +19,13 @@ from surfh import realmiri
 from surfh import cython_2D_interpolation
 
 
+main_directory = '/home/nmonnier/Data/JWST/Orion_bar/'
+
+fits_directory = main_directory + 'Single_fits/'
+numpy_directory = main_directory + 'Single_numpy/'#
+slices_directory = main_directory + 'Single_numpy_slices/'
+
+
 def orion():
     """Rerturn maps, templates, spatial step and wavelength"""
     maps = fits.open("./cube_orion/abundances_orion.fits")[0].data
@@ -51,15 +58,10 @@ maps = np.asarray([conv2(arr, impulse_response)[::spatial_subsampling, ::spatial
 step_Angle = Angle(step, u.arcsec)
 
 
-
-fits_directory = '/home/nmonnier/Data/JWST/Orion_bar/All_bands_fits'
-numpy_directory = '/home/nmonnier/Data/JWST/Orion_bar/All_bands_numpy'#
-slices_directory = '/home/nmonnier/Data/JWST/Orion_bar/All_bands_numpy_slices/'
-
 """
 Set Cube coordinate.
 """
-margin=100
+margin=0
 maps_shape = (maps.shape[0], maps.shape[1]+margin*2, maps.shape[2]+margin*2)
 step_Angle = Angle(step, u.arcsec)
 origin_alpha_axis = np.arange(maps_shape[1]) * step_Angle.degree
@@ -68,12 +70,17 @@ origin_alpha_axis -= np.mean(origin_alpha_axis)
 origin_beta_axis -= np.mean(origin_beta_axis)
 
 tpl_ss = 3
+impulse_response = np.ones((1, tpl_ss)) / tpl_ss
+tpl = conv2(tpl, impulse_response, "same")[:, ::tpl_ss]
 wavel_axis = wavel_axis[::tpl_ss]
 spsf = utils.gaussian_psf(wavel_axis, step_Angle.degree)
 
 if "sotf" not in globals():
     print("Compute SPSF")
     sotf = udft.ir2fr(spsf, maps_shape[1:])
+if "sim_cube" not in globals():
+    print("Compute sim cube")
+    sim_cube = np.sum(np.expand_dims(maps, 1) * tpl[..., np.newaxis, np.newaxis], axis=0)
 
 """
 Process Metadata for all Fits in directory
@@ -82,11 +89,11 @@ main_pointing = instru.Coord(0, 0) # Set the main pointing from the instrument F
 pointings = instru.CoordList([main_pointing])#.pix(step_Angle.degree) # We do not use dithering for first tests
 channels = []
 
-filename = 'ChannelCube_ch_1_medium_s3d_0210j_00001'
+filename = 'ChannelCube_ch_1_long_s3d_02111_00001'
 
-chan = realmiri.get_IFU('/home/nmonnier/Data/JWST/Orion_bar/All_bands_fits/'+filename+'.fits')
+chan = realmiri.get_IFU(fits_directory + filename + '.fits')
 channels.append(chan)
-cube = np.load('/home/nmonnier/Data/JWST/Orion_bar/All_bands_numpy/'+filename+'.npy')
+cube = np.load(numpy_directory + filename + '.npy')
 cube[np.where(np.isnan(cube))] = 0
 
 origin_alpha_axis += channels[0].fov.origin.alpha
@@ -103,15 +110,43 @@ spectro = models.Spectro(
     serial=False,
 )
 
+spectrolmm = models.SpectroLMM(
+    channels, # List of channels and bands 
+    origin_alpha_axis, # Alpha Coordinates of the cube
+    origin_beta_axis, # Beta Coordinates of the cube
+    wavel_axis, # Wavelength axis of the cube
+    sotf, # Optical PSF
+    pointings, # List of pointing (mainly used for dithering)
+    tpl,
+    verbose=True,
+    serial=True,
+)
+
+print("COmpute Forward")
+data = spectrolmm.forward(maps)
+
+nnn = spectrolmm.adjoint(data)
+
+ndata = spectrolmm.forward(nnn)
+
+print("-----------------------------------")
+
+
+
+
+
+
 cube[np.where(cube == 0)] = np.NaN
 #slices = spectro.channels[0].realData_cubeToSlice(np.rot90(np.fliplr(cube), 1, (1,2)))
 slices = spectro.channels[0].realData_cubeToSlice(cube)
 
-np.save(slices_directory + filename+'.npy', slices)
+# np.save(slices_directory + filename+'.npy', slices)
 slices[np.where(np.isnan(slices))] = 0
 
 #slices = spectro.channels[0].realData_cubeToSlice(cube)
 ncube = spectro.channels[0].realData_sliceToCube(slices, cube.shape)
+
+ad_cube = spectro.adjoint(slices)
 
 plt.figure()
 plt.title("Original")
@@ -120,5 +155,9 @@ plt.colorbar()
 plt.figure()
 plt.imshow(ncube[0])
 plt.title("ncube")
+plt.colorbar()
+plt.figure()
+plt.imshow(ad_cube[750])
+plt.title("ad_cube")
 plt.colorbar()
 plt.show()

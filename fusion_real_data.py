@@ -22,13 +22,19 @@ from qmm import QuadObjective, Objective, lcg, mmmg, Huber, HebertLeahy
 from udft import laplacian, irdftn, rdft2, ir2fr, diff_ir
 import aljabr
 
+main_directory = '/home/nmonnier/Data/JWST/Orion_bar/'
 
 # Data load and save directories 
-fits_directory = '/home/nmonnier/Data/JWST/Orion_bar/All_bands_fits/'
-numpy_directory = '/home/nmonnier/Data/JWST/Orion_bar/All_bands_numpy/'
-slices_directory = '/home/nmonnier/Data/JWST/Orion_bar/All_bands_numpy_slices/'
-psf_directory = '/home/nmonnier/Data/JWST/Orion_bar/All_bands_psf/'
+# fits_directory    = main_directory + 'Single_fits/'
+# numpy_directory   = main_directory + 'All_bands_numpy/'
+# slices_directory  = main_directory + 'All_bands_numpy_slices/'
+# psf_directory     = main_directory + 'All_bands_psf/'
 result_directory = ''
+
+fits_directory      = main_directory + 'Single_fits/'
+numpy_directory     = main_directory + 'Single_numpy/'
+slices_directory    = main_directory + 'Single_numpy_slices/'
+psf_directory       = main_directory + 'All_bands_psf/'
 
 
 # Create result cube
@@ -67,7 +73,7 @@ step_Angle = Angle(step, u.arcsec)
 """
 Set Cube coordinate.
 """
-margin=100
+margin=0
 maps_shape = (maps.shape[0], maps.shape[1]+margin*2, maps.shape[2]+margin*2)
 step_Angle = Angle(step, u.arcsec)
 origin_alpha_axis = np.arange(maps_shape[1]) * step_Angle.degree
@@ -76,9 +82,13 @@ origin_alpha_axis -= np.mean(origin_alpha_axis)
 origin_beta_axis -= np.mean(origin_beta_axis)
 
 tpl_ss = 3
+impulse_response = np.ones((1, tpl_ss)) / tpl_ss
+tpl = conv2(tpl, impulse_response, "same")[:, ::tpl_ss]
 wavel_axis = wavel_axis[::tpl_ss]
 #spsf = utils.gaussian_psf(wavel_axis, step_Angle.degree)
 spsf = np.load(psf_directory + 'psfs_pixscale0.025_fov11.25_date_300123.npy')
+spsf = spsf[:, 100:351, 100:351]
+print("SHAPE PSF ARE ", spsf.shape)
 
 if "sotf" not in globals():
     print("Compute SPSF")
@@ -105,17 +115,22 @@ for file in os.listdir(fits_directory):
     list_data.append(data)
 
 
-chans = []
-forward_data = []
-sorted_chan_data = [a for a in sorted((tup.name, tup, da) for tup, da in zip(list_channels, list_data))]
-for i in range(9):
-    chans.append(sorted_chan_data[i][1])
-    forward_data.append(sorted_chan_data[i][2].ravel())
+# chans = []
+# forward_data = []
+# sorted_chan_data = [a for a in sorted((tup.name, tup, da) for tup, da in zip(list_channels, list_data))]
+# for i in range(9):
+#     chans.append(sorted_chan_data[i][1])
+#     forward_data.append(sorted_chan_data[i][2].ravel())
 
-array_data = np.concatenate(forward_data, axis=0)
+# array_data = np.concatenate(forward_data, axis=0)
+
+array_data = list_data[0].ravel()
+
+origin_alpha_axis += list_channels[0].fov.origin.alpha
+origin_beta_axis += list_channels[0].fov.origin.beta
 
 spectro = models.SpectroLMM(
-    chans, # List of channels and bands 
+    list_channels, # List of channels and bands 
     origin_alpha_axis, # Alpha Coordinates of the cube
     origin_beta_axis, # Beta Coordinates of the cube
     wavel_axis, # Wavelength axis of the cube
@@ -194,7 +209,7 @@ class QuadCriterion_MRS:
         self.y_spectro = y_spectro
         self.model_spectro = model_spectro
 
-        n_spec = model_spectro.tpls[0]
+        n_spec = model_spectro.tpls.shape[0]
         self.n_spec = n_spec
 
         assert (
@@ -207,7 +222,7 @@ class QuadCriterion_MRS:
         if type(mu_reg) == list or type(mu_reg) == np.ndarray:
             assert len(mu_reg) == n_spec
 
-        shape_target = model_spectro
+        shape_target = model_spectro.ishape[1:]
         shape_of_output = (n_spec, shape_target[0], shape_target[1])
         self.shape_of_output = shape_of_output
 
@@ -254,6 +269,7 @@ class QuadCriterion_MRS:
                 hyper=self.mu_reg,
                 name="Reg joint",
             )
+            prior = [prior]
 
         elif self.gradient == "separated":
             prior_r = QuadObjective(
@@ -266,7 +282,7 @@ class QuadCriterion_MRS:
                 self.npdiff_c.adjoint,
                 hyper=self.mu_reg,
             )
-            prior = prior_r + prior_c
+            prior = [prior_r, prior_c]
 
         self.L_crit_val_lcg = []
         self.L_perf_crit = []
@@ -274,6 +290,8 @@ class QuadCriterion_MRS:
         def perf_crit_for_lcg(res_lcg):
             x_hat = res_lcg.x.reshape(self.shape_of_output)
             self.L_perf_crit.append(perf_crit(x_hat))
+
+        list_obj = [spectro_data_adeq] + prior
         
         t1 = time.time()
 
@@ -287,7 +305,7 @@ class QuadCriterion_MRS:
             #     calc_objv = True
             # )
             res_lcg = lcg(
-                spectro_data_adeq + prior,
+                list_obj,
                 init,
                 tol=tolerance,
                 max_iter=maximum_iterations,
@@ -296,7 +314,7 @@ class QuadCriterion_MRS:
         elif calc_crit == False and perf_crit != None:
             print("LCG : perf_crit calculated at each iteration!")
             res_lcg = lcg(
-                spectro_data_adeq + prior,
+                list_obj,
                 init,
                 tol=tolerance,
                 max_iter=maximum_iterations,
@@ -307,7 +325,7 @@ class QuadCriterion_MRS:
             return None
         elif calc_crit == False and perf_crit == None:
             res_lcg = lcg(
-                spectro_data_adeq + prior,
+                list_obj,
                 init,
                 tol=tolerance,
                 max_iter=maximum_iterations
@@ -349,7 +367,7 @@ class QuadCriterion_MRS:
 
 
 
-quadCrit = QuadCriterion_MRS(1, array_data, spectro, 0.1, True)
+quadCrit = QuadCriterion_MRS(1, array_data, spectro, 0.1, True, gradient="separated")
 res_lcg = quadCrit.run_lcg(5)
 
 

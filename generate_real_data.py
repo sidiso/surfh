@@ -26,8 +26,11 @@ in order to use them with Spectro or SpectroLMM.
 """
 
 # Fits and numpy directories
-fits_directory = '/home/nmonnier/Data/JWST/Orion_bar/All_bands_fits'
-numpy_directory = '/home/nmonnier/Data/JWST/Orion_bar/All_bands_numpy'
+
+main_directory = '/home/nmonnier/Data/JWST/Orion_bar/'
+
+fits_directory = main_directory + 'Single_fits'
+numpy_directory = main_directory + 'Single_numpy'
 
 
 
@@ -75,7 +78,7 @@ if "sotf" not in globals():
 """
 Set Cube coordinate.
 """
-margin=100
+margin=0
 maps_shape = (maps.shape[0], maps.shape[1]+margin*2, maps.shape[2]+margin*2)
 step_Angle = Angle(step, u.arcsec)
 origin_alpha_axis = np.arange(maps_shape[1]) * step_Angle.degree
@@ -212,7 +215,7 @@ for file in os.listdir(fits_directory):
                                                xi, 
                                                method='linear').reshape(maps_shape[1],maps_shape[2])
 
-        interpolated_cube[np.where(np.isnan(interpolated_cube))] = 0
+        # interpolated_cube[np.where(np.isnan(interpolated_cube))] = 0
 
         np.save(numpy_file, interpolated_cube)
 

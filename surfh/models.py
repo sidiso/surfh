@@ -326,12 +326,14 @@ class Channel(LinOp):
         not the case for wavel_axis that must only have incrising values.
         """
 
+        self.old_tmp = None
 
         _metadata = shared_dict.attach(shared_metadata_path)
         self._metadata_path = _metadata.path
         _metadata["wavel_axis"] = wavel_axis
         _metadata["alpha_axis"] = alpha_axis
         _metadata["beta_axis"] = beta_axis
+
 
         #self.wavel_axis = wavel_axis
         #self.alpha_axis = alpha_axis
@@ -555,10 +557,17 @@ class Channel(LinOp):
             ]
         ).T          
 
+        # for i, p in enumerate(local_coords.T):
+        #     if not np.logical_and(np.all(alpha_coord[i] <= p),
+        #                             np.all(p <= beta_coord[i])):
+        #         raise ValueError("One of the requested xi is out of bounds "
+        #                             "in dimension %d" % i)
+        # out_of_bounds = None
+
         return cython_2D_interpolation.interpn( (alpha_axis, beta_axis), 
                                               inarray, 
                                               local_coords, 
-                                              len(wl_idx)).reshape(out_shape) 
+                                              len(wl_idx)).reshape(out_shape)
     
 
     def gridding_t(self, inarray: array, pointing: instru.Coord) -> array:
@@ -776,14 +785,14 @@ class Channel(LinOp):
                 
                 gridded += self.slicing_t(sliced, slit_idx)
            
-            _otf_sr = udft.ir2fr(np.ones((1, self.srf)), self.local_shape[1:])[np.newaxis, ...]
+            _otf_sr = udft.ir2fr(np.ones((self.srf, 1)), self.local_shape[1:])[np.newaxis, ...]
             tmp = dft(gridded) * _otf_sr.conj() 
             tmp2 = idft(tmp, self.local_shape[1:])
             blurred += self.gridding_t(tmp2, pointing)
             # blurred += self.gridding_t(gridded, pointing)
 
         # out[self.wslice, ...] += self.fourier_duplicate_t(blurred)
-        out[self.wslice, ...] += blurred
+        out[self.wslice, ...] += dft(blurred)
 
 
     def sliceToCube(self, measures):
@@ -837,15 +846,12 @@ class Channel(LinOp):
             out_slice[:, nslices[0], nslices[1]] = sliced* weights
             gridded += out_slice
 
-        _otf_sr = udft.ir2fr(np.ones((1, self.srf)), self.local_shape[1:])[np.newaxis, ...]
+        _otf_sr = udft.ir2fr(np.ones((self.srf, 1)), self.local_shape[1:])[np.newaxis, ...]
         tmp = dft(gridded) * _otf_sr.conj() 
 
         # blurred += self.gridding_t(gridded, instru.Coord(0, 0))
         tmp2 = idft(tmp, self.local_shape[1:])
         
-        plt.imshow(tmp2[0].real)
-        plt.colorbar()
-        plt.show()
         blurred += self.gridding_t(tmp2, instru.Coord(0, 0))
 
         # Replace Fourier dupplicate to match the right shape
@@ -1308,7 +1314,15 @@ class SpectroLMM(LinOp):
             self.channels[chan_idx].oshape,
         )
 
-    
+    def get_cube(self, maps):
+        out = np.zeros(self.oshape)
+        if self.verbose:
+            logger.info(f"Cube generation")
+        cube = np.sum(
+            np.expand_dims(maps, 1) * self.tpls[..., np.newaxis, np.newaxis], axis=0
+        )
+        return cube
+
     def forward(self, inarray: array) -> array:
         out = np.zeros(self.oshape)
         if self.verbose:
@@ -1324,7 +1338,7 @@ class SpectroLMM(LinOp):
                 logger.info(f"Channel {chan.name}")
             APPL.runJob("Forward_id:%d"%idx, chan.forward_multiproc, 
                         args=(blurred_f,), 
-                        serial=False)
+                        serial=self.serial)
             
         APPL.awaitJobResult("Forward*", progress=self.verbose)
         
@@ -1345,7 +1359,7 @@ class SpectroLMM(LinOp):
                 logger.info(f"Channel {chan.name}")
             APPL.runJob("Adjoint_id:%d"%idx, chan.adjoint_multiproc, 
                         args=(np.reshape(inarray[self._idx[idx] : self._idx[idx + 1]], chan.oshape),), 
-                        serial=False)
+                        serial=self.serial)
 
         APPL.awaitJobResult("Adjoint*", progress=self.verbose)
 
