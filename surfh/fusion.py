@@ -155,7 +155,11 @@ class QuadCriterion_MRS:
         self.L_crit_val = []
         
         def perf_crit_with_reshape(res):
+            print(res.x.shape)
             x_hat = res.x.reshape(self.shape_of_output)
+            print(self.shape_of_output)
+            print(type(x_hat))
+            print(x_hat.shape)
             crit_val = perf_crit(x_hat)
             self.L_crit_val.append(crit_val)
             print(f"Criterion value = {crit_val}\n")
