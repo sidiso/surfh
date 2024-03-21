@@ -20,8 +20,8 @@ from surfh import realmiri
 from surfh import fusion
 
 from pathlib import Path
-
 import click
+
 import datetime
 
 
@@ -35,7 +35,8 @@ import datetime
 @click.option('--verbose', default=False, type=click.BOOL, help='Set spectro verbose')
 @click.option('--method', default='lcg', type=click.STRING)
 @click.option('--margin', default=0, type=click.INT)
-def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose, method, margin):
+@click.option('--value_init', default=100, type=click.FLOAT)
+def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose, method, margin, value_init):
 
     if multi_chan is True:
         print("Multi channels/bands fusion")
@@ -159,7 +160,7 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
         y_data = list_data[0].ravel()
     
     quadCrit = fusion.QuadCriterion_MRS(1, np.copy(y_data), spectro, hyper, True, gradient="separated")
-    res = quadCrit.run_method(method, niter, perf_crit = 1, calc_crit=True)
+    res = quadCrit.run_method(method, niter, perf_crit = 1, calc_crit=True, value_init=value_init)
 
     """
     Save results

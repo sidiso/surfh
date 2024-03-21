@@ -75,7 +75,7 @@ class QuadCriterion_MRS:
 
         n_spec = model_spectro.tpls.shape[0]
         self.n_spec = n_spec
-        self.it = 0
+        self.it = 1
 
         assert (
             type(mu_reg) == float
@@ -166,7 +166,8 @@ class QuadCriterion_MRS:
 
         def print_last_grad_norm_and_crit(res):
             print_last_grad_norm(res)
-            perf_crit_with_reshape(res)
+            if self.it%5 == 2:
+                perf_crit_with_reshape(res)
 
 
         list_obj = [spectro_data_adeq] + prior

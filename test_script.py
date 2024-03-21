@@ -99,16 +99,16 @@ cube[np.where(np.isnan(cube))] = 0
 origin_alpha_axis += channels[0].fov.origin.alpha
 origin_beta_axis += channels[0].fov.origin.beta
 
-spectro = models.Spectro(
-    channels, # List of channels and bands 
-    origin_alpha_axis, # Alpha Coordinates of the cube
-    origin_beta_axis, # Beta Coordinates of the cube
-    wavel_axis, # Wavelength axis of the cube
-    sotf, # Optical PSF
-    pointings, # List of pointing (mainly used for dithering)
-    verbose=True,
-    serial=False,
-)
+# spectro = models.Spectro(
+#     channels, # List of channels and bands 
+#     origin_alpha_axis, # Alpha Coordinates of the cube
+#     origin_beta_axis, # Beta Coordinates of the cube
+#     wavel_axis, # Wavelength axis of the cube
+#     sotf, # Optical PSF
+#     pointings, # List of pointing (mainly used for dithering)
+#     verbose=True,
+#     serial=False,
+# )
 
 spectrolmm = models.SpectroLMM(
     channels, # List of channels and bands 
@@ -122,45 +122,11 @@ spectrolmm = models.SpectroLMM(
     serial=True,
 )
 
-print("COmpute Forward")
-data = spectrolmm.forward(maps)
+# print("COmpute Forward")
+# data = spectrolmm.forward(maps)
 
-nnn = spectrolmm.adjoint(data)
+# nnn = spectrolmm.adjoint(data)
 
-ndata = spectrolmm.forward(nnn)
-sim_cube = spectrolmm.get_cube(nnn)
+# ndata = spectrolmm.forward(nnn)
+# sim_cube = spectrolmm.get_cube(nnn)
 
-
-
-print("-----------------------------------")
-
-
-
-
-
-
-cube[np.where(cube == 0)] = np.NaN
-#slices = spectro.channels[0].realData_cubeToSlice(np.rot90(np.fliplr(cube), 1, (1,2)))
-slices = spectro.channels[0].realData_cubeToSlice(cube)
-
-# np.save(slices_directory + filename+'.npy', slices)
-slices[np.where(np.isnan(slices))] = 0
-
-#slices = spectro.channels[0].realData_cubeToSlice(cube)
-ncube = spectro.channels[0].realData_sliceToCube(slices, cube.shape)
-
-ad_cube = spectro.adjoint(slices)
-
-plt.figure()
-plt.title("Original")
-plt.imshow(cube[0])
-plt.colorbar()
-plt.figure()
-plt.imshow(ncube[0])
-plt.title("ncube")
-plt.colorbar()
-plt.figure()
-plt.imshow(ad_cube[750])
-plt.title("ad_cube")
-plt.colorbar()
-plt.show()
