@@ -155,12 +155,8 @@ class QuadCriterion_MRS:
         self.L_crit_val = []
         
         def perf_crit_with_reshape(res):
-            print(res.x.shape)
             x_hat = res.x.reshape(self.shape_of_output)
-            print(self.shape_of_output)
-            print(type(x_hat))
-            print(x_hat.shape)
-            crit_val = perf_crit(x_hat)
+            crit_val = crit_val(x_hat)
             self.L_crit_val.append(crit_val)
             print(f"Criterion value = {crit_val}\n")
 
@@ -201,7 +197,7 @@ class QuadCriterion_MRS:
                 callback = print_last_grad_norm
             )
         elif calc_crit and perf_crit != None:
-            print(f"{method} : perf_crit calculated at each iteration!")
+            print(f"{method} : criterion and gradient printed at each iteration!")
             res = function(
                 list_obj,
                 init,
