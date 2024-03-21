@@ -1248,7 +1248,6 @@ class SpectroLMM(LinOp):
         verbose: bool = True,
         serial: bool = False,
     ):
-        self.it = 0
 
         self.wavel_axis = wavel_axis
         self.alpha_axis = alpha_axis
@@ -1349,8 +1348,6 @@ class SpectroLMM(LinOp):
             fw_data = self._shared_metadata[chan.name]["fw_data"]
             out[self._idx[idx] : self._idx[idx + 1]] = fw_data.ravel()
 
-        self.it = self.it + 1
-        print(f"Iteration n°{self.it}")
         return out 
 
     

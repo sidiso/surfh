@@ -49,7 +49,7 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
         psf_directory       = data_dir + 'All_bands_psf/'
 
     date = str(datetime.date.today())+ '-' + str(datetime.datetime.now().hour) + '-' + str(datetime.datetime.now().minute)
-    result_directory = res_dir + date +  '_MC_' + str(multi_chan) + '_SD_' + str(sim_data) + '_NIT_' + str(niter)
+    result_directory = res_dir + '_SD_' + str(sim_data) + '_MC_' + str(multi_chan) + f'_{method}_' + '_NIT_' + str(niter) + date
     Path(result_directory).mkdir(parents=True, exist_ok=True)    
     print(f"Result dir is {result_directory}")
 
