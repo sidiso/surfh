@@ -34,6 +34,7 @@ import datetime
 @click.option('--multi_chan', default=False, type=click.BOOL, help='Multi-channel or single channel option')
 @click.option('--verbose', default=False, type=click.BOOL, help='Set spectro verbose')
 @click.option('--method', default='lcg', type=click.STRING)
+@click.option('--margin', default=0, type=click.INT)
 def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose, method):
 
     if multi_chan is True:

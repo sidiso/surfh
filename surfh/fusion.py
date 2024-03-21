@@ -75,6 +75,7 @@ class QuadCriterion_MRS:
 
         n_spec = model_spectro.tpls.shape[0]
         self.n_spec = n_spec
+        self.it = 0
 
         assert (
             type(mu_reg) == float
@@ -108,8 +109,7 @@ class QuadCriterion_MRS:
         self.printing = printing
         self.gradient = gradient
 
-
-    def run_lcg(self, maximum_iterations, tolerance=1e-12, calc_crit = False, perf_crit = None, value_init = 0.5):
+    def run_method(self, method='lcg', maximum_iterations=10, tolerance=1e-12, calc_crit = False, perf_crit = None, value_init = 0.5):
         assert type(self.mu_reg) == int or type(self.mu_reg) == float
         # lcg codé que avec un hyper paramètre
 
@@ -152,30 +152,35 @@ class QuadCriterion_MRS:
             )
             prior = [prior_r, prior_c]
 
-        self.L_crit_val_lcg = []
-        self.L_perf_crit = []
+        self.L_crit_val = []
         
-        def perf_crit_for_lcg(res_lcg):
-            x_hat = res_lcg.x.reshape(self.shape_of_output)
-            self.L_perf_crit.append(perf_crit(x_hat))
+        def perf_crit_with_reshape(res):
+            x_hat = res.x.reshape(self.shape_of_output)
+            crit_val = perf_crit(x_hat)
+            self.L_crit_val.append(crit_val)
+            print(f"Criterion value = {crit_val}\n")
 
-        def print_last_grad_norm(res_lcg):
-            print(res_lcg.grad_norm[-1])
+        def print_last_grad_norm(res):
+            print(f"Iteration n°{self.it}, Grad norm = {res.grad_norm[-1]}")
+            self.it = self.it + 1
+
+        def print_last_grad_norm_and_crit(res):
+            print_last_grad_norm(res)
+            perf_crit_with_reshape(res)
+
 
         list_obj = [spectro_data_adeq] + prior
         
         t1 = time.time()
 
+        if method == 'lcg':
+            function = lcg    
+        else:
+            function = mmmg
+
         if calc_crit and perf_crit == None:
-            print("LCG : Criterion calculated at each iteration!")
-            # res_lcg = lcg(
-            #     imager_data_adeq + spectro_data_adeq + prior,
-            #     init,
-            #     tol=tolerance,
-            #     max_iter=maximum_iterations,
-            #     calc_objv = True
-            # )
-            res_lcg = lcg(
+            print(f"{method} : Criterion calculated at each iteration!")
+            res = function(
                 list_obj,
                 init,
                 tol=tolerance,
@@ -183,8 +188,8 @@ class QuadCriterion_MRS:
                 callback = self.crit_val_for_lcg
             )
         elif calc_crit == False and perf_crit != None:
-            print("LCG : perf_crit calculated at each iteration!")
-            res_lcg = lcg(
+            print(f"{method} : perf_crit calculated at each iteration!")
+            res = function(
                 list_obj,
                 init,
                 tol=tolerance,
@@ -192,117 +197,29 @@ class QuadCriterion_MRS:
                 callback = print_last_grad_norm
             )
         elif calc_crit and perf_crit != None:
-            print("Criterion to calculate AND performance criterion to calculate ?")
-            return None
+            print(f"{method} : perf_crit calculated at each iteration!")
+            res = function(
+                list_obj,
+                init,
+                tol=tolerance,
+                max_iter=maximum_iterations,
+                callback = print_last_grad_norm_and_crit
+            )
         elif calc_crit == False and perf_crit == None:
-            res_lcg = lcg(
+            res = function(
                 list_obj,
                 init,
                 tol=tolerance,
                 max_iter=maximum_iterations
             )
         if self.printing:
-            print("Total time needed for LCG :", round(time.time() - t1, 3))
+            print(f"Total time needed for {method} :", round(time.time() - t1, 3))
         
         # running_time = time.time() - t1
 
-        return res_lcg  # , running_time
-    
+        return res  # , running_time
 
-    def run_mmmg(self, maximum_iterations, tolerance=1e-12, calc_crit = False, perf_crit = None, value_init = 0.5):
-        assert type(self.mu_reg) == int or type(self.mu_reg) == float
-        # lcg codé que avec un hyper paramètre
 
-        if type(value_init) == float or type(value_init) == int:
-            init = np.ones(self.shape_of_output) * value_init
-        elif type(value_init) == np.ndarray:
-            assert value_init.shape == self.shape_of_output
-            init = value_init
-
-        # t1 = time.time()
-
-        spectro_data_adeq = QuadObjective(
-            self.model_spectro.forward,
-            self.model_spectro.adjoint,
-            data=self.y_spectro,
-            hyper=self.mu_spectro,
-            name="Spectro",
-        )
-
-        if self.gradient == "joint":  # regularization term with joint gradients
-            prior = QuadObjective(
-                self.diff_op_joint.D,
-                self.diff_op_joint.D_t,
-                self.diff_op_joint.DtD,
-                hyper=self.mu_reg,
-                name="Reg joint",
-            )
-            prior = [prior]
-
-        elif self.gradient == "separated":
-            prior_r = QuadObjective(
-                self.npdiff_r.forward,
-                self.npdiff_r.adjoint,
-                hyper=self.mu_reg,
-            )
-            prior_c = QuadObjective(
-                self.npdiff_c.forward,
-                self.npdiff_c.adjoint,
-                hyper=self.mu_reg,
-            )
-            prior = [prior_r, prior_c]
-
-        self.L_crit_val_lcg = []
-        self.L_perf_crit = []
-
-        def print_last_grad_norm(res_lcg):
-            print(res_lcg.grad_norm[-1])
-
-        list_obj = [spectro_data_adeq] + prior
-        
-        t1 = time.time()
-
-        if calc_crit and perf_crit == None:
-            print("LCG : Criterion calculated at each iteration!")
-            # res_lcg = lcg(
-            #     imager_data_adeq + spectro_data_adeq + prior,
-            #     init,
-            #     tol=tolerance,
-            #     max_iter=maximum_iterations,
-            #     calc_objv = True
-            # )
-            res_mmmg = mmmg(
-                list_obj,
-                init,
-                tol=tolerance,
-                max_iter=maximum_iterations,
-                callback = self.crit_val
-            )
-        elif calc_crit == False and perf_crit != None:
-            print("LCG : perf_crit calculated at each iteration!")
-            res_mmmg = mmmg(
-                list_obj,
-                init,
-                tol=tolerance,
-                max_iter=maximum_iterations,
-                callback = print_last_grad_norm
-            )
-        elif calc_crit and perf_crit != None:
-            print("Criterion to calculate AND performance criterion to calculate ?")
-            return None
-        elif calc_crit == False and perf_crit == None:
-            res_mmmg = mmmg(
-                list_obj,
-                init,
-                tol=tolerance,
-                max_iter=maximum_iterations
-            )
-        if self.printing:
-            print("Total time needed for MMMG :", round(time.time() - t1, 3))
-        
-        # running_time = time.time() - t1
-
-        return res_mmmg  # , running_time
     
     def crit_val(self, x_hat):
         # data_term_imager = self.mu_imager * np.sum(
@@ -328,9 +245,5 @@ class QuadCriterion_MRS:
         # on divise par 2 par convention, afin de ne pas trouver un 1/2 dans le calcul de dérivée
 
         return J_val
-    
-    def crit_val_for_lcg(self, res_lcg):
-        x_hat = res_lcg.x.reshape(self.shape_of_output)
-        self.L_crit_val_lcg.append(self.crit_val(x_hat))
 
     
