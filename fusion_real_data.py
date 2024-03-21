@@ -166,8 +166,8 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
     """
     np.save(result_directory + '/res_x.npy', res.x)
     np.save(result_directory + '/res_grad_norm.npy', res.grad_norm)
-    np.save(result_directory + '/res_time.npy', res.time)
-    
+    np.save(result_directory + '/res_time.npy', res.time) 
+    np.save(result_directory + '/res_crit_val.npy', quadCrit.L_crit_val)
 
 if __name__ == '__main__':
     launch_fusion()
