@@ -156,7 +156,7 @@ class QuadCriterion_MRS:
         
         def perf_crit_with_reshape(res):
             x_hat = res.x.reshape(self.shape_of_output)
-            crit_val = crit_val(x_hat)
+            crit_val = self.get_crit_val(x_hat)
             self.L_crit_val.append(crit_val)
             print(f"Criterion value = {crit_val}\n")
 
@@ -185,7 +185,7 @@ class QuadCriterion_MRS:
                 init,
                 tol=tolerance,
                 max_iter=maximum_iterations,
-                callback = self.crit_val_for_lcg
+                callback = self.get_crit_val
             )
         elif calc_crit == False and perf_crit != None:
             print(f"{method} : perf_crit calculated at each iteration!")
@@ -221,7 +221,7 @@ class QuadCriterion_MRS:
 
 
     
-    def crit_val(self, x_hat):
+    def get_crit_val(self, x_hat):
         # data_term_imager = self.mu_imager * np.sum(
         #     (self.y_imager - self.model_imager.forward(x_hat)) ** 2
         # )
