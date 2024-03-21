@@ -35,7 +35,7 @@ import datetime
 @click.option('--verbose', default=False, type=click.BOOL, help='Set spectro verbose')
 @click.option('--method', default='lcg', type=click.STRING)
 @click.option('--margin', default=0, type=click.INT)
-def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose, method):
+def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose, method, margin):
 
     if multi_chan is True:
         print("Multi channels/bands fusion")
@@ -159,14 +159,7 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
         y_data = list_data[0].ravel()
     
     quadCrit = fusion.QuadCriterion_MRS(1, np.copy(y_data), spectro, hyper, True, gradient="separated")
-
-    res = None
-    if method == 'lcg':
-        print("Start LCG ! ")
-        res = quadCrit.run_lcg(niter, perf_crit = 1)
-    elif method == 'mmmg':
-        print("Start MMMG ! ")
-        res = quadCrit.run_mmmg(niter, perf_crit = 1)
+    res = quadCrit.run_method(method, niter, perf_crit = 1, calc_crit=True)
 
     """
     Save results
