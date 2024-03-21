@@ -128,6 +128,9 @@ data = spectrolmm.forward(maps)
 nnn = spectrolmm.adjoint(data)
 
 ndata = spectrolmm.forward(nnn)
+sim_cube = spectrolmm.get_cube(nnn)
+
+
 
 print("-----------------------------------")
 
