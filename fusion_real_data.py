@@ -33,7 +33,8 @@ import datetime
 @click.option('--niter', default=5, type=click.INT, help='Number of iteration for lcg')
 @click.option('--multi_chan', default=False, type=click.BOOL, help='Multi-channel or single channel option')
 @click.option('--verbose', default=False, type=click.BOOL, help='Set spectro verbose')
-def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose):
+@click.option('--method', default='lcg', type=click.STRING)
+def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose, method):
 
     if multi_chan is True:
         print("Multi channels/bands fusion")
@@ -155,18 +156,23 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
         # Otherwise, we use real data
         print("Real data selection")
         y_data = list_data[0].ravel()
-
-
-    print("Start LCG ! ")
+    
     quadCrit = fusion.QuadCriterion_MRS(1, np.copy(y_data), spectro, hyper, True, gradient="separated")
-    res_lcg = quadCrit.run_lcg(niter, perf_crit = 1)
+
+    res = None
+    if method == 'lcg':
+        print("Start LCG ! ")
+        res = quadCrit.run_lcg(niter, perf_crit = 1)
+    elif method == 'mmmg':
+        print("Start MMMG ! ")
+        res = quadCrit.run_mmmg(niter, perf_crit = 1)
 
     """
     Save results
     """
-    np.save(result_directory + '/res_x.npy', res_lcg.x)
-    np.save(result_directory + '/res_grad_norm.npy', res_lcg.grad_norm)
-    np.save(result_directory + '/res_time.npy', res_lcg.time)
+    np.save(result_directory + '/res_x.npy', res.x)
+    np.save(result_directory + '/res_grad_norm.npy', res.grad_norm)
+    np.save(result_directory + '/res_time.npy', res.time)
     
 
 if __name__ == '__main__':
