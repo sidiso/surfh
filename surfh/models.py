@@ -664,7 +664,9 @@ class Channel(LinOp):
     def wdirac_blur_t(self, inarray: array, slit_idx: int) -> array:
         """Returns spectral blurring transpose of inarray using a dirac function.
            Only used to create generate cube from Forward data with applying Adjoint operator. """    
-        return sliceToCube_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx, 'dirac'), self.num_threads if not self.serial else 1)
+        
+        tmp =  sliceToCube_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx, 'dirac'), self.num_threads if not self.serial else 1)
+        return tmp
 
     def forward(self, inarray_f):
         """inarray is supposed in global coordinate, spatially blurred and in Fourier space.
@@ -786,9 +788,9 @@ class Channel(LinOp):
                 gridded += self.slicing_t(sliced, slit_idx)
            
             _otf_sr = udft.ir2fr(np.ones((self.srf, 1)), self.local_shape[1:])[np.newaxis, ...]
-            tmp = dft(gridded) * _otf_sr.conj() 
-            tmp2 = idft(tmp, self.local_shape[1:])
-            blurred += self.gridding_t(tmp2, pointing)
+            tmp3 = dft(gridded) * _otf_sr.conj() 
+            tmp4 = idft(tmp3, self.local_shape[1:])
+            blurred += self.gridding_t(tmp4, pointing)
             # blurred += self.gridding_t(gridded, pointing)
 
         # out[self.wslice, ...] += self.fourier_duplicate_t(blurred)
@@ -813,13 +815,23 @@ class Channel(LinOp):
                     )/sliced.shape[2] #TODO : Véririfier si diviser par la taille de beta est correct ?
                                       # Car dans le modèle direct/Adjoint c'est faux. Mais ici on fait que de la transformation
                                       # pas du modèle...
-
-                tmp2 = self.wdirac_blur_t(tmp, slit_idx)
+                tmp2 = self.wdirac_blur_t(tmp, slit_idx) # TODO fix wdirac_blur_t() function (it currently gived full 0)
+                
                 sliced[:, : self.oshape[3] * self.srf : self.srf] = tmp2
-            
                 gridded += self.slicing_Fente2Cube_t(sliced, slit_idx)
-            blurred += self.gridding_t(gridded, pointing)
-        out[self.wslice, ...] = self.fourier_duplicate_t(blurred)
+
+
+            
+            _otf_sr = udft.ir2fr(np.ones((self.srf, 1)), self.local_shape[1:])[np.newaxis, ...]
+            tmp3 = dft(gridded) * _otf_sr.conj()
+            tmp4 = idft(tmp3, self.local_shape[1:])
+
+            
+
+            blurred += self.gridding_t(tmp4, instru.Coord(0, 0))
+            # blurred += self.gridding_t(gridded, pointing)
+        out[self.wslice, ...] += dft(blurred)
+        # out[self.wslice, ...] = self.fourier_duplicate_t(blurred)
         return out
 
     def realData_sliceToCube(self, slices, cube_dim):
@@ -1062,13 +1074,14 @@ class Spectro(LinOp):
             output : 
                 list of hyperspectral cube. One cube per frequency band.  
         """
-        cubes = []
-
+        tmp = np.zeros(
+            self.ishape[:2] + (self.ishape[2] // 2 + 1,), dtype=np.complex128
+        )
+        
         for idx, chan in enumerate(self.channels):
-            res = chan.sliceToCube(np.reshape(slices[self._idx[idx] : self._idx[idx + 1]], chan.oshape),)
-            cube = idft(res, self.imshape)
-            cubes.append(cube[chan.wslice,...])
-        return cubes
+            tmp += chan.sliceToCube(np.reshape(slices[self._idx[idx] : self._idx[idx + 1]], chan.oshape))
+
+        return idft(tmp * self.sotf.conj(), self.imshape)
 
 
     def qdcoadd(self, measures: array) -> array:
@@ -1394,13 +1407,15 @@ class SpectroLMM(LinOp):
             output : 
                 list of hyperspectral cube. One cube per frequency band.  
         """
-        cubes = []
-
+        cube_shape = ((len(self.wavel_axis), len(self.alpha_axis), len(self.beta_axis)))
+        tmp = np.zeros(
+            cube_shape[:2] + (cube_shape[2] // 2 + 1,), dtype=np.complex128
+        )
+        
         for idx, chan in enumerate(self.channels):
-            res = chan.sliceToCube(np.reshape(slices[self._idx[idx] : self._idx[idx + 1]], chan.oshape),)
-            cube = idft(res, self.imshape)
-            cubes.append(cube[chan.wslice,...])
-        return cubes
+            tmp += chan.sliceToCube(np.reshape(slices[self._idx[idx] : self._idx[idx + 1]], chan.oshape))
+
+        return idft(tmp * self.sotf.conj(), self.imshape)
 
 
     def check_observation(self):

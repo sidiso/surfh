@@ -50,7 +50,7 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
         psf_directory       = data_dir + 'All_bands_psf/'
 
     date = str(datetime.date.today())+ '-' + str(datetime.datetime.now().hour) + '-' + str(datetime.datetime.now().minute)
-    result_directory = res_dir + '_SD_' + str(sim_data) + '_MC_' + str(multi_chan) + f'_{method}_' + '_NIT_' + str(niter) + date
+    result_directory = res_dir + 'Fusion_SD_' + str(sim_data) + '_MC_' + str(multi_chan) + f'_{method}_' + '_NIT_' + str(niter) + '_' + date
     Path(result_directory).mkdir(parents=True, exist_ok=True)    
     print(f"Result dir is {result_directory}")
 
@@ -90,7 +90,7 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
     """
     Set Cube coordinate.
     """
-    margin=0
+    # margin=0
     maps_shape = (maps.shape[0], maps.shape[1]+margin*2, maps.shape[2]+margin*2)
     step_Angle = Angle(step, u.arcsec)
     origin_alpha_axis = np.arange(maps_shape[1]) * step_Angle.degree
@@ -159,7 +159,17 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
         print("Real data selection")
         y_data = list_data[0].ravel()
     
-    quadCrit = fusion.QuadCriterion_MRS(1, np.copy(y_data), spectro, hyper, True, gradient="separated")
+
+    mask = utils.make_mask_FoV(spectro.sliceToCube(y_data), 0)
+    
+
+    quadCrit = fusion.QuadCriterion_MRS(mu_spectro=1, 
+                                        y_spectro=np.copy(y_data), 
+                                        model_spectro=spectro, 
+                                        mu_reg=hyper, 
+                                        mask=mask,
+                                        printing=True, 
+                                        gradient="separated")
     res = quadCrit.run_method(method, niter, perf_crit = 1, calc_crit=True, value_init=value_init)
 
     """

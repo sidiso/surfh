@@ -110,6 +110,13 @@ origin_beta_axis += channels[0].fov.origin.beta
 #     serial=False,
 # )
 
+# data = np.load('/home/nmonnier/Data/JWST/Orion_bar/Single_numpy_slices/ChannelCube_ch_1_long_s3d_02111_00001.npy')
+# data[np.where(np.isnan(data))] = 0
+# test = spectro.sliceToCube(data)
+
+# mask = utils.mask_FoV(test)
+
+
 spectrolmm = models.SpectroLMM(
     channels, # List of channels and bands 
     origin_alpha_axis, # Alpha Coordinates of the cube
