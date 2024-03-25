@@ -160,7 +160,7 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
         y_data = list_data[0].ravel()
     
 
-    mask = utils.make_mask_FoV(spectro.sliceToCube(y_data), 0)
+    mask = utils.make_mask_FoV(spectro.sliceToCube(y_data))
     
 
     quadCrit = fusion.QuadCriterion_MRS(mu_spectro=1, 
@@ -184,3 +184,4 @@ if __name__ == '__main__':
     launch_fusion()
 
 
+# TODO 0210f -> ch1-short

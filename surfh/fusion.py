@@ -24,7 +24,7 @@ class NpDiff_r(aljabr.LinOp): # dim = 3
 
         Dx_masked = - np.diff(np.pad(x_masked, ((0, 0), (1, 0), (0, 0)), 'wrap'), axis=1)
         Dx_masked[np.where(np.isnan(Dx_masked))] = 0
-        return - np.diff(np.pad(x, ((0, 0), (1, 0), (0, 0)), 'wrap'), axis=1)
+        return Dx_masked
 
     def adjoint(self, y):       
         return np.diff(np.pad(y, ((0, 0), (0, 1), (0, 0)), 'wrap'), axis=1)
@@ -42,7 +42,7 @@ class NpDiff_c(aljabr.LinOp): # dim = 3
 
         Dx_masked = - np.diff(np.pad(x_masked, ((0, 0), (0, 0), (1, 0)), 'wrap'), axis=2)        
         Dx_masked[np.where(np.isnan(Dx_masked))] = 0
-        return - np.diff(np.pad(x, ((0, 0), (0, 0), (1, 0)), 'wrap'), axis=2)    
+        return Dx_masked   
 
     def adjoint(self, y):
         return np.diff(np.pad(y, ((0, 0), (0, 0), (0, 1)), 'wrap'), axis=2)

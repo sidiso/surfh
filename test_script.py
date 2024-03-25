@@ -129,16 +129,10 @@ spectrolmm = models.SpectroLMM(
     serial=True,
 )
 
-data = np.load('/home/nmonnier/Data/JWST/Orion_bar/Single_numpy_slices/ChannelCube_ch_1_long_s3d_02111_00001.npy')
-data[np.where(np.isnan(data))] = 0
-test = spectrolmm.sliceToCube(data)
-mask = utils.make_mask_FoV(test)
-plt.imshow(test[750])
-plt.figure()
-plt.imshow(mask)
-
-plt.show()
-
+# data = np.load('/home/nmonnier/Data/JWST/Orion_bar/Single_numpy_slices/ChannelCube_ch_1_long_s3d_02111_00001.npy')
+# data[np.where(np.isnan(data))] = 0
+# test = spectrolmm.sliceToCube(data)
+# mask = utils.make_mask_FoV(test)
 
 # print("COmpute Forward")
 # data = spectrolmm.forward(maps)
