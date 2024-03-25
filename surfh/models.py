@@ -1081,7 +1081,7 @@ class Spectro(LinOp):
         for idx, chan in enumerate(self.channels):
             tmp += chan.sliceToCube(np.reshape(slices[self._idx[idx] : self._idx[idx + 1]], chan.oshape))
 
-        return idft(tmp * self.sotf.conj(), self.imshape)
+        return idft(tmp, self.imshape)
 
 
     def qdcoadd(self, measures: array) -> array:
@@ -1415,7 +1415,7 @@ class SpectroLMM(LinOp):
         for idx, chan in enumerate(self.channels):
             tmp += chan.sliceToCube(np.reshape(slices[self._idx[idx] : self._idx[idx + 1]], chan.oshape))
 
-        return idft(tmp * self.sotf.conj(), self.imshape)
+        return idft(tmp, self.imshape)
 
 
     def check_observation(self):
