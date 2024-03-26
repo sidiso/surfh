@@ -8,7 +8,7 @@ from astropy.io import fits
 from loguru import logger
 from pathlib import Path
 
-from . import instru
+from .Models import instru
 
 ARCSEC_TO_DEGREE = 3600
 PCE_PATH = '/home/nmonnier/Data/JWST/Orion_bar/All_bands_pce/'

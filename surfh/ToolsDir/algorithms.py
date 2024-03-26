@@ -20,7 +20,7 @@ import numpy as np
 import qmm
 from numpy import ndarray as array
 
-from . import models
+from .Models import models
 
 
 def vox_reconstruction(

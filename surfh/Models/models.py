@@ -32,12 +32,12 @@ from pathlib import Path
 import psutil
 
 from . import instru
-from . import cython_2D_interpolation
+from ..ToolsDir import cython_2D_interpolation
 from surfh import cythons_files
-from . import shared_dict
-from . import utils
+from ..Others import shared_dict
+from ..ToolsDir import utils
 
-from .AsyncProcessPoolLight import APPL
+from ..Others.AsyncProcessPoolLight import APPL
 from multiprocessing import Pool
 from multiprocessing import Process, Queue, connection
 import matplotlib.pyplot as plt
@@ -891,7 +891,9 @@ class Channel(LinOp):
        
         for slit_idx in range(self.instr.n_slit):
             slices = self.slit_slices(slit_idx)
-            sliced = gridded[:, slices[0], slices[1]]
+            sliced = gridded[
+                    :, slices[0], slices[1]
+                ]
             sliced = sliced[
                     :, : self.oshape[3] * self.srf : self.srf
                 ]
