@@ -64,8 +64,22 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
         mu[1] = mu[1] + '0'
     mu = mu[0] + mu[1] 
 
+    val = str(value_init)
+    val = val.split('.')
+    if len(val[0]) == 1:
+        val[0] = '00'+ val[0]
+    elif len(mu[0]) == 2:
+        val[0] = '0'+ val[0]
+
+    if len(val[1]) == 1:
+        val[1] = val[1] + '00'
+    elif len(val[1]) == 2:
+        val[1] = val[1] + '0'
+    val = val[0] + val[1]
+
+
     date = str(datetime.date.today())+ '-' + str(datetime.datetime.now().hour) + '-' + str(datetime.datetime.now().minute)
-    result_directory = res_dir + 'Fusion_SD_' + str(sim_data) + '_MC_' + str(multi_chan) + f'_{method}_' + '_Mu_+' + mu + '_NIT_' + str(niter) + '_' + date
+    result_directory = res_dir + 'Fusion_SD_' + str(sim_data) + '_MC_' + str(multi_chan) + f'_{method}_' + '_Mu_' + mu + '_Init_' + val + '_Nit_' + str(niter) + '_' + date
     Path(result_directory).mkdir(parents=True, exist_ok=True)    
     print(f"Result dir is {result_directory}")
 

@@ -5,7 +5,7 @@ import itertools
 import numpy as np
 import time
 
-from surfh import cythons_files
+from surfh.ToolsDir import cythons_files
 
 # OLD Cython
 def find_indices(grid, xi):
