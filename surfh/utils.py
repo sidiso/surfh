@@ -37,3 +37,18 @@ def otf(psf, shape, components):
         psf[np.newaxis, ...] * components[:, :, np.newaxis, np.newaxis], shape
     )
     return otf
+
+
+def make_mask_FoV(cube, tol=10):
+    mask = np.zeros(cube.shape[1:])
+    cube[cube<tol] = 0
+    for i in range(cube.shape[1]):
+        for j in range(cube.shape[2]):
+            if np.any(cube[:,i,j]):
+                mask[i,j] = 1
+    return mask
+
+def apply_mask_FoV(mask, cube):
+    masked = mask[np.newaxis,...] * cube
+    masked[np.where(masked == 0)] = np.NaN
+    return masked
