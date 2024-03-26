@@ -17,15 +17,15 @@ from surfh.Models import instru
 from surfh.ToolsDir import utils
 from surfh.Models import realmiri
 
-from surfh import fusion
+from surfh.ToolsDir import fusion
 
 from pathlib import Path
 import click
 
 import datetime
 
-from surfh.Models import models
-
+from surfh.Models import spectro
+from surfh.Models import spectrolmm
 
 @click.command()
 @click.option('--data_dir', default='/home/nmonnier/Data/JWST/Orion_bar/', type=click.STRING, help='Path to data directory')
@@ -51,8 +51,21 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
         slices_directory    = data_dir + 'Single_numpy_slices/'
         psf_directory       = data_dir + 'All_bands_psf/'
 
+    mu = str(hyper)
+    mu = mu.split('.')
+    if len(mu[0]) == 1:
+        mu[0] = '00'+ mu[0]
+    elif len(mu[0]) == 2:
+        mu[0] = '0'+ mu[0]
+
+    if len(mu[1]) == 1:
+        mu[1] = mu[1] + '00'
+    elif len(mu[1]) == 2:
+        mu[1] = mu[1] + '0'
+    mu = mu[0] + mu[1] 
+
     date = str(datetime.date.today())+ '-' + str(datetime.datetime.now().hour) + '-' + str(datetime.datetime.now().minute)
-    result_directory = res_dir + 'Fusion_SD_' + str(sim_data) + '_MC_' + str(multi_chan) + f'_{method}_' + '_NIT_' + str(niter) + '_' + date
+    result_directory = res_dir + 'Fusion_SD_' + str(sim_data) + '_MC_' + str(multi_chan) + f'_{method}_' + '_Mu_+' + mu + '_NIT_' + str(niter) + '_' + date
     Path(result_directory).mkdir(parents=True, exist_ok=True)    
     print(f"Result dir is {result_directory}")
 
@@ -139,7 +152,7 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
     origin_alpha_axis += list_channels[0].fov.origin.alpha
     origin_beta_axis += list_channels[0].fov.origin.beta
 
-    spectro = models.SpectroLMM(
+    spectro = spectrolmm.SpectroLMM(
         list_channels, # List of channels and bands 
         origin_alpha_axis, # Alpha Coordinates of the cube
         origin_beta_axis, # Beta Coordinates of the cube
@@ -187,3 +200,6 @@ if __name__ == '__main__':
 
 
 # TODO 0210f -> ch1-short
+#      0210f -> ch2-short
+#      0210f -> ch3-short
+#      0210f -> ch4-short

@@ -16,9 +16,9 @@ from scipy.signal import convolve as conv
 from scipy.signal import convolve2d as conv2
 
 from surfh.Models import instru
-#from surfh import smallmiri as miri
-from surfh.Models import dummymiri as miri
-#from surfh import miri
+#from surfh.Models import smallmiri as miri
+# from surfh.Models import dummymiri as miri
+from surfh.Models import miri
 from surfh.ToolsDir import utils
 import scipy
 

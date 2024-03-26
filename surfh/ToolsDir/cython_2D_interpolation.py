@@ -8,8 +8,6 @@ import time
 from surfh import cythons_files
 
 # OLD Cython
-
-# OLD Cython
 def find_indices(grid, xi):
 
     # Axes to iterate over

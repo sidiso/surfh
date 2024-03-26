@@ -17,7 +17,7 @@ def build():
     extensions = [
         Extension(
             "*",
-            ["surfh/*.pyx"],
+            ["surfh/Others/*.pyx"],
             extra_compile_args=compile_args,
             extra_link_args=link_args,
             include_dirs=include_dirs,

@@ -7,7 +7,7 @@ import numpy as np
 from astropy.io import fits
 from loguru import logger
 
-from .Models import instru
+from surfh.Models import instru
 
 
 def mrs_pce(filename):
