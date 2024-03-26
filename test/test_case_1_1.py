@@ -17,9 +17,9 @@ from udft import ir2fr
 from scipy.signal import convolve2d as conv2
 from scipy.ndimage import gaussian_filter
 
-from surfh import smallmiri as miri
-from surfh import instru
-from surfh import utils
+from surfh.Models import smallmiri as miri
+from surfh.Models import instru
+from surfh.ToolsDir import utils
 
 # %% 1) INPUTS FOR MODELS
 

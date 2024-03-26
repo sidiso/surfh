@@ -13,11 +13,12 @@ from astropy.coordinates import Angle
 import scipy
 from scipy.signal import convolve2d as conv2
 
-from surfh import instru, models
-from surfh import utils
-from surfh import realmiri
-from surfh import cython_2D_interpolation
-
+from surfh.Models import instru
+from surfh.ToolsDir import utils
+from surfh.Models import realmiri
+from surfh.ToolsDir import cython_2D_interpolation
+from surfh.Models import spectro
+from surfh.Models import spectrolmm
 
 main_directory = '/home/nmonnier/Data/JWST/Orion_bar/'
 
@@ -99,7 +100,7 @@ cube[np.where(np.isnan(cube))] = 0
 origin_alpha_axis += channels[0].fov.origin.alpha
 origin_beta_axis += channels[0].fov.origin.beta
 
-# spectro = models.Spectro(
+# spectro = spectro.Spectro(
 #     channels, # List of channels and bands 
 #     origin_alpha_axis, # Alpha Coordinates of the cube
 #     origin_beta_axis, # Beta Coordinates of the cube
@@ -117,7 +118,7 @@ origin_beta_axis += channels[0].fov.origin.beta
 # mask = utils.make_mask_FoV(test)
 
 
-spectrolmm = models.SpectroLMM(
+spectrolmm = spectrolmm.SpectroLMM(
     channels, # List of channels and bands 
     origin_alpha_axis, # Alpha Coordinates of the cube
     origin_beta_axis, # Beta Coordinates of the cube

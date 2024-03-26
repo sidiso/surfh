@@ -13,10 +13,11 @@ from astropy.coordinates import Angle
 import scipy
 from scipy.signal import convolve2d as conv2
 
-from surfh import instru, models
-from surfh import utils
-from surfh import realmiri
-from surfh import cython_2D_interpolation
+from surfh.Models import instru
+from surfh.ToolsDir import utils
+from surfh.Models import realmiri
+from surfh.ToolsDir import cython_2D_interpolation
+from surfh.Models import spectro
 
 
 """
@@ -31,6 +32,7 @@ main_directory = '/home/nmonnier/Data/JWST/Orion_bar/'
 
 fits_directory = main_directory + 'Single_fits'
 numpy_directory = main_directory + 'Single_numpy'
+numpy_slices_directory = main_directory + 'Single_numpy_slices'
 
 
 
@@ -78,7 +80,7 @@ if "sotf" not in globals():
 """
 Set Cube coordinate.
 """
-margin=0
+margin=40
 maps_shape = (maps.shape[0], maps.shape[1]+margin*2, maps.shape[2]+margin*2)
 step_Angle = Angle(step, u.arcsec)
 origin_alpha_axis = np.arange(maps_shape[1]) * step_Angle.degree
@@ -103,6 +105,8 @@ for file in os.listdir(fits_directory):
     """
     filename = Path(file).stem
     numpy_file = Path(numpy_directory + '/' + filename + '.npy')
+    numpy_slices_file = Path(numpy_slices_directory + '/' + filename + '.npy')
+
     print("------------------")
     print(numpy_file)
     if numpy_file.is_file():
@@ -238,7 +242,7 @@ origin_beta_axis += channels[0].fov.origin.beta
 """
 Define instrumental model from previous metadata
 """
-""" spectro = models.Spectro(
+spectro = spectro.Spectro(
     channels, # List of channels and bands 
     origin_alpha_axis, # Alpha Coordinates of the cube
     origin_beta_axis, # Beta Coordinates of the cube
@@ -249,14 +253,15 @@ Define instrumental model from previous metadata
     serial=False,
 )
 
-cube = np.load('cube.npy')
-slices = spectro.channels[0].realData_cubeToSlice(cube)
-ncube = spectro.channels[0].realData_sliceToCube(slices, cube.shape)
+slices = spectro.channels[0].realData_cubeToSlice(interpolated_cube)
+#np.save(numpy_slices_file, slices)
+slices[np.where(np.isnan(slices))] = 0
+ncube = spectro.channels[0].realData_sliceToCube(slices, interpolated_cube.shape)
 
 plt.figure()
-plt.imshow(cube[50])
+plt.imshow(interpolated_cube[50])
 plt.colorbar()
 plt.figure()
 plt.imshow(ncube[50])
 plt.colorbar()
-plt.show() """
+plt.show() 

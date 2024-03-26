@@ -5,7 +5,7 @@ import os
 from qmm import QuadObjective, Objective, lcg, mmmg, Huber, HebertLeahy
 from udft import laplacian, irdftn, rdft2, ir2fr, diff_ir
 import aljabr
-from surfh import utils
+from surfh.ToolsDir import utils
 
 from scipy.signal import convolve2d as conv2
 

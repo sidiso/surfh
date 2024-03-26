@@ -15,14 +15,16 @@ from astropy.io import fits
 from scipy.signal import convolve as conv
 from scipy.signal import convolve2d as conv2
 
-from surfh import instru, models, old_model
-from surfh import smallmiri as miri
+from surfh import old_model
+from surfh.Models import smallmiri as miri
 #from surfh import dummymiri as miri
 #from surfh import miri
-from surfh import utils
+from surfh.ToolsDir import utils
 
 import time
 import os
+
+from surfh.Models import instru, models
 #from surfh import shared_dict
 
 #from surfh.AsyncProcessPoolLight import APPL

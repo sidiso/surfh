@@ -15,8 +15,14 @@
 # You should have received a copy of the GNU General Public License along with
 # this program. If not, see <http://www.gnu.org/licenses/>.
 
+from collections import namedtuple
+from math import ceil
+from typing import List, Tuple
+
 import numpy as np
 import udft
+import scipy as sp
+
 
 
 def gaussian_psf(wavel_axis, step, D=6.5):
@@ -37,6 +43,41 @@ def otf(psf, shape, components):
         psf[np.newaxis, ...] * components[:, :, np.newaxis, np.newaxis], shape
     )
     return otf
+
+
+def idft(inarray: np.ndarray, shape: Tuple[int, int]) -> np.ndarray:
+    """Apply the unitary inverse Discret Fourier Transform on last two axis.
+
+    Parameters
+    ----------
+    inarray: array-like
+      The array to transform
+    shape: tuple(int, int)
+      The output shape of the last two axis.
+
+    Notes
+    -----
+    Use `scipy.fft.irfftn` with `workers=-1`.
+    """
+    return sp.fft.irfftn(
+        inarray, s=shape, axes=range(-len(shape), 0), norm="ortho", workers=-1
+    )
+
+def dft(inarray: np.ndarray) -> np.ndarray:
+    """Apply the unitary Discret Fourier Transform on last two axis.
+
+    Parameters
+    ----------
+    inarray: array-like
+      The array to transform
+
+    Notes
+    -----
+    Use `scipy.fft.rfftn` with `workers=-1`.
+    """
+    return sp.fft.rfftn(inarray, axes=range(-2, 0), norm="ortho", workers=-1)
+
+
 
 
 def make_mask_FoV(cube, tol=10):

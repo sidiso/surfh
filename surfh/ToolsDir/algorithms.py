@@ -20,12 +20,12 @@ import numpy as np
 import qmm
 from numpy import ndarray as array
 
-from . import models
+from surfh.Models import spectro, spectrolmm
 
 
 def vox_reconstruction(
     data: array,
-    data_model: models.Spectro,
+    data_model: spectro.Spectro,
     spat_reg: float = 1.0,
     spat_th: float = 1.0,
     spec_reg: float = 1.0,
@@ -72,7 +72,7 @@ def vox_reconstruction(
 
 def lmm_reconstruction(
     data: array,
-    data_model: models.SpectroLMM,
+    data_model: spectrolmm.SpectroLMM,
     spat_reg: float = 1.0,
     spat_th: float = 1.0,
     init: array = None,

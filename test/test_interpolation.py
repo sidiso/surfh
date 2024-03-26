@@ -3,8 +3,8 @@ import scipy.misc
 import matplotlib.pyplot as plt
 from matplotlib import transforms
 
-from surfh import cython_2D_interpolation 
-from surfh import smallmiri as mrs
+from surfh.ToolsDir import cython_2D_interpolation 
+from surfh.Models import smallmiri as mrs
 
 im = scipy.misc.ascent()
 
