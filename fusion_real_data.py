@@ -13,9 +13,9 @@ from astropy.coordinates import Angle
 import scipy
 from scipy.signal import convolve2d as conv2
 
-from surfh import instru, models
-from surfh import utils
-from surfh import realmiri
+from surfh.Models import instru
+from surfh.ToolsDir import utils
+from surfh.Models import realmiri
 
 from surfh import fusion
 
@@ -23,6 +23,8 @@ from pathlib import Path
 import click
 
 import datetime
+
+from surfh.Models import models
 
 
 @click.command()

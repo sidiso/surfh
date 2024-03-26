@@ -13,10 +13,11 @@ from astropy.coordinates import Angle
 import scipy
 from scipy.signal import convolve2d as conv2
 
-from surfh import instru, models
-from surfh import utils
-from surfh import realmiri
-from surfh import cython_2D_interpolation
+from surfh.Models import instru
+from surfh.ToolsDir import utils
+from surfh.Models import realmiri
+from surfh.ToolsDir import cython_2D_interpolation
+from surfh.Models import models
 
 
 main_directory = '/home/nmonnier/Data/JWST/Orion_bar/'

@@ -13,11 +13,12 @@ from astropy.io import fits
 from scipy.signal import convolve as conv
 from scipy.signal import convolve2d as conv2
 
-from surfh import instru, models
-from surfh import smallmiri as miri
-from surfh import utils
+from surfh.Models import instru
+from surfh.Models import smallmiri as miri
+from surfh.ToolsDir import utils
 
-from surfh import cython_2D_interpolation
+from surfh.ToolsDir import cython_2D_interpolation
+from surfh.Models import models
 
 
 def orion():
