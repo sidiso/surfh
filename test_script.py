@@ -26,6 +26,8 @@ fits_directory = main_directory + 'Single_fits/'
 numpy_directory = main_directory + 'Single_numpy/'#
 slices_directory = main_directory + 'Single_numpy_slices/'
 
+filename = 'ChannelCube_ch_2_short_s3d_0210f_00001'
+
 
 def orion():
     """Rerturn maps, templates, spatial step and wavelength"""
@@ -90,8 +92,6 @@ main_pointing = instru.Coord(0, 0) # Set the main pointing from the instrument F
 pointings = instru.CoordList([main_pointing])#.pix(step_Angle.degree) # We do not use dithering for first tests
 channels = []
 
-filename = 'ChannelCube_ch_1_long_s3d_02111_00001'
-
 chan = realmiri.get_IFU(fits_directory + filename + '.fits')
 channels.append(chan)
 cube = np.load(numpy_directory + filename + '.npy')
@@ -111,7 +111,7 @@ origin_beta_axis += channels[0].fov.origin.beta
 #     serial=False,
 # )
 
-# data = np.load('/home/nmonnier/Data/JWST/Orion_bar/Single_numpy_slices/ChannelCube_ch_1_long_s3d_02111_00001.npy')
+# data = np.load('/home/nmonnier/Data/JWST/Orion_bar/Single_numpy_slices/' + filename +'.npy')
 # data[np.where(np.isnan(data))] = 0
 # test = spectro.sliceToCube(data)
 

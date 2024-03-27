@@ -30,6 +30,7 @@ from surfh.Models import instru, channel
 
 from surfh.Others import shared_dict
 from surfh.Others.AsyncProcessPoolLight import APPL
+from surfh.ToolsDir import utils
 
 import matplotlib.pyplot as plt
 
@@ -47,6 +48,7 @@ class SpectroLMM(LinOp):
         templates: array,
         verbose: bool = True,
         serial: bool = False,
+        mask = array,
     ):
 
         self.wavel_axis = wavel_axis
@@ -87,6 +89,7 @@ class SpectroLMM(LinOp):
             for srf, instr in zip(srfs, instrs)
         ]
 
+        self.mask = mask
         self._idx = np.cumsum([0] + [np.prod(chan.oshape) for chan in self.channels])
         self.imshape = (len(alpha_axis), len(beta_axis))
         self.tpls_shape = self.tpls.shape
@@ -174,13 +177,15 @@ class SpectroLMM(LinOp):
         if self.verbose:
             logger.info(f"Spatial blurring^T : IDFT2({tmp.shape})")
         cube = idft(tmp * self.sotf.conj(), self.imshape)
-        return np.concatenate(
+        tmp = np.concatenate(
             [
                 np.sum(cube * tpl[..., np.newaxis, np.newaxis], axis=0)[np.newaxis, ...]
                 for tpl in self.tpls
             ],
             axis=0,
         )
+        # tmp2 = utils.apply_mask_FoV(self.mask, tmp)
+        return tmp
 
 
     def sliceToCube(self, slices):

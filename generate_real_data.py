@@ -33,6 +33,7 @@ main_directory = '/home/nmonnier/Data/JWST/Orion_bar/'
 fits_directory = main_directory + 'Single_fits'
 numpy_directory = main_directory + 'Single_numpy'
 numpy_slices_directory = main_directory + 'Single_numpy_slices'
+mask_directory = main_directory + 'Single_mask'
 
 
 
@@ -80,7 +81,7 @@ if "sotf" not in globals():
 """
 Set Cube coordinate.
 """
-margin=40
+margin=0
 maps_shape = (maps.shape[0], maps.shape[1]+margin*2, maps.shape[2]+margin*2)
 step_Angle = Angle(step, u.arcsec)
 origin_alpha_axis = np.arange(maps_shape[1]) * step_Angle.degree
@@ -106,6 +107,7 @@ for file in os.listdir(fits_directory):
     filename = Path(file).stem
     numpy_file = Path(numpy_directory + '/' + filename + '.npy')
     numpy_slices_file = Path(numpy_slices_directory + '/' + filename + '.npy')
+    mask_file = Path(mask_directory + '/' + filename + '.npy')
 
     print("------------------")
     print(numpy_file)
@@ -120,6 +122,12 @@ for file in os.listdir(fits_directory):
 
 
         im = hdul[1].data
+
+        # Uncomment to get strongh masking
+        im[:,0:4, :] = np.NaN
+        im[:,-4:-1, :] = np.NaN
+        im[:, :, 0:4] = np.NaN
+        im[:, :, -4:-1] = np.NaN
 
         # Get wcs metadata from fits header
         w = wcs.WCS(hdul[1].header)
@@ -254,9 +262,14 @@ spectro = spectro.Spectro(
 )
 
 slices = spectro.channels[0].realData_cubeToSlice(interpolated_cube)
-#np.save(numpy_slices_file, slices)
+np.save(numpy_slices_file, slices)
 slices[np.where(np.isnan(slices))] = 0
 ncube = spectro.channels[0].realData_sliceToCube(slices, interpolated_cube.shape)
+
+# mask = utils.make_mask_FoV(ncube)
+# np.save(mask_file, mask)
+# plt.imshow(mask)
+# plt.show()
 
 plt.figure()
 plt.imshow(interpolated_cube[50])

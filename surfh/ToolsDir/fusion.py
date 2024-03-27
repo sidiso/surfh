@@ -9,7 +9,9 @@ from surfh.ToolsDir import utils
 
 from scipy.signal import convolve2d as conv2
 
+import matplotlib.pyplot as plt
 
+import inspect
 
 class NpDiff_r(aljabr.LinOp): # dim = 3
     def __init__(self, maps_shape, mask):
@@ -22,12 +24,20 @@ class NpDiff_r(aljabr.LinOp): # dim = 3
     def forward(self, x):
         x_masked = utils.apply_mask_FoV(self.mask, x)
 
-        Dx_masked = - np.diff(np.pad(x_masked, ((0, 0), (1, 0), (0, 0)), 'wrap'), axis=1)
-        Dx_masked[np.where(np.isnan(Dx_masked))] = 0
+        Dx_masked = - np.diff(np.pad(x, ((0, 0), (1, 0), (0, 0)), 'wrap'), axis=1)
+        
+        # Dx_masked[np.where(np.isnan(Dx_masked))] = 0
         return Dx_masked
 
-    def adjoint(self, y):       
-        return np.diff(np.pad(y, ((0, 0), (0, 1), (0, 0)), 'wrap'), axis=1)
+    def adjoint(self, y):    
+        y_masked = utils.apply_mask_FoV(self.mask, y)
+
+        Dy_masked = np.diff(np.pad(y, ((0, 0), (0, 1), (0, 0)), 'wrap'), axis=1)
+
+        #Dy_masked = utils.apply_mask_FoV(self.mask, Dy_masked)
+        # Dy_masked[np.where(np.isnan(Dy_masked))] = 0
+
+        return Dy_masked
 
 class NpDiff_c(aljabr.LinOp): # dim = 3
     def __init__(self, maps_shape, mask):
@@ -40,8 +50,8 @@ class NpDiff_c(aljabr.LinOp): # dim = 3
     def forward(self, x):
         x_masked = utils.apply_mask_FoV(self.mask, x)
 
-        Dx_masked = - np.diff(np.pad(x_masked, ((0, 0), (0, 0), (1, 0)), 'wrap'), axis=2)        
-        Dx_masked[np.where(np.isnan(Dx_masked))] = 0
+        Dx_masked = - np.diff(np.pad(x, ((0, 0), (0, 0), (1, 0)), 'wrap'), axis=2)        
+        # Dx_masked[np.where(np.isnan(Dx_masked))] = 0
         return Dx_masked   
 
     def adjoint(self, y):
@@ -141,6 +151,9 @@ class QuadCriterion_MRS:
             hyper=self.mu_spectro,
             name="Spectro",
         )
+        print("Spectro data adeq")
+        print(spectro_data_adeq)
+        print("-----------")
 
         if self.gradient == "joint":  # regularization term with joint gradients
             prior = QuadObjective(
@@ -183,8 +196,16 @@ class QuadCriterion_MRS:
                 perf_crit_with_reshape(res)
 
 
-        list_obj = [spectro_data_adeq] + prior
+        print("Prior")
+        print(prior[0].hyper)
+        print(prior[1].hyper)
         
+        print("---------")
+        
+        list_obj = [spectro_data_adeq] + prior
+        print("list_obj")
+        print(list_obj)
+        print("---------")
         t1 = time.time()
 
         if method == 'lcg':

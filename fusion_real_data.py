@@ -23,6 +23,7 @@ from pathlib import Path
 import click
 
 import datetime
+import aljabr
 
 from surfh.Models import spectro
 from surfh.Models import spectrolmm
@@ -40,6 +41,8 @@ from surfh.Models import spectrolmm
 @click.option('--value_init', default=100, type=click.FLOAT)
 def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose, method, margin, value_init):
 
+
+
     if multi_chan is True:
         print("Multi channels/bands fusion")
         fits_directory    = data_dir + 'All_bands_fits/'
@@ -50,6 +53,7 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
         fits_directory      = data_dir + 'Single_fits/'
         slices_directory    = data_dir + 'Single_numpy_slices/'
         psf_directory       = data_dir + 'All_bands_psf/'
+        mask_directory      = data_dir + 'Single_mask/'
 
     mu = str(hyper)
     mu = mu.split('.')
@@ -133,7 +137,7 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
     wavel_axis = wavel_axis[::tpl_ss]
     #spsf = utils.gaussian_psf(wavel_axis, step_Angle.degree)
     spsf = np.load(psf_directory + 'psfs_pixscale0.025_fov11.25_date_300123.npy')
-    spsf = spsf[:, 100:351, 100:351]
+    spsf = spsf[:, (100-margin):(351+margin), (100-margin):(351+margin)]
     print("SHAPE PSF ARE ", spsf.shape)
 
     if "sotf" not in globals():
@@ -162,6 +166,9 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
 
         list_data.append(data)
 
+        #mask = np.load(mask_directory + Path(file).stem + '.npy')
+        #mask = np.ones_like(mask)
+
 
     origin_alpha_axis += list_channels[0].fov.origin.alpha
     origin_beta_axis += list_channels[0].fov.origin.beta
@@ -176,6 +183,7 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
         tpl,
         verbose=verbose,
         serial=False,
+        mask=0,
     )
 
 
@@ -188,9 +196,7 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
         print("Real data selection")
         y_data = list_data[0].ravel()
     
-
-    mask = utils.make_mask_FoV(spectro.sliceToCube(y_data))
-    
+    mask = utils.make_mask_FoV(spectro.sliceToCube(y_data)) 
 
     quadCrit = fusion.QuadCriterion_MRS(mu_spectro=1, 
                                         y_spectro=np.copy(y_data), 
@@ -199,6 +205,10 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
                                         mask=mask,
                                         printing=True, 
                                         gradient="separated")
+    print("Dot Test : ")
+    print(aljabr.dottest(quadCrit.npdiff_r))
+    print(aljabr.dottest(quadCrit.npdiff_c))
+    print("---------------")
     res = quadCrit.run_method(method, niter, perf_crit = 1, calc_crit=True, value_init=value_init)
 
     """
