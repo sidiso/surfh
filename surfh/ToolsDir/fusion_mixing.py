@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import inspect
 
 class NpDiff_r(aljabr.LinOp): # dim = 3
-    def __init__(self, maps_shape, mask):
+    def __init__(self, maps_shape, mask=None):
         super().__init__(
             ishape=maps_shape,
             oshape=maps_shape,
@@ -32,7 +32,7 @@ class NpDiff_r(aljabr.LinOp): # dim = 3
         return Dy_masked
 
 class NpDiff_c(aljabr.LinOp): # dim = 3
-    def __init__(self, maps_shape, mask):
+    def __init__(self, maps_shape, mask=None):
         super().__init__(
             ishape=maps_shape,
             oshape=maps_shape,

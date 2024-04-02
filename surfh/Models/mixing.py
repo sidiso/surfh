@@ -19,22 +19,44 @@ from einops import einsum, rearrange
 # de chaque pixel avant la décimation.
 def make_H_spec_freq_sum2(array_psfs, L_pce, L_spec, shape_target, di, dj):
     # print("Use of function {}.".format("make_H_spec_freq_sum"))
-    weighted_psfs = array_psfs * L_pce[..., np.newaxis, np.newaxis] # (300, 250, 500)
-    newaxis_weighted_psfs = weighted_psfs[np.newaxis, ...] # (1, 300, 250, 500)
-    
-    specs = L_spec[..., np.newaxis, np.newaxis] # (5, 300, 1, 1)
+    print("State -31 ")
 
-    H_spec = newaxis_weighted_psfs * specs # (5, 300, 250, 500)
+    # weighted_psfs = array_psfs * L_pce[..., np.newaxis, np.newaxis] # (300, 250, 500)
+    # newaxis_weighted_psfs = weighted_psfs[np.newaxis, ...] # (1, 300, 250, 500)
+    # print("State -32 ")
 
-    H_spec_freq = ir2fr(H_spec, shape_target)
-    
-    # différence par rapport à make_H_spec_freq est ici
-    kernel_for_sum = np.ones((di, dj)) # le flux est bien intégré sur toute la surface du pixel, sans normalisation
-    # print("avant ir2fr de make_H_spec_freq")
-    kernel_for_sum_freq = ir2fr(kernel_for_sum, shape_target)[np.newaxis, np.newaxis, ...] # (1, 1, 250, 251)
-    # print("après ir2fr de make_H_spec_freq")
-    
-    return H_spec_freq * kernel_for_sum_freq # (5, 300, 250, 251)
+    # specs = L_spec[..., np.newaxis, np.newaxis] # (5, 300, 1, 1)
+    # print("State -33 ")
+
+    # H_spec = newaxis_weighted_psfs * specs # (5, 300, 250, 500)
+    print("State -34 ", shape_target)
+
+    kernel_for_sum = np.ones((di, dj))
+    kernel_for_sum_freq = ir2fr(kernel_for_sum, shape_target)
+    print("State -35 ")
+    n_map = L_spec.shape[0]
+    n_lam = L_spec.shape[1]
+
+    H_spec_freq = np.zeros((n_map, n_lam, shape_target[0], shape_target[1]//2 +1), dtype=np.complex128)
+    print("State -36 ")
+    for lam in range(n_lam):       
+        H_spec_slice = (array_psfs[lam] * 
+                        L_pce[lam, np.newaxis, np.newaxis] * 
+                        L_spec[:, lam, np.newaxis, np.newaxis]
+                        )
+
+        H_spec_freq[:,lam,:,:] = ir2fr(H_spec_slice, shape_target)*kernel_for_sum_freq
+        # print(f"Type H_spec_slice = {H_spec_slice.dtype}")
+        # print(f"Type kernel_for_sum_freq = {kernel_for_sum_freq.dtype}")
+        # print(f"Type H_spec_freq = {H_spec_freq.dtype}")
+        # print(f"Type array_psfs = {array_psfs.dtype}")
+        # print(f"Type L_pce = {L_pce.dtype}")
+        # print(f"Type L_spec = {L_spec.dtype}")
+
+    #H_spec_freq = ir2fr(H_spec, shape_target)
+    print("State -37 ")
+
+    return H_spec_freq #* kernel_for_sum_freq # (5, 300, 250, 251)
 
 
 def make_H_spec_freq_sum_full(array_psfs, L_pce, L_spec, shape_target, di, dj):
@@ -148,27 +170,36 @@ class Model_WCT(aljabr.LinOp):
 
         # produit des psfs avec les conjuguées
         # (300, 1, 25, 50, 100) * (300, 25, 1, 50, 100) = (300, 25, 25, 50, 100)
-        mat = (
-            (1 / (di * dj))
-            * part_psfs_freq_full[:, np.newaxis, ...]
-            * conj_part_psfs_freq_full[:, :, np.newaxis, ...]
-        )
-        # print("mat", mat.shape)
 
         # création de HtH
         specs = L_specs[
             :, :, np.newaxis, np.newaxis, np.newaxis, np.newaxis
         ]  # (5, 300, 1, 1)
-        # print("check1")
+
         n_spec = specs.shape[0]
         HtH_freq = np.zeros(
             (n_spec, n_spec, di * dj, di * dj, h_block, w_block), dtype=complex
         )
-        # print("check2")
-        for k1 in range(n_spec):
-            for k2 in range(k1, n_spec):
-                HtH_freq[k1, k2] += np.sum(specs[k1] * specs[k2] * mat, axis=0)
 
+        print("State -1 ")
+        n_lamb = L_specs.shape[1]
+        for lamb in range(n_lamb):
+
+            mat = (
+                (1 / (di * dj))
+                * part_psfs_freq_full[lamb, np.newaxis, ...]
+                * conj_part_psfs_freq_full[lamb, :, np.newaxis, ...]
+            )
+  
+            for k1 in range(n_spec):
+                for k2 in range(k1, n_spec):
+                    HtH_freq[k1, k2] += specs[k1, lamb] * specs[k2, lamb] * mat
+
+
+        del part_psfs_freq_full
+        del conj_part_psfs_freq_full
+
+        print("State - 2 ")
         # print("check3")
         # utilisation de la symétrie de HtH
         for k1 in range(n_spec):
@@ -176,22 +207,19 @@ class Model_WCT(aljabr.LinOp):
                 HtH_freq[k1, k2] += HtH_freq[k2, k1]
 
         self.hess_spec_freq = HtH_freq
-        
+        print("State -3 ")
         self.H_spec_freq = make_H_spec_freq_sum2(
             psfs_monoch, L_pce, L_specs, shape_target, di, dj
         ) * rdft2(decal)[np.newaxis, np.newaxis, :, :]
+        print("State -4 ")
         
-        self.H_spec_freq_full = make_H_spec_freq_sum_full(
-            psfs_monoch, L_pce, L_specs, shape_target, di, dj
-        ) * decalf[np.newaxis, np.newaxis, :, :]
-        
+        print(f"H_spec_freq shape {self.H_spec_freq.shape}")
+        print(f"self.hess_spec_freq shape {self.hess_spec_freq.shape}")
         self.di = di
         self.dj = dj
         self.shape_target = shape_target
         self.n_lamb = n_lamb
         self.n_spec = n_spec
-        self.L_pce = L_pce
-        self.psfs_monoch = psfs_monoch
 
         super().__init__(
             ishape=(self.n_spec, shape_target[0], shape_target[1]),
