@@ -17,7 +17,7 @@ from surfh.Models import instru
 from surfh.ToolsDir import utils
 from surfh.Models import realmiri
 
-from surfh.ToolsDir import fusion
+from surfh.ToolsDir import fusion_spectro
 
 from pathlib import Path
 import click
@@ -182,7 +182,7 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
         pointings, # List of pointing (mainly used for dithering)
         tpl,
         verbose=verbose,
-        serial=False,
+        serial=True,
         mask=0,
     )
 
@@ -198,17 +198,13 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
     
     mask = utils.make_mask_FoV(spectro.sliceToCube(y_data)) 
 
-    quadCrit = fusion.QuadCriterion_MRS(mu_spectro=1, 
+    quadCrit = fusion_spectro.QuadCriterion_MRS(mu_spectro=1, 
                                         y_spectro=np.copy(y_data), 
                                         model_spectro=spectro, 
                                         mu_reg=hyper, 
                                         mask=mask,
                                         printing=True, 
                                         gradient="separated")
-    print("Dot Test : ")
-    print(aljabr.dottest(quadCrit.npdiff_r))
-    print(aljabr.dottest(quadCrit.npdiff_c))
-    print("---------------")
     res = quadCrit.run_method(method, niter, perf_crit = 1, calc_crit=True, value_init=value_init)
 
     """

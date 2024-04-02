@@ -21,6 +21,7 @@ import qmm
 from numpy import ndarray as array
 
 from surfh.Models import spectro, spectrolmm
+from einops import einsum, rearrange
 
 
 def vox_reconstruction(
@@ -103,3 +104,81 @@ def lmm_reconstruction(
         init = data_adeq.ht_data
 
     return qmm.mmmg(data_adeq + spat_prior_r + spat_prior_c, x0=init, max_iter=500)
+
+def partitioning_einops2(cube, di, dj):
+    new_cube = rearrange(
+        cube, "wl (dx bx) (dy by) -> wl (dx dy) bx by", dx=di, dy=dj
+    )
+    return new_cube
+
+
+
+
+def concat_M(M):
+    nb_blocks, _, nb_subblocks, _ = M.shape
+    concat_width = nb_blocks * nb_subblocks
+    concat = np.zeros((concat_width, concat_width), dtype=complex)  # always a square
+    for l in range(nb_blocks):
+        for c in range(nb_blocks):
+            concat[
+                l * nb_subblocks : (l + 1) * nb_subblocks,
+                c * nb_subblocks : (c + 1) * nb_subblocks,
+            ] += M[l, c, ...]
+    return concat
+
+# diff with concatenating: now works with decim different for both dimensions
+def concatenating2(cubef, shape_target, di, dj):
+    n_maps, d1_times_d2, h_block, w_block = cubef.shape
+    h, w = shape_target
+    
+    concatenated_cube = np.zeros((n_maps, h, w), dtype=complex)
+    k = 0
+    for i in range(di):
+        for j in range(dj):
+            concatenated_cube[:, i * h_block : (i+1) * h_block, j * w_block : (j+1) * w_block] += cubef[:, k, :, :]
+            k += 1
+    
+    return concatenated_cube
+
+
+def split_M(M, split_shape):
+    split = np.zeros(split_shape, dtype=complex)
+    nb_blocks, _, nb_subblocks, _ = split_shape
+    for l in range(nb_blocks):
+        for c in range(nb_blocks):
+            split[l, c, ...] += M[
+                l * nb_subblocks : (l + 1) * nb_subblocks,
+                c * nb_subblocks : (c + 1) * nb_subblocks,
+            ]
+    return split
+
+
+def make_iHtH_spectro(HtH_freq_spectro):
+    inv_hess_freq = np.zeros_like(HtH_freq_spectro, dtype=complex)
+    H, W = inv_hess_freq.shape[-2:]
+    for h in range(H):
+        for w in range(W):
+            M = np.copy(HtH_freq_spectro[..., h, w])
+            C = concat_M(M)
+            iC = np.linalg.inv(C)
+            S = split_M(iC, inv_hess_freq.shape[:4])
+            inv_hess_freq[..., h, w] += S
+    return inv_hess_freq
+
+
+# input in freq and not part, output in freq
+def apply_hessian_freq(hess_spec_freq, di, dj, shape_target, x_freq):
+    # partitionnement de x
+    part_x_freq = partitioning_einops2(x_freq, di, dj)  # (5, 25, 50, 100)
+
+    # produit de HtH avec x
+    HtH_x_freq = hess_spec_freq * part_x_freq[np.newaxis, :, np.newaxis, :, :, :]
+    # (5, 5, 25, 25, 50, 100) * (1, 5, 1, 25, 50, 100) = (5, 5, 25, 25, 50, 100)
+
+    HtH_x_freq_sum = einsum(HtH_x_freq, "ti tj di dj h w -> ti di h w")
+
+    # reconstitution des cartes en freq
+    concat_HtH_x_freq = concatenating2(HtH_x_freq_sum, shape_target, di, dj)
+    # (5, 25, 50, 100) --> (5, 250, 500) --> (5, 250, 251)
+
+    return concat_HtH_x_freq
