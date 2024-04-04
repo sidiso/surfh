@@ -252,12 +252,13 @@ class Model_WCT(aljabr.LinOp):
         
 
         # make convolution with conjugated weighted psfs
-        original_cube_freq = rdft2(original_cube)[np.newaxis, ...]  # (1, 300, 250, 251)
+        # original_cube_freq = rdft2(original_cube)[np.newaxis, ...]  # (1, 300, 250, 251)
+        
         # H_spec_x_freq = np.sum(
         #     np.conj(self.H_spec_freq) * original_cube_freq, axis=1
         # )  # (5, 300, 250, 251) * (1, 300, 250, 251)
         H_spec_x_freq = einsum(
-            np.conj(self.H_spec_freq) * original_cube_freq, "t l i j -> t i j"
+            np.conj(self.H_spec_freq) * rdft2(original_cube)[np.newaxis, ...], "t l i j -> t i j"
         )  # (5, 300, 250, 251) * (1, 300, 250, 251)
         maps = irdftn(H_spec_x_freq, self.shape_target)  # (5, 250, 500)
         

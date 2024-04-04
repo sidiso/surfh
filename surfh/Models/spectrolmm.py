@@ -119,7 +119,6 @@ class SpectroLMM(LinOp):
         )
 
     def get_cube(self, maps):
-        out = np.zeros(self.oshape)
         if self.verbose:
             logger.info(f"Cube generation")
         cube = np.sum(
@@ -208,6 +207,13 @@ class SpectroLMM(LinOp):
             tmp += chan.sliceToCube(np.reshape(slices[self._idx[idx] : self._idx[idx + 1]], chan.oshape))
 
         return idft(tmp, self.imshape)
+
+
+    def interpolate_FoV(self, cube: array, chan: channel.Channel) -> array:
+        """
+        Re-interpolate a cube using chan_x as reference coordinates.
+        """
+        return chan.gridding(cube, chan.pointings[0])
 
 
     def check_observation(self):
