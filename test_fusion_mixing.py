@@ -102,43 +102,53 @@ origin_alpha_axis += channels[0].fov.origin.alpha
 origin_beta_axis += channels[0].fov.origin.beta
 
 
-# spectroModel = spectro.Spectro(
-#     channels, # List of channels and bands 
-#     origin_alpha_axis, # Alpha Coordinates of the cube
-#     origin_beta_axis, # Beta Coordinates of the cube
-#     wavel_axis, # Wavelength axis of the cube
-#     sotf, # Optical PSF
-#     pointings, # List of pointing (mainly used for dithering)
-#     verbose=True,
-#     serial=False,
-# )
+spectroModel = spectro.Spectro(
+    channels, # List of channels and bands 
+    origin_alpha_axis, # Alpha Coordinates of the cube
+    origin_beta_axis, # Beta Coordinates of the cube
+    wavel_axis, # Wavelength axis of the cube
+    sotf, # Optical PSF
+    pointings, # List of pointing (mainly used for dithering)
+    verbose=True,
+    serial=False,
+)
 
 # # Generate data projected into the cube
 # data = np.load('/home/nmonnier/Data/JWST/Orion_bar/Single_numpy_slices/' + filename +'.npy')
 # data[np.where(np.isnan(data))] = 0
 # y_cube = spectroModel.sliceToCube(data)
 
-# spectroModel.__del__()
-# del spectroModel
+print("Make Forward data")
+data = np.load(slices_directory + filename +'.npy')
+data[np.where(np.isnan(data))] = 0
+y_cube = spectroModel.sliceToCube(data)
+localFov_y = spectroModel.interpolate_FoV(y_cube, spectroModel.channels[0])
+localFov_y = localFov_y[:, 23:, 17:]
+localFov_y = localFov_y[:, :-10,:-7]
+
+
+
+spectroModel.__del__()
+del spectroModel
 
 
 #%% MODEL CT
 pce = np.ones(tpl.shape[1])
 print("Initialization model WCT")
-model_wct = mixing.Model_WCT(spsf, tpl, maps.shape[1:], pce)
+model_wct = mixing.Model_WCT(spsf, tpl, localFov_y.shape[1:], pce)
 
 # print("Perform dottest")
 # aljabr.dottest(model_wct)
 
-print("Make Forward data")
-y_forward = model_wct.forward(maps)
+# print("Make Forward data")
+# y_forward = model_wct.forward(maps)
 
 
 
 
 print("Init quadcrit")
 quadcriterion = fusion_mixing.QuadCriterion3(
-    y_forward,
+    localFov_y,
     model_wct,
     0.237,
     printing = False,

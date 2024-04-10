@@ -130,6 +130,14 @@ spectrolmm = spectrolmm.SpectroLMM(
     serial=True,
 )
 
+data = np.load(slices_directory + filename +'.npy')
+data[np.where(np.isnan(data))] = 0
+y_cube = spectrolmm.sliceToCube(data)
+
+localFov_y = spectrolmm.interpolate_FoV(y_cube, spectrolmm.channels[0])
+localFov_y = localFov_y[:, 23:, 17:]
+localFov_y = localFov_y[:, :-10,:-7]
+
 # data = np.load('/home/nmonnier/Data/JWST/Orion_bar/Single_numpy_slices/ChannelCube_ch_1_long_s3d_02111_00001.npy')
 # data[np.where(np.isnan(data))] = 0
 # test = spectrolmm.sliceToCube(data)

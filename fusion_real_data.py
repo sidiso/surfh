@@ -201,10 +201,12 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
     quadCrit = fusion_spectro.QuadCriterion_MRS(mu_spectro=1, 
                                         y_spectro=np.copy(y_data), 
                                         model_spectro=spectro, 
-                                        mu_reg=hyper, 
+                                        mu_reg=14500000, 
                                         mask=mask,
                                         printing=True, 
                                         gradient="separated")
+    
+    value_init = np.load('/home/nmonnier/Data/JWST/Orion_bar/Mixing_results/145000000.npy')
     res = quadCrit.run_method(method, niter, perf_crit = 1, calc_crit=True, value_init=value_init)
 
     """
