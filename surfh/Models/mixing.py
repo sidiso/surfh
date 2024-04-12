@@ -15,6 +15,9 @@ from surfh.ToolsDir import algorithms
 from udft import idft2, dft2, ir2fr, rdft2, irdftn
 from einops import einsum, rearrange
 
+from surfh.ToolsDir import cythons_files
+
+
 # la matrice inclut désormais le filtre en fréquence correspondant à la somme
 # de chaque pixel avant la décimation.
 def make_H_spec_freq_sum2(array_psfs, L_pce, L_spec, shape_target, di, dj):
@@ -269,37 +272,58 @@ class Model_WCT(aljabr.LinOp):
         return apply_hessian2(self.hess_spec_freq, self.di, self.dj, self.shape_target, x)
 
 
-class Mixing(LinOp):
+
+
+
+
+
+class MixingST(LinOp):
     def __init__(self, 
                  templates: array,
                  alpha_axis: array,
                  beta_axis: array,
                  wavel_axis: array,
+                 selection_arr: array,
+                 fast_selection_arr: array,
                  dtype=np.float64):
         
         self.templates = templates
         self.alpha_axis = alpha_axis
         self.beta_axis = beta_axis
         self.wavel_axis = wavel_axis
+
+        self.selection_arr = selection_arr
+        self.fast_selection_arr = fast_selection_arr
     
         ishape = (self.templates.shape[0], len(alpha_axis), len(beta_axis))
         oshape = (len(wavel_axis), len(alpha_axis), len(beta_axis))
-        super().__init__(ishape, oshape, "MixingModel", dtype)
-
+        super().__init__(ishape, oshape, "MixingModelST", dtype)
 
     def forward(self, maps: array) -> array:
-        cube = np.sum(
-            np.expand_dims(maps, 1) * self.templates[..., np.newaxis, np.newaxis], axis=0
-        )
-        return cube
-    
+        cube = cythons_files.c_fast_forward_TST(len(self.wavel_axis), self.templates.shape[0], 
+                                                len(self.alpha_axis), len(self.beta_axis),
+                                                self.fast_selection_arr.astype(np.int32), self.fast_selection_arr.shape[0],
+                                                self.templates.astype(np.float32), maps.astype(np.float32))
+        return np.array(cube)
+        
     def adjoint(self, cube: array) -> array:
+        maps = cythons_files.c_fast_adjoint_TST(len(self.wavel_axis), self.templates.shape[0], 
+                                                len(self.alpha_axis), len(self.beta_axis),
+                                                self.fast_selection_arr.astype(np.int32), self.fast_selection_arr.shape[0],
+                                                self.templates.astype(np.float32), cube.astype(np.float32))
+        return np.array(maps)
 
-        maps = np.concatenate(
-            [
-                np.sum(cube * tpl[..., np.newaxis, np.newaxis], axis=0)[np.newaxis, ...]
-                for tpl in self.templates
-            ],
-            axis=0,
-        )
-        return maps
+
+    def fwadj(self, maps: array) -> array:
+        return np.sum(self.TST * maps[np.newaxis,...],axis=1)
+    
+    
+    def fast_precompute_TST(self):
+        S = np.ones((len(self.wavel_axis), len(self.alpha_axis), len(self.beta_axis)), dtype=np.float32)
+        S[self.selection_arr] = 0
+
+        TST = cythons_files.c_precompute_TST(self.templates.shape[0], len(self.alpha_axis), len(self.beta_axis),
+                                           len(self.wavel_axis), S, self.templates.astype(dtype=np.float32))
+        
+        self.TST = TST
+        return TST

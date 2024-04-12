@@ -601,15 +601,20 @@ class Channel(LinOp):
                 tmp2 = self.wdirac_blur_t(tmp, slit_idx) # TODO fix wdirac_blur_t() function (it currently gived full 0)
                 
                 sliced[:, : self.oshape[3] * self.srf : self.srf] = tmp2
-                gridded += self.slicing_Fente2Cube_t(sliced, slit_idx)
+
+                out_slice = np.zeros((self.local_shape[0], self.local_shape[1], self.local_shape[2]))
+                nslices = self.slit_slices(slit_idx)
+                weights = self.slit_weights(slit_idx)
+                print(tmp.shape)
+                out_slice[:, nslices[0], nslices[1]] = sliced* weights
 
 
-            
+
+                gridded += out_slice#self.slicing_Fente2Cube_t(sliced, slit_idx)
+
             _otf_sr = udft.ir2fr(np.ones((self.srf, 1)), self.local_shape[1:])[np.newaxis, ...]
             tmp3 = dft(gridded) * _otf_sr.conj()
             tmp4 = idft(tmp3, self.local_shape[1:])
-
-            
 
             blurred += self.gridding_t(tmp4, instru.Coord(0, 0))
             # blurred += self.gridding_t(gridded, pointing)

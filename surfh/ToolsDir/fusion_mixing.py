@@ -16,12 +16,11 @@ import matplotlib.pyplot as plt
 import inspect
 
 class NpDiff_r(aljabr.LinOp): # dim = 3
-    def __init__(self, maps_shape, mask=None):
+    def __init__(self, maps_shape):
         super().__init__(
             ishape=maps_shape,
             oshape=maps_shape,
         )
-        self.mask = mask
     
     def forward(self, x):
         Dx_masked = - np.diff(np.pad(x, ((0, 0), (1, 0), (0, 0)), 'wrap'), axis=1)
@@ -32,12 +31,11 @@ class NpDiff_r(aljabr.LinOp): # dim = 3
         return Dy_masked
 
 class NpDiff_c(aljabr.LinOp): # dim = 3
-    def __init__(self, maps_shape, mask=None):
+    def __init__(self, maps_shape):
         super().__init__(
             ishape=maps_shape,
             oshape=maps_shape,
         )
-        self.mask=mask
 
     def forward(self, x):
         Dx_masked = - np.diff(np.pad(x, ((0, 0), (0, 0), (1, 0)), 'wrap'), axis=2)        
@@ -76,7 +74,6 @@ class QuadCriterion_MRS:
         y_spectro,
         model_mixing,
         mu_reg,
-        mask,
         printing=False,
         gradient="separated",
     ):
@@ -87,7 +84,6 @@ class QuadCriterion_MRS:
         n_spec = model_mixing.ishape[0]
         self.n_spec = n_spec
         self.it = 1
-        self.mask = mask
 
         assert (
             type(mu_reg) == float
@@ -107,9 +103,9 @@ class QuadCriterion_MRS:
             diff_op_joint = Difference_Operator_Joint(shape_target)
             self.diff_op_joint = diff_op_joint
         elif gradient == "separated":
-            npdiff_r = NpDiff_r(shape_of_output, self.mask)
+            npdiff_r = NpDiff_r(shape_of_output)
             self.npdiff_r = npdiff_r
-            npdiff_c = NpDiff_c(shape_of_output, self.mask)
+            npdiff_c = NpDiff_c(shape_of_output)
             self.npdiff_c = npdiff_c
 
         if type(self.mu_reg) == list or type(self.mu_reg) == np.ndarray:
@@ -136,6 +132,7 @@ class QuadCriterion_MRS:
         spectro_data_adeq = QuadObjective(
             self.model_spectro.forward,
             self.model_spectro.adjoint,
+            hessp=self.model_spectro.fwadj,
             data=self.y_spectro,
             hyper=self.mu_spectro,
             name="Spectro",
@@ -169,15 +166,11 @@ class QuadCriterion_MRS:
             x_hat = res.x.reshape(self.shape_of_output)
             crit_val = self.get_crit_val(x_hat)
             self.L_crit_val.append(crit_val)
-            print(f"Criterion value = {crit_val}\n")
-
-        def print_last_grad_norm(res):
-            print(f"Iteration n°{self.it}, Grad norm = {res.grad_norm[-1]}")
-            self.it = self.it + 1
+            print(f"Criterion value = {crit_val}\n")         
 
         def print_last_grad_norm_and_crit(res):
-            print_last_grad_norm(res)
-            if self.it%5 == 2:
+            self.it = self.it + 1
+            if self.it%1000 == 0:
                 perf_crit_with_reshape(res)
 
 
@@ -196,7 +189,7 @@ class QuadCriterion_MRS:
                 init,
                 tol=tolerance,
                 max_iter=maximum_iterations,
-                callback = self.get_crit_val
+                callback = print_last_grad_norm_and_crit
             )
         elif calc_crit == False and perf_crit != None:
             print(f"{method} : perf_crit calculated at each iteration!")
@@ -236,26 +229,30 @@ class QuadCriterion_MRS:
         # data_term_imager = self.mu_imager * np.sum(
         #     (self.y_imager - self.model_imager.forward(x_hat)) ** 2
         # )
-        data_term_spectro = self.mu_spectro * np.sum(
-            (self.y_spectro - self.model_spectro.forward(x_hat)) ** 2
-        )
-
-        if self.gradient == "joint":
-            regul_term = self.mu_reg * np.sum((self.diff_op_joint.D(x_hat)) ** 2)
-            
-        elif self.gradient == "separated":
-            regul_term = self.mu_reg * (
-                np.sum(
-                    self.npdiff_r.forward(x_hat) ** 2
-                    + self.npdiff_c.forward(x_hat) ** 2
-                )
+        if self.it%100 == 0:
+            data_term_spectro = self.mu_spectro * np.sum(
+                (self.y_spectro - self.model_spectro.forward(x_hat)) ** 2
             )
 
-        # J_val = (data_term_imager + data_term_spectro + regul_term) / 2
-        J_val = (data_term_spectro + regul_term) / 2
-        # on divise par 2 par convention, afin de ne pas trouver un 1/2 dans le calcul de dérivée
+            if self.gradient == "joint":
+                regul_term = self.mu_reg * np.sum((self.diff_op_joint.D(x_hat)) ** 2)
+                
+            elif self.gradient == "separated":
+                regul_term = self.mu_reg * (
+                    np.sum(
+                        self.npdiff_r.forward(x_hat) ** 2
+                        + self.npdiff_c.forward(x_hat) ** 2
+                    )
+                )
 
-        return J_val
+            # J_val = (data_term_imager + data_term_spectro + regul_term) / 2
+            J_val = (data_term_spectro + regul_term) / 2
+            # on divise par 2 par convention, afin de ne pas trouver un 1/2 dans le calcul de dérivée
+
+            self.L_crit_val.append(J_val)
+            print(J_val)
+            return J_val
+        self.it = self.it + 1
 
     
 

@@ -132,6 +132,9 @@ spectroModel.__del__()
 del spectroModel
 
 
+if True:
+    exit()
+
 #%% MODEL CT
 pce = np.ones(tpl.shape[1])
 print("Initialization model WCT")
@@ -142,6 +145,7 @@ model_wct = mixing.Model_WCT(spsf, tpl, localFov_y.shape[1:], pce)
 
 # print("Make Forward data")
 # y_forward = model_wct.forward(maps)
+
 
 
 
