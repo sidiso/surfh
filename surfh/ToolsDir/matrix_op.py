@@ -199,7 +199,7 @@ def linearMixingModel_maps2cube(maps, NLambda, ishape, tpls):
     cube = cythons_files.c_fast_LMM_maps2cube(NLambda,ishape[0], 
                                               ishape[1], ishape[2],
                                               tpls.astype(np.float32), maps.astype(np.float32))
-    return cube
+    return np.array(cube)
 
 @njit(parallel=True)
 def linearMixingModel_cube2maps(cube, NLambda, ishape, tpls):

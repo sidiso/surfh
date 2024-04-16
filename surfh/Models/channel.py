@@ -33,6 +33,7 @@ from surfh.Others.AsyncProcessPoolLight import APPL
 from surfh.ToolsDir import cython_2D_interpolation, matrix_op
 
 import matplotlib.pyplot as plt
+import jax
 
 InputShape = namedtuple("InputShape", ["wavel", "alpha", "beta"])
 
@@ -548,6 +549,7 @@ class Channel(LinOp):
         out[self.wslice, ...] += self.fourier_duplicate_t(blurred)
 
 
+    
     def adjoint_multiproc(self, measures):
         out = shared_dict.attach(self._metadata_path)["ad_data"]
         blurred = np.zeros(self.cshape)
@@ -571,9 +573,11 @@ class Channel(LinOp):
                 gridded += self.slicing_t(sliced, slit_idx)
            
             _otf_sr = udft.ir2fr(np.ones((self.srf, 1)), self.local_shape[1:])[np.newaxis, ...]
+
             tmp3 = dft(gridded) * _otf_sr.conj() 
             tmp4 = idft(tmp3, self.local_shape[1:])
-            blurred += self.gridding_t(tmp4, pointing)
+
+            blurred += self.gridding_t(np.array(tmp4).astype(np.float64), pointing)
             # blurred += self.gridding_t(gridded, pointing)
 
         # out[self.wslice, ...] += self.fourier_duplicate_t(blurred)

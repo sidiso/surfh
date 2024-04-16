@@ -16,7 +16,7 @@ from scipy.signal import convolve2d as conv2
 from surfh.Models import instru
 from surfh.ToolsDir import utils
 from surfh.Models import realmiri
-from surfh.ToolsDir import cython_2D_interpolation
+from surfh.ToolsDir import cython_2D_interpolation, matrix_op
 from surfh.Models import spectro
 from surfh.Models import spectrolmm
 
@@ -109,7 +109,7 @@ spectro = spectrolmm.SpectroLMM(
     pointings, # List of pointing (mainly used for dithering)
     tpl,
     verbose=True,
-    serial=False,
+    serial=True,
 )
 
 data = np.load('/home/nmonnier/Data/JWST/Orion_bar/Single_numpy_slices/' + filename +'.npy')
@@ -119,6 +119,10 @@ data[np.where(np.isnan(data))] = 0
 acube = spectro.adjoint(data)
 ndata = spectro.forward(acube)
 test = spectro.sliceToCube(data)
+j_cube = spectro.adjoint_jax(data)
+f_data = spectro.forward_jax(acube)
+
+
 amaps = spectro.python_lmm_adjoint(test)
 pythoncube = spectro.python_lmm_forward(amaps)
 
