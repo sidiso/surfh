@@ -30,9 +30,10 @@ from surfh.Models import instru
 
 from surfh.Others import shared_dict
 from surfh.Others.AsyncProcessPoolLight import APPL
-from surfh.ToolsDir import cython_2D_interpolation, wrapper
+from surfh.ToolsDir import cython_2D_interpolation, matrix_op
 
 import matplotlib.pyplot as plt
+import jax
 
 InputShape = namedtuple("InputShape", ["wavel", "alpha", "beta"])
 
@@ -252,7 +253,7 @@ class Channel(LinOp):
         local_beta_axis = shared_dict.attach(self._metadata_path)["local_beta_axis"]
         slices = self.slit_slices(slit_idx)
 
-        weights = wrapper.fov_weight(
+        weights = matrix_op.fov_weight(
             self.slit_local_fov(slit_idx),
             slices,
             local_alpha_axis,
@@ -434,21 +435,21 @@ class Channel(LinOp):
 
     def wblur(self, inarray: array, slit_idx: int) -> array:
         """Returns spectral blurring of inarray"""
-        return wrapper.wblur(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads if not self.serial else 1)
+        return matrix_op.wblur(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads if not self.serial else 1)
 
     def wdirac_blur(self, inarray: array, slit_idx: int) -> array:
         """Returns spectral blurring transpose of inarray using a dirac function.
            Only used to create generate cube from Forward data with applying Adjoint operator. """    
-        return wrapper.cubeToSlice(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx, 'dirac'), self.num_threads if not self.serial else 1)
+        return matrix_op.cubeToSlice(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx, 'dirac'), self.num_threads if not self.serial else 1)
    
     def wblur_t(self, inarray: array, slit_idx: int) -> array:
         """Returns spectral blurring transpose of inarray"""
-        return wrapper.wblur_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads if not self.serial else 1)
+        return matrix_op.wblur_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads if not self.serial else 1)
 
     def wdirac_blur_t(self, inarray: array, slit_idx: int) -> array:
         """Returns spectral blurring transpose of inarray using a dirac function.
            Only used to create generate cube from Forward data with applying Adjoint operator. """    
-        return wrapper.sliceToCube_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx, 'dirac'), self.num_threads if not self.serial else 1)
+        return matrix_op.sliceToCube_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx, 'dirac'), self.num_threads if not self.serial else 1)
 
 
     def forward(self, inarray_f):
@@ -548,6 +549,7 @@ class Channel(LinOp):
         out[self.wslice, ...] += self.fourier_duplicate_t(blurred)
 
 
+    
     def adjoint_multiproc(self, measures):
         out = shared_dict.attach(self._metadata_path)["ad_data"]
         blurred = np.zeros(self.cshape)
@@ -571,9 +573,11 @@ class Channel(LinOp):
                 gridded += self.slicing_t(sliced, slit_idx)
            
             _otf_sr = udft.ir2fr(np.ones((self.srf, 1)), self.local_shape[1:])[np.newaxis, ...]
+
             tmp3 = dft(gridded) * _otf_sr.conj() 
             tmp4 = idft(tmp3, self.local_shape[1:])
-            blurred += self.gridding_t(tmp4, pointing)
+
+            blurred += self.gridding_t(np.array(tmp4).astype(np.float64), pointing)
             # blurred += self.gridding_t(gridded, pointing)
 
         # out[self.wslice, ...] += self.fourier_duplicate_t(blurred)
@@ -601,15 +605,20 @@ class Channel(LinOp):
                 tmp2 = self.wdirac_blur_t(tmp, slit_idx) # TODO fix wdirac_blur_t() function (it currently gived full 0)
                 
                 sliced[:, : self.oshape[3] * self.srf : self.srf] = tmp2
-                gridded += self.slicing_Fente2Cube_t(sliced, slit_idx)
+
+                out_slice = np.zeros((self.local_shape[0], self.local_shape[1], self.local_shape[2]))
+                nslices = self.slit_slices(slit_idx)
+                weights = self.slit_weights(slit_idx)
+                print(tmp.shape)
+                out_slice[:, nslices[0], nslices[1]] = sliced* weights
 
 
-            
+
+                gridded += out_slice#self.slicing_Fente2Cube_t(sliced, slit_idx)
+
             _otf_sr = udft.ir2fr(np.ones((self.srf, 1)), self.local_shape[1:])[np.newaxis, ...]
             tmp3 = dft(gridded) * _otf_sr.conj()
             tmp4 = idft(tmp3, self.local_shape[1:])
-
-            
 
             blurred += self.gridding_t(tmp4, instru.Coord(0, 0))
             # blurred += self.gridding_t(gridded, pointing)

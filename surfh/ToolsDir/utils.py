@@ -23,6 +23,8 @@ import numpy as np
 import udft
 import scipy as sp
 
+import matplotlib.pyplot as plt
+
 
 
 def gaussian_psf(wavel_axis, step, D=6.5):
@@ -91,5 +93,5 @@ def make_mask_FoV(cube, tol=10):
 
 def apply_mask_FoV(mask, cube):
     masked = mask[np.newaxis,...] * cube
-    masked[np.where(masked == 0)] = np.NaN
+    #masked[np.where(masked == 0)] = np.NaN
     return masked

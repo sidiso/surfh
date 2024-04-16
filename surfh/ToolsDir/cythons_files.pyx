@@ -355,10 +355,127 @@ def c_sliceToCube_t(const double[:,:,:] arr, const double[:,:,:]dirac,
                         tmp = tmp + arr[ll,a,b]* dirac[ll,l,b]
                     c_res[l,a,b] = tmp 
 
-    for a in range(sizeAlpha):
-        for b in range(sizeBeta):
-            for l in range(1, sizeLambda-1):
-                if c_res[l,a,b] <1e-2: # Threshold to 1e-2 instead of 0
-                    c_res[l,a,b] = (c_res[l-1,a,b] + c_res[l+1,a,b])/2
+    # for a in range(sizeAlpha):
+    #     for b in range(sizeBeta):
+    #         for l in range(1, sizeLambda-1):
+    #             if c_res[l,a,b] <1e-2: # Threshold to 1e-2 instead of 0
+    #                 c_res[l,a,b] = (c_res[l-1,a,b] + c_res[l+1,a,b])/2
 
     return np.asarray(c_res)
+
+
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+@cython.cdivision(True)
+@cython.initializedcheck(False)
+def c_precompute_TST(int Nmaps, int Nx, int Ny,
+                   int Nlam,
+                   float[:,:,:] S,
+                   float[:,:] templates):
+    cdef:
+        float[:,:,:,:] TST = np.zeros((Nmaps, Nmaps, Nx, Ny), dtype=np.float32)
+        int m, mp, lam, i, j = 0
+        float tmp1, tmp2 = 0.
+
+    for m in range(Nmaps):
+        for mp in range(Nmaps):
+            for i in range(Nx):
+                for j in range(Ny):
+                    for lam in range(Nlam):
+                        tmp1 = templates[mp, lam]
+                        tmp2 = templates[m,lam]
+                        TST[m, mp, i, j] += tmp1 * tmp2 * S[lam, i, j]
+    return TST
+
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+@cython.cdivision(True)
+@cython.initializedcheck(False)
+def c_fast_forward_TST(int NLambda, int Nmaps, int Nx, int Ny,
+                       int[:,:] select_arr, int size_select,
+                       float[:,:] templates,
+                       float[:,:,:] maps):
+
+    cdef:
+        float[:,:,:] cube = np.zeros((NLambda, Nx, Ny), dtype=np.float32)
+        int m, pix, lam, i, j = 0
+    
+    with nogil, parallel():
+        for pix in prange(size_select):
+            lam = select_arr[pix, 0]
+            i   = select_arr[pix, 1]
+            j   = select_arr[pix, 2]
+            for m in range(Nmaps):
+                cube[lam, i, j] += maps[m, i, j]*templates[m, lam]
+    return cube
+
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+@cython.cdivision(True)
+@cython.initializedcheck(False)
+def c_fast_LMM_maps2cube(int NLambda, int Nmaps, int Nx, int Ny,
+                       float[:,:] templates,
+                       float[:,:,:] maps):
+    cdef:
+        float[:,:,:] cube = np.zeros((NLambda, Nx, Ny), dtype=np.float32)
+        int m, lam, i, j = 0
+        float tmp = 0.
+    
+    with nogil, parallel():
+        for lam in prange(NLambda):
+            for i in range(Nx):
+                for j in range(Ny):
+                    for m in range(Nmaps):
+                        tmp += maps[m, i, j]*templates[m, lam]
+                    cube[lam, i, j] = tmp
+                    tmp = 0 
+    return cube
+
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+@cython.cdivision(True)
+@cython.initializedcheck(False)
+def c_fast_adjoint_TST(int NLambda, int Nmaps, int Nx, int Ny,
+                       int[:,:] select_arr, int size_select,
+                       float[:,:] templates,
+                       float[:,:,:] cube):
+    cdef:
+        float[:,:,:] maps = np.zeros((Nmaps, Nx, Ny), dtype=np.float32)
+        int m, pix, lam, i, j = 0
+
+    
+    for m in range(Nmaps):        
+        for pix in range(size_select):
+            lam = select_arr[pix, 0]
+            i   = select_arr[pix, 1]
+            j   = select_arr[pix, 2]
+            maps[m, i, j] = maps[m, i, j] + cube[lam, i, j]*templates[m, lam]
+
+    return maps
+
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+@cython.cdivision(True)
+@cython.initializedcheck(False)
+def c_fast_LMM_cube2maps(int NLambda, int Nmaps, int Nx, int Ny,
+                       float[:,:] templates,
+                       float[:,:,:] cube):
+    cdef:
+        float[:,:,:] maps = np.zeros((Nmaps, Nx, Ny), dtype=np.float32)
+        int m, lam, i, j = 0
+        float tmp = 0.
+    
+    with nogil, parallel():
+        for m in range(Nmaps):
+            for lam in prange(NLambda):
+                for i in range(Nx):
+                    for j in range(Ny):
+                        maps[m, i, j] += cube[i, j, lam]*templates[m, lam]
+                    # maps[m, i, j] = tmp
+                    # tmp = 0 
+    return maps

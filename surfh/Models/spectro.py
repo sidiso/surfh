@@ -220,6 +220,13 @@ class Spectro(LinOp):
         return idft(tmp, self.imshape)
 
 
+    def interpolate_FoV(self, cube: array, chan: channel.Channel) -> array:
+        """
+        Re-interpolate a cube using chan_x as reference coordinates.
+        """
+        return chan.gridding(cube, chan.pointings[0])
+
+
     def qdcoadd(self, measures: array) -> array:
         out = np.zeros(self.ishape)
         nhit = np.zeros(self.ishape)

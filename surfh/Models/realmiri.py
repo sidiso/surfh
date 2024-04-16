@@ -57,7 +57,7 @@ def get_IFU(filename):
         pix_size = 0.196/ARCSEC_TO_DEGREE
         alpha_width = 4.0/ARCSEC_TO_DEGREE
         beta_width = 4.8/ARCSEC_TO_DEGREE
-        rotation = 8.2
+        rotation = 8.2 + rotation_ref
     elif channel == 3:
         slices = 16
         pix_size = 0.245/ARCSEC_TO_DEGREE
