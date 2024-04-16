@@ -26,6 +26,7 @@ import time
 import psutil
 
 from surfh.ToolsDir.utils import dft, idft
+from surfh.ToolsDir import cythons_files, matrix_op
 from surfh.Models import instru, channel
 
 from surfh.Others import shared_dict
@@ -33,6 +34,8 @@ from surfh.Others.AsyncProcessPoolLight import APPL
 from surfh.ToolsDir import utils
 
 import matplotlib.pyplot as plt
+
+from numba import njit, prange
 
 InputShape = namedtuple("InputShape", ["wavel", "alpha", "beta"])
 
@@ -130,9 +133,8 @@ class SpectroLMM(LinOp):
         out = np.zeros(self.oshape)
         if self.verbose:
             logger.info(f"Cube generation")
-        cube = np.sum(
-            np.expand_dims(inarray, 1) * self.tpls[..., np.newaxis, np.newaxis], axis=0
-        )
+        cube = matrix_op.linearMixingModel_maps2cube(inarray, len(self.wavel_axis), self.ishape, self.tpls)
+
         if self.verbose:
             logger.info(f"Spatial blurring DFT2({inarray.shape})")
         blurred_f = dft(cube) * self.sotf
@@ -152,7 +154,6 @@ class SpectroLMM(LinOp):
 
         return out 
 
-    
     def adjoint(self, inarray: array) -> array:
         tmp = np.zeros(
             (self.wavel_axis.shape[0], self.ishape[1], self.ishape[2] // 2 + 1), dtype=np.complex128
@@ -176,15 +177,64 @@ class SpectroLMM(LinOp):
         if self.verbose:
             logger.info(f"Spatial blurring^T : IDFT2({tmp.shape})")
         cube = idft(tmp * self.sotf.conj(), self.imshape)
-        tmp = np.concatenate(
+
+        maps = matrix_op.linearMixingModel_cube2maps(cube, len(self.wavel_axis), self.ishape, self.tpls)
+
+        return maps
+
+
+    def python_lmm_forward(self, inarray: array) -> array:
+        cube = np.sum(
+            np.expand_dims(inarray, 1) * self.tpls[..., np.newaxis, np.newaxis], axis=0
+        )
+        return cube
+
+    def python_lmm_forward_details(self, inarray: array) -> array:
+        tmp1 = np.expand_dims(inarray, 1)
+        tmp2 = self.tpls[..., np.newaxis, np.newaxis]
+        tmp3 = tmp1*tmp2
+        tmp4 = np.sum(tmp3, axis=0)
+        return tmp4
+    
+    def cython_lmm_forward(self, inarray: array) -> array:
+        cube = matrix_op.linearMixingModel_maps2cube(inarray, len(self.wavel_axis), self.ishape, self.tpls)
+        return cube
+
+    
+    def python_lmm_adjoint(self, cube: array) -> array:
+        maps = np.concatenate(
             [
                 np.sum(cube * tpl[..., np.newaxis, np.newaxis], axis=0)[np.newaxis, ...]
                 for tpl in self.tpls
             ],
             axis=0,
         )
-        # tmp2 = utils.apply_mask_FoV(self.mask, tmp)
-        return tmp
+        return maps
+    
+    def python_lmm_adjoint_details(self, cube: array) -> array:
+        maps = []
+        for m in range(self.ishape[0]):
+            tmp  = cube * self.tpls[..., np.newaxis, np.newaxis]
+            
+
+        maps = np.concatenate(
+            [
+                np.sum(cube * tpl[..., np.newaxis, np.newaxis], axis=0)[np.newaxis, ...]
+                for tpl in self.tpls
+            ],
+            axis=0,
+        )
+        return maps
+    
+    def cython_lmm_adjoint(self, cube: array) -> array:
+        maps = cythons_files.c_fast_LMM_cube2maps(len(self.wavel_axis), self.ishape[0], 
+                                                  self.ishape[1], self.ishape[2],
+                                                  self.tpls.astype(np.float32), cube.astype(np.float32))
+        return maps
+    
+    def numba_lmm_adjoint(self, inarray: array) -> array:
+        maps = matrix_op.linearMixingModel_cube2maps(inarray, len(self.wavel_axis), self.ishape, self.tpls)
+        return maps
 
 
     def sliceToCube(self, slices):
@@ -306,3 +356,4 @@ class SpectroLMM(LinOp):
         if self._shared_metadata is not None:
             dico = shared_dict.attach(self._shared_metadata.path)
             dico.delete() 
+

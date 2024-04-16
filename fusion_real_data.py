@@ -196,18 +196,16 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
         print("Real data selection")
         y_data = list_data[0].ravel()
     
-    mask = utils.make_mask_FoV(spectro.sliceToCube(y_data)) 
-
     quadCrit = fusion_spectro.QuadCriterion_MRS(mu_spectro=1, 
                                         y_spectro=np.copy(y_data), 
                                         model_spectro=spectro, 
-                                        mu_reg=14500000, 
-                                        mask=mask,
+                                        mu_reg=hyper, 
                                         printing=True, 
                                         gradient="separated")
     
-    value_init = np.load('/home/nmonnier/Data/JWST/Orion_bar/Mixing_results/145000000.npy')
+    value_init = np.load('/home/nmonnier/Data/JWST/Orion_bar/Mixing_results/TST/init.npy')
     res = quadCrit.run_method(method, niter, perf_crit = 1, calc_crit=True, value_init=value_init)
+    x_cube = spectro.get_cube(res.x)
 
     """
     Save results
@@ -216,6 +214,8 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
     np.save(result_directory + '/res_grad_norm.npy', res.grad_norm)
     np.save(result_directory + '/res_time.npy', res.time) 
     np.save(result_directory + '/res_crit_val.npy', quadCrit.L_crit_val)
+    np.save(result_directory + '/res_cube.npy', x_cube)
+
 
 if __name__ == '__main__':
     launch_fusion()

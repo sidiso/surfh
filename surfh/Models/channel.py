@@ -30,7 +30,7 @@ from surfh.Models import instru
 
 from surfh.Others import shared_dict
 from surfh.Others.AsyncProcessPoolLight import APPL
-from surfh.ToolsDir import cython_2D_interpolation, wrapper
+from surfh.ToolsDir import cython_2D_interpolation, matrix_op
 
 import matplotlib.pyplot as plt
 
@@ -252,7 +252,7 @@ class Channel(LinOp):
         local_beta_axis = shared_dict.attach(self._metadata_path)["local_beta_axis"]
         slices = self.slit_slices(slit_idx)
 
-        weights = wrapper.fov_weight(
+        weights = matrix_op.fov_weight(
             self.slit_local_fov(slit_idx),
             slices,
             local_alpha_axis,
@@ -434,21 +434,21 @@ class Channel(LinOp):
 
     def wblur(self, inarray: array, slit_idx: int) -> array:
         """Returns spectral blurring of inarray"""
-        return wrapper.wblur(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads if not self.serial else 1)
+        return matrix_op.wblur(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads if not self.serial else 1)
 
     def wdirac_blur(self, inarray: array, slit_idx: int) -> array:
         """Returns spectral blurring transpose of inarray using a dirac function.
            Only used to create generate cube from Forward data with applying Adjoint operator. """    
-        return wrapper.cubeToSlice(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx, 'dirac'), self.num_threads if not self.serial else 1)
+        return matrix_op.cubeToSlice(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx, 'dirac'), self.num_threads if not self.serial else 1)
    
     def wblur_t(self, inarray: array, slit_idx: int) -> array:
         """Returns spectral blurring transpose of inarray"""
-        return wrapper.wblur_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads if not self.serial else 1)
+        return matrix_op.wblur_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx), self.num_threads if not self.serial else 1)
 
     def wdirac_blur_t(self, inarray: array, slit_idx: int) -> array:
         """Returns spectral blurring transpose of inarray using a dirac function.
            Only used to create generate cube from Forward data with applying Adjoint operator. """    
-        return wrapper.sliceToCube_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx, 'dirac'), self.num_threads if not self.serial else 1)
+        return matrix_op.sliceToCube_t(inarray, self._wpsf(inarray.shape[2], self.beta_step, slit_idx, 'dirac'), self.num_threads if not self.serial else 1)
 
 
     def forward(self, inarray_f):

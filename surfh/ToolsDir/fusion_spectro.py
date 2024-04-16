@@ -14,44 +14,29 @@ import matplotlib.pyplot as plt
 import inspect
 
 class NpDiff_r(aljabr.LinOp): # dim = 3
-    def __init__(self, maps_shape, mask):
+    def __init__(self, maps_shape):
         super().__init__(
             ishape=maps_shape,
             oshape=maps_shape,
         )
-        self.mask = mask
     
     def forward(self, x):
-        x_masked = utils.apply_mask_FoV(self.mask, x)
-
         Dx_masked = - np.diff(np.pad(x, ((0, 0), (1, 0), (0, 0)), 'wrap'), axis=1)
-        
-        # Dx_masked[np.where(np.isnan(Dx_masked))] = 0
         return Dx_masked
 
     def adjoint(self, y):    
-        y_masked = utils.apply_mask_FoV(self.mask, y)
-
         Dy_masked = np.diff(np.pad(y, ((0, 0), (0, 1), (0, 0)), 'wrap'), axis=1)
-
-        #Dy_masked = utils.apply_mask_FoV(self.mask, Dy_masked)
-        # Dy_masked[np.where(np.isnan(Dy_masked))] = 0
-
         return Dy_masked
 
 class NpDiff_c(aljabr.LinOp): # dim = 3
-    def __init__(self, maps_shape, mask):
+    def __init__(self, maps_shape):
         super().__init__(
             ishape=maps_shape,
             oshape=maps_shape,
         )
-        self.mask=mask
 
     def forward(self, x):
-        x_masked = utils.apply_mask_FoV(self.mask, x)
-
         Dx_masked = - np.diff(np.pad(x, ((0, 0), (0, 0), (1, 0)), 'wrap'), axis=2)        
-        # Dx_masked[np.where(np.isnan(Dx_masked))] = 0
         return Dx_masked   
 
     def adjoint(self, y):
@@ -87,7 +72,6 @@ class QuadCriterion_MRS:
         y_spectro,
         model_spectro,
         mu_reg,
-        mask,
         printing=False,
         gradient="separated",
     ):
@@ -98,7 +82,6 @@ class QuadCriterion_MRS:
         n_spec = model_spectro.tpls.shape[0]
         self.n_spec = n_spec
         self.it = 1
-        self.mask = mask
 
         assert (
             type(mu_reg) == float
@@ -118,9 +101,9 @@ class QuadCriterion_MRS:
             diff_op_joint = Difference_Operator_Joint(shape_target)
             self.diff_op_joint = diff_op_joint
         elif gradient == "separated":
-            npdiff_r = NpDiff_r(shape_of_output, self.mask)
+            npdiff_r = NpDiff_r(shape_of_output)
             self.npdiff_r = npdiff_r
-            npdiff_c = NpDiff_c(shape_of_output, self.mask)
+            npdiff_c = NpDiff_c(shape_of_output)
             self.npdiff_c = npdiff_c
 
         if type(self.mu_reg) == list or type(self.mu_reg) == np.ndarray:

@@ -19,10 +19,13 @@ from collections import namedtuple
 from typing import List, Tuple
 import numpy as np
 from numpy import ndarray as array
+from numba import njit, prange
 
 from surfh.Models import instru
 from surfh.ToolsDir import cythons_files
 from surfh.Others.AsyncProcessPoolLight import APPL
+
+
 
 InputShape = namedtuple("InputShape", ["wavel", "alpha", "beta"])
 
@@ -192,3 +195,21 @@ def diffracted_psf(template, spsf, wpsf) -> List[array]:
     return wblur(weighted_psf, wpsf)
 
 
+def linearMixingModel_maps2cube(maps, NLambda, ishape, tpls):
+    cube = cythons_files.c_fast_LMM_maps2cube(NLambda,ishape[0], 
+                                              ishape[1], ishape[2],
+                                              tpls.astype(np.float32), maps.astype(np.float32))
+    return cube
+
+@njit(parallel=True)
+def linearMixingModel_cube2maps(cube, NLambda, ishape, tpls):
+    maps = np.zeros(ishape, dtype=tpls.dtype)
+    tmp = 0
+    for m in range(ishape[0]):
+        for i in prange(ishape[1]):
+            for j in range(ishape[2]):
+                for lam in range(NLambda):
+                    tmp += cube[lam, i, j]*tpls[m, lam]
+                maps[m,i,j] = tmp
+                tmp = 0
+    return maps

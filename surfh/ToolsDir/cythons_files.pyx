@@ -411,6 +411,30 @@ def c_fast_forward_TST(int NLambda, int Nmaps, int Nx, int Ny,
                 cube[lam, i, j] += maps[m, i, j]*templates[m, lam]
     return cube
 
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+@cython.cdivision(True)
+@cython.initializedcheck(False)
+def c_fast_LMM_maps2cube(int NLambda, int Nmaps, int Nx, int Ny,
+                       float[:,:] templates,
+                       float[:,:,:] maps):
+    cdef:
+        float[:,:,:] cube = np.zeros((NLambda, Nx, Ny), dtype=np.float32)
+        int m, lam, i, j = 0
+        float tmp = 0.
+    
+    with nogil, parallel():
+        for lam in prange(NLambda):
+            for i in range(Nx):
+                for j in range(Ny):
+                    for m in range(Nmaps):
+                        tmp += maps[m, i, j]*templates[m, lam]
+                    cube[lam, i, j] = tmp
+                    tmp = 0 
+    return cube
+
+
 @cython.wraparound(False)
 @cython.boundscheck(False)
 @cython.cdivision(True)
@@ -431,4 +455,27 @@ def c_fast_adjoint_TST(int NLambda, int Nmaps, int Nx, int Ny,
             j   = select_arr[pix, 2]
             maps[m, i, j] = maps[m, i, j] + cube[lam, i, j]*templates[m, lam]
 
+    return maps
+
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+@cython.cdivision(True)
+@cython.initializedcheck(False)
+def c_fast_LMM_cube2maps(int NLambda, int Nmaps, int Nx, int Ny,
+                       float[:,:] templates,
+                       float[:,:,:] cube):
+    cdef:
+        float[:,:,:] maps = np.zeros((Nmaps, Nx, Ny), dtype=np.float32)
+        int m, lam, i, j = 0
+        float tmp = 0.
+    
+    with nogil, parallel():
+        for m in range(Nmaps):
+            for lam in prange(NLambda):
+                for i in range(Nx):
+                    for j in range(Ny):
+                        maps[m, i, j] += cube[i, j, lam]*templates[m, lam]
+                    # maps[m, i, j] = tmp
+                    # tmp = 0 
     return maps

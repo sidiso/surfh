@@ -81,6 +81,8 @@ impulse_response = np.ones((1, tpl_ss)) / tpl_ss
 tpl = conv2(tpl, impulse_response, "same")[:, ::tpl_ss]
 wavel_axis = wavel_axis[::tpl_ss]
 
+# Each template is normalized by its median
+n_tpl = np.array([template/np.median(template) for template in tpl])
 
 if "sim_cube" not in globals():
     print("Compute sim cube")
@@ -106,6 +108,7 @@ spectroModel = spectro.Spectro(
     serial=True,
 )
 
+
 # Generate data projected into the cube
 data = np.load('/home/nmonnier/Data/JWST/Orion_bar/Single_numpy_slices/' + filename +'.npy')
 data[np.where(np.isnan(data))] = 0
@@ -113,17 +116,14 @@ y_cube = spectroModel.sliceToCube(data)
 selection_arr = np.where(y_cube < 1e-5)
 fast_selection_arr = np.array(np.where(y_cube > 1e-5)).T
 
-spectroModel.__del__()
-del spectroModel
-
-
-STModel = mixing.MixingST(templates=tpl,
+STModel = mixing.MixingST(templates=n_tpl,
                           alpha_axis=origin_alpha_axis,
                           beta_axis=origin_beta_axis,   
                           wavel_axis=wavel_axis,
                           selection_arr=selection_arr,
                           fast_selection_arr=fast_selection_arr)
-
+spectroModel.__del__()
+del spectroModel
 data = STModel.forward(maps)
 # ad_data = STModel.adjoint(data)
 # ad_data2 = STModel.c_fast_adjoint(data)
@@ -137,7 +137,7 @@ print("Time Cython TST = ", e1-t1)
 quadcriterion = fusion_mixing.QuadCriterion_MRS(mu_spectro=1,
                                                 y_spectro=y_cube,
                                                 model_mixing=STModel,
-                                                mu_reg=10e6,
+                                                mu_reg=10e8,
                                                 printing=True,
                                                 gradient="separated")
 
@@ -171,5 +171,7 @@ def plot_maps(estimated_maps):
             fig.colorbar(m, ax=axes[i,j])
 
 
+# path = '/home/nmonnier/Data/JWST/Orion_bar/Mixing_results/TST/'
+# np.save(path + 'init.npy', res.x)
 plot_maps(res.x)
 plt.show()

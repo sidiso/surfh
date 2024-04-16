@@ -100,7 +100,33 @@ cube[np.where(np.isnan(cube))] = 0
 origin_alpha_axis += channels[0].fov.origin.alpha
 origin_beta_axis += channels[0].fov.origin.beta
 
-# spectro = spectro.Spectro(
+spectro = spectrolmm.SpectroLMM(
+    channels, # List of channels and bands 
+    origin_alpha_axis, # Alpha Coordinates of the cube
+    origin_beta_axis, # Beta Coordinates of the cube
+    wavel_axis, # Wavelength axis of the cube
+    sotf, # Optical PSF
+    pointings, # List of pointing (mainly used for dithering)
+    tpl,
+    verbose=True,
+    serial=False,
+)
+
+data = np.load('/home/nmonnier/Data/JWST/Orion_bar/Single_numpy_slices/' + filename +'.npy')
+data[np.where(np.isnan(data))] = 0
+
+
+acube = spectro.adjoint(data)
+ndata = spectro.forward(acube)
+test = spectro.sliceToCube(data)
+amaps = spectro.python_lmm_adjoint(test)
+pythoncube = spectro.python_lmm_forward(amaps)
+
+
+# mask = utils.make_mask_FoV(test)
+
+
+# spectroModel = spectro.Spectro(
 #     channels, # List of channels and bands 
 #     origin_alpha_axis, # Alpha Coordinates of the cube
 #     origin_beta_axis, # Beta Coordinates of the cube
@@ -108,36 +134,18 @@ origin_beta_axis += channels[0].fov.origin.beta
 #     sotf, # Optical PSF
 #     pointings, # List of pointing (mainly used for dithering)
 #     verbose=True,
-#     serial=False,
+#     serial=True,
 # )
 
-# data = np.load('/home/nmonnier/Data/JWST/Orion_bar/Single_numpy_slices/' + filename +'.npy')
+# path = '/home/nmonnier/Data/JWST/Orion_bar/Single_numpy'
+# interpolated_cube = np.load(path + '/ChannelCube_ch_2_short_s3d_0210f_00001.npy')
+# print("Build Slices")
+# slices = spectroModel.channels[0].realData_cubeToSlice(interpolated_cube)
+
+# data = np.load(slices_directory + filename +'.npy')
 # data[np.where(np.isnan(data))] = 0
-# test = spectro.sliceToCube(data)
-
-# mask = utils.make_mask_FoV(test)
-
-
-spectroModel = spectro.Spectro(
-    channels, # List of channels and bands 
-    origin_alpha_axis, # Alpha Coordinates of the cube
-    origin_beta_axis, # Beta Coordinates of the cube
-    wavel_axis, # Wavelength axis of the cube
-    sotf, # Optical PSF
-    pointings, # List of pointing (mainly used for dithering)
-    verbose=True,
-    serial=True,
-)
-
-path = '/home/nmonnier/Data/JWST/Orion_bar/Single_numpy'
-interpolated_cube = np.load(path + '/ChannelCube_ch_2_short_s3d_0210f_00001.npy')
-print("Build Slices")
-slices = spectroModel.channels[0].realData_cubeToSlice(interpolated_cube)
-
-data = np.load(slices_directory + filename +'.npy')
-data[np.where(np.isnan(data))] = 0
-print("Build Cube")
-y_cube = spectroModel.sliceToCube(data)
+# print("Build Cube")
+# y_cube = spectroModel.sliceToCube(data)
 
 
 
