@@ -133,37 +133,8 @@ class SpectroLMM(LinOp):
             np.expand_dims(maps, 1) * self.tpls[..., np.newaxis, np.newaxis], axis=0
         )
         return cube
-
-    def forward(self, inarray: array) -> array:
-        out = np.zeros(self.oshape)
-        if self.verbose:
-            logger.info(f"Cube generation")
-        cube = np.sum(
-            np.expand_dims(inarray, 1) * self.tpls[..., np.newaxis, np.newaxis], axis=0
-        )
-
-        if self.verbose:
-            logger.info(f"Spatial blurring DFT2({inarray.shape})")
-        
-        blurred_f = dft(cube) * self.sotf
-
-        for idx, chan in enumerate(self.channels):
-            if self.verbose:
-                logger.info(f"Channel {chan.name}")
-            APPL.runJob("Forward_id:%d"%idx, chan.forward_multiproc, 
-                        args=(blurred_f,), 
-                        serial=self.serial)
-            
-        APPL.awaitJobResult("Forward*", progress=self.verbose)
-        
-        self._shared_metadata.reload()
-        for idx, chan in enumerate(self.channels):
-            fw_data = self._shared_metadata[chan.name]["fw_data"]
-            out[self._idx[idx] : self._idx[idx + 1]] = fw_data.ravel()
-
-        return out 
     
-    def forward_jax(self, inarray: array) -> array:
+    def forward(self, inarray: array) -> array:
         out = np.zeros(self.oshape)
 
         cube = jax_utils.lmm_maps2cube(inarray, self.tpls)
@@ -184,43 +155,8 @@ class SpectroLMM(LinOp):
 
         return out 
 
+
     def adjoint(self, inarray: array) -> array:
-        tmp = np.zeros(
-            (self.wavel_axis.shape[0], self.ishape[1], self.ishape[2] // 2 + 1), dtype=np.complex128
-        )
-        for idx, chan in enumerate(self.channels):
-            if self.verbose:
-                logger.info(f"Channel {chan.name}")
-            APPL.runJob("Adjoint_id:%d"%idx, chan.adjoint_multiproc, 
-                        args=(np.reshape(inarray[self._idx[idx] : self._idx[idx + 1]], chan.oshape),), 
-                        serial=self.serial)
-
-        APPL.awaitJobResult("Adjoint*", progress=self.verbose)
-
-        self._shared_metadata.reload()
-        for idx, chan in enumerate(self.channels):
-            ad_data = self._shared_metadata[chan.name]["ad_data"]
-            tmp += ad_data
-            self._shared_metadata[chan.name]["ad_data"] = np.zeros_like(self._shared_metadata[chan.name]["ad_data"])
-
-
-        if self.verbose:
-            logger.info(f"Spatial blurring^T : IDFT2({tmp.shape})")
-
-        print(f"IDT shape : {tmp.shape} || {self.sotf.conj().shape}")
-        cube = idft(tmp * self.sotf.conj(), self.imshape)
-
-        maps = np.concatenate(
-            [
-                np.sum(cube * tpl[..., np.newaxis, np.newaxis], axis=0)[np.newaxis, ...]
-                for tpl in self.tpls
-            ],
-            axis=0,
-        )
-
-        return maps
-
-    def adjoint_jax(self, inarray: array) -> array:
         cube = np.zeros(
             (self.wavel_axis.shape[0], self.ishape[1], self.ishape[2] // 2 + 1), dtype=np.complex128
         )
@@ -234,24 +170,6 @@ class SpectroLMM(LinOp):
             logger.info(f"Spatial blurring^T : IDFT2({cube.shape})")
         maps = jax_utils.lmm_cube2maps_idft_mult(cube, self.sotf_jax.conj(), self.tpls_jax, (251,251))
 
-        return maps
-
-
-    def python_lmm_forward(self, inarray: array) -> array:
-        cube = np.sum(
-            np.expand_dims(inarray, 1) * self.tpls[..., np.newaxis, np.newaxis], axis=0
-        )
-        return cube
-
-
-    def python_lmm_adjoint(self, cube: array) -> array:
-        maps = np.concatenate(
-            [
-                np.sum(cube * tpl[..., np.newaxis, np.newaxis], axis=0)[np.newaxis, ...]
-                for tpl in self.tpls
-            ],
-            axis=0,
-        )
         return maps
 
 
@@ -374,34 +292,3 @@ class SpectroLMM(LinOp):
         if self._shared_metadata is not None:
             dico = shared_dict.attach(self._shared_metadata.path)
             dico.delete() 
-
-
-def jax_lmm_forward(maps, NLambda, ishape, tpls):
-    maps = jnp.zeros((NLambda, ishape[1], ishape[2]))
-    cube = jnp.sum(
-            jnp.expand_dims(maps, 1) * tpls[..., jnp.newaxis, jnp.newaxis], axis=0
-        )
-    return cube
-
-
-def jax_lmm_adjoint(cube, tpls):
-    maps = jnp.concatenate(
-            [
-                jnp.sum(cube * tpl[..., jnp.newaxis, jnp.newaxis], axis=0)[jnp.newaxis, ...]
-                for tpl in tpls
-            ],
-            axis=0,
-        )
-    return maps
-
-def jax_fast_lmm_adjoint(cube, NLambda, ishape, tpls):
-    maps = jnp.zeros(ishape, dtype=tpls.dtype)
-    tmp = 0
-    for m in range(ishape[0]):
-        for i in range(ishape[1]):
-            for j in range(ishape[2]):
-                for lam in range(3631):
-                    tmp += cube[lam, i, j]*tpls[m, lam]
-                maps[m,i,j] = tmp
-                tmp = 0
-    return maps

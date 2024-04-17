@@ -342,14 +342,6 @@ class Channel(LinOp):
                 beta_coord.ravel()
             ]
         ).T          
-
-        # for i, p in enumerate(local_coords.T):
-        #     if not np.logical_and(np.all(alpha_coord[i] <= p),
-        #                             np.all(p <= beta_coord[i])):
-        #         raise ValueError("One of the requested xi is out of bounds "
-        #                             "in dimension %d" % i)
-        # out_of_bounds = None
-
         return cython_2D_interpolation.interpn( (alpha_axis, beta_axis), 
                                               inarray, 
                                               local_coords, 
@@ -472,24 +464,6 @@ class Channel(LinOp):
                     ..., np.newaxis
                 ]* self.wblur(sliced).sum(axis=2)
                
-    
-    def forward_multiproc(self, inarray_f):
-        """inarray is supposed in global coordinate, spatially blurred and in Fourier space.
-
-        Output is an array of shape (pointing, slit, wavelength, alpha)."""
-        # [pointing, slit, λ', α]
-        out = shared_dict.attach(self._metadata_path)["fw_data"]
-        blurred = self.sblur(inarray_f[self.wslice, ...])
-        for p_idx, pointing in enumerate(self.pointings):
-            gridded = self.gridding(blurred, pointing)
-            for slit_idx in range(self.instr.n_slit):
-                # Slicing, weighting and α subsampling for SR
-                sliced = self.slicing(gridded, slit_idx)[
-                    :, : self.oshape[3] * self.srf : self.srf
-                ]
-                out[p_idx, slit_idx, :, :] = self.instr.pce[
-                    ..., np.newaxis
-                ]* self.wblur(sliced, slit_idx).sum(axis=2)
 
     def forward_multiproc_jax(self, inarray_f):
         """inarray is supposed in global coordinate, spatially blurred and in Fourier space.
@@ -536,40 +510,6 @@ class Channel(LinOp):
         
         out[self.wslice, ...] += self.fourier_duplicate_t(blurred)
 
-
-    
-    def adjoint_multiproc(self, measures):
-        out = shared_dict.attach(self._metadata_path)["ad_data"]
-        blurred = np.zeros(self.cshape)
-        for p_idx, pointing in enumerate(self.pointings):
-            gridded = np.zeros(self.local_shape)
-            for slit_idx in range(self.instr.n_slit):
-                sliced = np.zeros(self.slit_shape(slit_idx))
-                # α zero-filling, λ blurrling_t, and β duplication
-                tmp = np.repeat(
-                        np.expand_dims(
-                            measures[p_idx, slit_idx] * self.instr.pce[..., np.newaxis],
-                            axis=2,
-                        ),
-                        sliced.shape[2],
-                        axis=2,
-                    )
-
-                tmp2 = self.wblur_t(tmp, slit_idx)
-                sliced[:, : self.oshape[3] * self.srf : self.srf] = tmp2
-                
-                gridded += self.slicing_t(sliced, slit_idx)
-           
-            _otf_sr = udft.ir2fr(np.ones((self.srf, 1)), self.local_shape[1:])[np.newaxis, ...]
-
-            tmp3 = dft(gridded) * _otf_sr.conj() 
-            tmp4 = idft(tmp3, self.local_shape[1:])
-
-            blurred += self.gridding_t(np.array(tmp4).astype(np.float64), pointing)
-            # blurred += self.gridding_t(gridded, pointing)
-
-        # out[self.wslice, ...] += self.fourier_duplicate_t(blurred)
-        out[self.wslice, ...] += dft(blurred)
 
     def adjoint_multiproc_jax(self, measures):
         # out = shared_dict.attach(self._metadata_path)["ad_data"]
