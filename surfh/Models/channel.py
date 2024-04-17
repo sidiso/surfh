@@ -30,10 +30,11 @@ from surfh.Models import instru
 
 from surfh.Others import shared_dict
 from surfh.Others.AsyncProcessPoolLight import APPL
-from surfh.ToolsDir import cython_2D_interpolation, matrix_op
+from surfh.ToolsDir import cython_2D_interpolation, matrix_op, jax_utils
 
 import matplotlib.pyplot as plt
-import jax
+
+import jax.numpy as jnp
 
 InputShape = namedtuple("InputShape", ["wavel", "alpha", "beta"])
 
@@ -490,37 +491,24 @@ class Channel(LinOp):
                     ..., np.newaxis
                 ]* self.wblur(sliced, slit_idx).sum(axis=2)
 
-    def cubeToSlice(self, cube):
-        """cube is supposed in global coordinate in Fourier space for a specific Channel and band.
-        slices is an array of shape (pointing, slit, wavelength, alpha).
-        Reshape input cube into slices without spatial and spectral blurring 
-        done in Forward operator.
-        """
+    def forward_multiproc_jax(self, inarray_f):
+        """inarray is supposed in global coordinate, spatially blurred and in Fourier space.
+        Output is an array of shape (pointing, slit, wavelength, alpha)."""
         # [pointing, slit, λ', α]
-        slices = np.zeros(self.oshape)
-        blurred = idft(cube[self.wslice, ...], self.imshape) # Replace sblur
-
+        out = shared_dict.attach(self._metadata_path)["fw_data"]
+        blurred = self.sblur(inarray_f[self.wslice, ...])
         for p_idx, pointing in enumerate(self.pointings):
             gridded = self.gridding(blurred, pointing)
             for slit_idx in range(self.instr.n_slit):
                 # Slicing, weighting and α subsampling for SR
-                sliced = self.slicing_cube2Fente(gridded, slit_idx)[
+                sliced = self.slicing(gridded, slit_idx)[
                     :, : self.oshape[3] * self.srf : self.srf
                 ]
-                slices[p_idx, slit_idx, :, :] = self.wdirac_blur(sliced, slit_idx).sum(axis=2) #TODO Change: That
-        return slices      
-
-    def realData_cubeToSlice(self, cube):
-        slices = np.zeros(self.oshape[1:]) # Remove pointing dimension
-        gridded = self.gridding(cube, instru.Coord(0, 0))
-        for slit_idx in range(self.instr.n_slit):
-            sliced = self.slicing_cube2Fente(gridded, slit_idx)[
-                    :, : self.oshape[3] * self.srf : self.srf
-                ]
-            slices[slit_idx, :, :] = sliced.sum(axis=2) # Only sum on the Beta axis
-        return slices      
-
-          
+                out[p_idx, slit_idx, :, :] = self.instr.pce[
+                    ..., np.newaxis
+                ]*jax_utils.wblur(sliced, self._wpsf(sliced.shape[2], self.beta_step, slit_idx))
+                
+                
 
     def adjoint(self, measures):
         out = shared_dict.attach(self._metadata_path)["ad_data"]
@@ -582,6 +570,85 @@ class Channel(LinOp):
 
         # out[self.wslice, ...] += self.fourier_duplicate_t(blurred)
         out[self.wslice, ...] += dft(blurred)
+
+    def adjoint_multiproc_jax(self, measures):
+        # out = shared_dict.attach(self._metadata_path)["ad_data"]
+        out = np.zeros(self.ishape, dtype=np.complex128)
+        blurred = np.zeros(self.cshape)
+        for p_idx, pointing in enumerate(self.pointings):
+            gridded = np.zeros(self.local_shape)
+            for slit_idx in range(self.instr.n_slit):
+                sliced = np.zeros(self.slit_shape(slit_idx))
+                # α zero-filling, λ blurrling_t, and β duplication
+                tmp = np.repeat(
+                        np.expand_dims(
+                            measures[p_idx, slit_idx] * self.instr.pce[..., np.newaxis],
+                            axis=2,
+                        ),
+                        sliced.shape[2],
+                        axis=2,
+                    )
+                
+                sliced[:, : self.oshape[3] * self.srf : self.srf] = jax_utils.wblur_t(tmp, 
+                                                                                      self._wpsf(tmp.shape[2], 
+                                                                                                 self.beta_step, 
+                                                                                                 slit_idx)
+                                                                                      ) 
+                
+                slices = self.slit_slices(slit_idx)
+                weights = self.slit_weights(slit_idx)
+                gridded[:, slices[0], slices[1]] += sliced * weights
+           
+            _otf_sr = udft.ir2fr(np.ones((self.srf, 1)), self.local_shape[1:])[np.newaxis, ...]
+            tmp3 = dft(gridded) * _otf_sr.conj() 
+            tmp4 = idft(tmp3, self.local_shape[1:])
+            blurred += self.gridding_t(np.array(tmp4).astype(np.float64), pointing)
+
+        
+        out[self.wslice, ...] += np.array(dft(blurred))
+        return out
+
+
+
+
+
+
+
+
+    def cubeToSlice(self, cube):
+        """cube is supposed in global coordinate in Fourier space for a specific Channel and band.
+        slices is an array of shape (pointing, slit, wavelength, alpha).
+        Reshape input cube into slices without spatial and spectral blurring 
+        done in Forward operator.
+        """
+        # [pointing, slit, λ', α]
+        slices = np.zeros(self.oshape)
+        blurred = idft(cube[self.wslice, ...], self.imshape) # Replace sblur
+
+        for p_idx, pointing in enumerate(self.pointings):
+            gridded = self.gridding(blurred, pointing)
+            for slit_idx in range(self.instr.n_slit):
+                # Slicing, weighting and α subsampling for SR
+                sliced = self.slicing_cube2Fente(gridded, slit_idx)[
+                    :, : self.oshape[3] * self.srf : self.srf
+                ]
+                slices[p_idx, slit_idx, :, :] = self.wdirac_blur(sliced, slit_idx).sum(axis=2) #TODO Change: That
+        return slices      
+
+    def realData_cubeToSlice(self, cube):
+        slices = np.zeros(self.oshape[1:]) # Remove pointing dimension
+        gridded = self.gridding(cube, instru.Coord(0, 0))
+        for slit_idx in range(self.instr.n_slit):
+            sliced = self.slicing_cube2Fente(gridded, slit_idx)[
+                    :, : self.oshape[3] * self.srf : self.srf
+                ]
+            slices[slit_idx, :, :] = sliced.sum(axis=2) # Only sum on the Beta axis
+        return slices      
+
+
+
+
+
 
 
     def sliceToCube(self, measures):

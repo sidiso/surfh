@@ -116,14 +116,18 @@ data = np.load('/home/nmonnier/Data/JWST/Orion_bar/Single_numpy_slices/' + filen
 data[np.where(np.isnan(data))] = 0
 
 
-acube = spectro.adjoint(data)
-ndata = spectro.forward(acube)
-test = spectro.sliceToCube(data)
-j_cube = spectro.adjoint_jax(data)
-f_data = spectro.forward_jax(acube)
+ref_ad = spectro.adjoint(data)
+ref_fw = spectro.forward(ref_ad)
 
+start = time.time()
+jax_ad = spectro.adjoint_jax(data)
+print(f"Time jax Adjoint = {time.time()-start}")
+start = time.time()
+jax_fw = spectro.forward_jax(jax_ad)
+print(f"Time jax Forward = {time.time()-start}")
 
-amaps = spectro.python_lmm_adjoint(test)
+p_cube = spectro.sliceToCube(data)
+amaps = spectro.python_lmm_adjoint(p_cube)
 pythoncube = spectro.python_lmm_forward(amaps)
 
 

@@ -62,11 +62,13 @@ class SpectroLMM(LinOp):
         self.beta_axis = beta_axis
 
         self.sotf = sotf
+        self.sotf_jax = jnp.array(sotf)
         self.pointings = pointings
         self.verbose = verbose
         self.serial = serial
 
         self.tpls = templates
+        self.tpls_jax = jnp.array(templates)
 
         srfs = instru.get_srf(
             [chan.det_pix_size for chan in instrs],
@@ -136,7 +138,9 @@ class SpectroLMM(LinOp):
         out = np.zeros(self.oshape)
         if self.verbose:
             logger.info(f"Cube generation")
-        cube = matrix_op.linearMixingModel_maps2cube(inarray, len(self.wavel_axis), self.ishape, self.tpls)
+        cube = np.sum(
+            np.expand_dims(inarray, 1) * self.tpls[..., np.newaxis, np.newaxis], axis=0
+        )
 
         if self.verbose:
             logger.info(f"Spatial blurring DFT2({inarray.shape})")
@@ -161,25 +165,18 @@ class SpectroLMM(LinOp):
     
     def forward_jax(self, inarray: array) -> array:
         out = np.zeros(self.oshape)
-        if self.verbose:
-            logger.info(f"Cube generation")
-        cube = matrix_op.linearMixingModel_maps2cube(inarray, len(self.wavel_axis), self.ishape, self.tpls)
 
-        if self.verbose:
-            logger.info(f"Spatial blurring DFT2({inarray.shape})")
+        cube = jax_utils.lmm_maps2cube(inarray, self.tpls)
         
-        f_cube = jax.numpy.fft.rfftn(cube, axes=range(-2, 0), norm="ortho")
-        blurred_f = np.array(f_cube) * self.sotf
+        # f_cube = jax_utils.dft(cube)
+
+        blurred_f = np.array(jax_utils.dft_mult(cube, self.sotf))
 
         for idx, chan in enumerate(self.channels):
             if self.verbose:
                 logger.info(f"Channel {chan.name}")
-            APPL.runJob("Forward_id:%d"%idx, chan.forward_multiproc, 
-                        args=(blurred_f,), 
-                        serial=self.serial)
-            
-        APPL.awaitJobResult("Forward*", progress=self.verbose)
-        
+            chan.forward_multiproc_jax(blurred_f,)
+                    
         self._shared_metadata.reload()
         for idx, chan in enumerate(self.channels):
             fw_data = self._shared_metadata[chan.name]["fw_data"]
@@ -213,41 +210,29 @@ class SpectroLMM(LinOp):
         print(f"IDT shape : {tmp.shape} || {self.sotf.conj().shape}")
         cube = idft(tmp * self.sotf.conj(), self.imshape)
 
-        maps = matrix_op.linearMixingModel_cube2maps(cube, len(self.wavel_axis), self.ishape, self.tpls)
+        maps = np.concatenate(
+            [
+                np.sum(cube * tpl[..., np.newaxis, np.newaxis], axis=0)[np.newaxis, ...]
+                for tpl in self.tpls
+            ],
+            axis=0,
+        )
 
         return maps
 
-
     def adjoint_jax(self, inarray: array) -> array:
-        tmp = np.zeros(
+        cube = np.zeros(
             (self.wavel_axis.shape[0], self.ishape[1], self.ishape[2] // 2 + 1), dtype=np.complex128
         )
         for idx, chan in enumerate(self.channels):
             if self.verbose:
                 logger.info(f"Channel {chan.name}")
-            APPL.runJob("Adjoint_id:%d"%idx, chan.adjoint_multiproc, 
-                        args=(np.reshape(inarray[self._idx[idx] : self._idx[idx + 1]], chan.oshape),), 
-                        serial=self.serial)
-
-        APPL.awaitJobResult("Adjoint*", progress=self.verbose)
-
-        self._shared_metadata.reload()
-        for idx, chan in enumerate(self.channels):
-            ad_data = self._shared_metadata[chan.name]["ad_data"]
-            tmp += ad_data
-            self._shared_metadata[chan.name]["ad_data"] = np.zeros_like(self._shared_metadata[chan.name]["ad_data"])
+            cube += chan.adjoint_multiproc_jax(np.reshape(inarray[self._idx[idx] : self._idx[idx + 1]], chan.oshape),)
 
 
         if self.verbose:
-            logger.info(f"Spatial blurring^T : IDFT2({tmp.shape})")
-
-        print(f"IDT shape : {tmp.shape} || {self.sotf.conj().shape}")
-        # cube = idft(tmp * self.sotf.conj(), self.imshape)
-
-        tmp2 = tmp * self.sotf.conj()
-        cube = jax.numpy.fft.irfftn(tmp2, (251,251), axes=range(-len((251,251)), 0), norm="ortho")
-        
-        maps = jax_utils.lmm_cube2maps(cube, self.tpls)
+            logger.info(f"Spatial blurring^T : IDFT2({cube.shape})")
+        maps = jax_utils.lmm_cube2maps_idft_mult(cube, self.sotf_jax.conj(), self.tpls_jax, (251,251))
 
         return maps
 
