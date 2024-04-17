@@ -31,13 +31,14 @@ from surfh.Models import instru, channel
 
 from surfh.Others import shared_dict
 from surfh.Others.AsyncProcessPoolLight import APPL
-from surfh.ToolsDir import utils
+from surfh.ToolsDir import utils, jax_utils
 
 import matplotlib.pyplot as plt
 
 from numba import njit, prange
 
 import jax
+import jax.numpy as jnp
 
 InputShape = namedtuple("InputShape", ["wavel", "alpha", "beta"])
 
@@ -245,8 +246,8 @@ class SpectroLMM(LinOp):
 
         tmp2 = tmp * self.sotf.conj()
         cube = jax.numpy.fft.irfftn(tmp2, (251,251), axes=range(-len((251,251)), 0), norm="ortho")
-
-        maps = matrix_op.linearMixingModel_cube2maps(np.array(cube), len(self.wavel_axis), self.ishape, self.tpls)
+        
+        maps = jax_utils.lmm_cube2maps(cube, self.tpls)
 
         return maps
 
@@ -257,18 +258,7 @@ class SpectroLMM(LinOp):
         )
         return cube
 
-    def python_lmm_forward_details(self, inarray: array) -> array:
-        tmp1 = np.expand_dims(inarray, 1)
-        tmp2 = self.tpls[..., np.newaxis, np.newaxis]
-        tmp3 = tmp1*tmp2
-        tmp4 = np.sum(tmp3, axis=0)
-        return tmp4
-    
-    def cython_lmm_forward(self, inarray: array) -> array:
-        cube = matrix_op.linearMixingModel_maps2cube(inarray, len(self.wavel_axis), self.ishape, self.tpls)
-        return cube
 
-    
     def python_lmm_adjoint(self, cube: array) -> array:
         maps = np.concatenate(
             [
@@ -277,31 +267,6 @@ class SpectroLMM(LinOp):
             ],
             axis=0,
         )
-        return maps
-    
-    def python_lmm_adjoint_details(self, cube: array) -> array:
-        maps = []
-        for m in range(self.ishape[0]):
-            tmp  = cube * self.tpls[..., np.newaxis, np.newaxis]
-            
-
-        maps = np.concatenate(
-            [
-                np.sum(cube * tpl[..., np.newaxis, np.newaxis], axis=0)[np.newaxis, ...]
-                for tpl in self.tpls
-            ],
-            axis=0,
-        )
-        return maps
-    
-    def cython_lmm_adjoint(self, cube: array) -> array:
-        maps = cythons_files.c_fast_LMM_cube2maps(len(self.wavel_axis), self.ishape[0], 
-                                                  self.ishape[1], self.ishape[2],
-                                                  self.tpls.astype(np.float32), cube.astype(np.float32))
-        return maps
-    
-    def numba_lmm_adjoint(self, inarray: array) -> array:
-        maps = matrix_op.linearMixingModel_cube2maps(inarray, len(self.wavel_axis), self.ishape, self.tpls)
         return maps
 
 
@@ -425,3 +390,33 @@ class SpectroLMM(LinOp):
             dico = shared_dict.attach(self._shared_metadata.path)
             dico.delete() 
 
+
+def jax_lmm_forward(maps, NLambda, ishape, tpls):
+    maps = jnp.zeros((NLambda, ishape[1], ishape[2]))
+    cube = jnp.sum(
+            jnp.expand_dims(maps, 1) * tpls[..., jnp.newaxis, jnp.newaxis], axis=0
+        )
+    return cube
+
+
+def jax_lmm_adjoint(cube, tpls):
+    maps = jnp.concatenate(
+            [
+                jnp.sum(cube * tpl[..., jnp.newaxis, jnp.newaxis], axis=0)[jnp.newaxis, ...]
+                for tpl in tpls
+            ],
+            axis=0,
+        )
+    return maps
+
+def jax_fast_lmm_adjoint(cube, NLambda, ishape, tpls):
+    maps = jnp.zeros(ishape, dtype=tpls.dtype)
+    tmp = 0
+    for m in range(ishape[0]):
+        for i in range(ishape[1]):
+            for j in range(ishape[2]):
+                for lam in range(3631):
+                    tmp += cube[lam, i, j]*tpls[m, lam]
+                maps[m,i,j] = tmp
+                tmp = 0
+    return maps
