@@ -130,3 +130,5 @@ def fov_weight_jax(
         ), f"Weight of last beta observed pixel in slit must be in [0, 1] ({wght:.2f})"
 
     return weights
+
+

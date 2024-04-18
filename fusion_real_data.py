@@ -56,23 +56,23 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
         mask_directory      = data_dir + 'Single_mask/'
 
     mu = str(hyper)
-    mu = mu.split('.')
-    if len(mu[0]) == 1:
-        mu[0] = '00'+ mu[0]
-    elif len(mu[0]) == 2:
-        mu[0] = '0'+ mu[0]
+    # mu = mu.split('.')
+    # if len(mu[0]) == 1:
+    #     mu[0] = '00'+ mu[0]
+    # elif len(mu[0]) == 2:
+    #     mu[0] = '0'+ mu[0]
 
-    if len(mu[1]) == 1:
-        mu[1] = mu[1] + '00'
-    elif len(mu[1]) == 2:
-        mu[1] = mu[1] + '0'
-    mu = mu[0] + mu[1] 
+    # if len(mu[1]) == 1:
+    #     mu[1] = mu[1] + '00'
+    # elif len(mu[1]) == 2:
+    #     mu[1] = mu[1] + '0'
+    # mu = mu[0] + mu[1] 
 
     val = str(value_init)
     val = val.split('.')
     if len(val[0]) == 1:
         val[0] = '00'+ val[0]
-    elif len(mu[0]) == 2:
+    elif len(val[0]) == 2:
         val[0] = '0'+ val[0]
 
     if len(val[1]) == 1:
@@ -203,7 +203,8 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
                                         printing=True, 
                                         gradient="separated")
     
-    value_init = np.load('/home/nmonnier/Data/JWST/Orion_bar/Mixing_results/TST/init.npy')
+    value_init = np.load('/home/nmonnier/Data/JWST/Orion_bar/Mixing_results/TST/update_init_2.npy')
+
     res = quadCrit.run_method(method, niter, perf_crit = 1, calc_crit=True, value_init=value_init)
     x_cube = spectro.get_cube(res.x)
 
