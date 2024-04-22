@@ -327,3 +327,10 @@ class MixingST(LinOp):
         
         self.TST = TST
         return TST
+
+
+    def mapsToCube(self, maps):
+        cube = np.sum(
+            np.expand_dims(maps, 1) * self.templates[..., np.newaxis, np.newaxis], axis=0
+        )
+        return cube 

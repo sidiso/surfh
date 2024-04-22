@@ -82,7 +82,7 @@ tpl = conv2(tpl, impulse_response, "same")[:, ::tpl_ss]
 wavel_axis = wavel_axis[::tpl_ss]
 
 # Each template is normalized by its median
-n_tpl = np.array([template/np.median(template) for template in tpl])
+# tpl = np.array([template/np.median(template) for template in tpl])
 
 if "sim_cube" not in globals():
     print("Compute sim cube")
@@ -113,10 +113,11 @@ spectroModel = spectro.Spectro(
 data = np.load('/home/nmonnier/Data/JWST/Orion_bar/Single_numpy_slices/' + filename +'.npy')
 data[np.where(np.isnan(data))] = 0
 y_cube = spectroModel.sliceToCube(data)
+
 selection_arr = np.where(y_cube < 1e-5)
 fast_selection_arr = np.array(np.where(y_cube > 1e-5)).T
 
-STModel = mixing.MixingST(templates=n_tpl,
+STModel = mixing.MixingST(templates=tpl,
                           alpha_axis=origin_alpha_axis,
                           beta_axis=origin_beta_axis,   
                           wavel_axis=wavel_axis,
@@ -130,7 +131,7 @@ data = STModel.forward(maps)
 
 t1 = time.time()
 TST1 = STModel.fast_precompute_TST()
-e1 = time.time()
+e1 = time.time()    
 print("Time Cython TST = ", e1-t1)
 
 
@@ -141,7 +142,7 @@ quadcriterion = fusion_mixing.QuadCriterion_MRS(mu_spectro=1,
                                                 printing=True,
                                                 gradient="separated")
 
-res = quadcriterion.run_method('lcg', 10000, value_init=0.5, calc_crit = False)
+res = quadcriterion.run_method('lcg', 5000, value_init=0.5, calc_crit = False)
 
 # def plot_maps_share(true_maps, estimated_maps):
 #     n_rows = true_maps.shape[0]
