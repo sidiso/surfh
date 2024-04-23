@@ -142,6 +142,11 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
     impulse_response = np.ones((1, tpl_ss)) / tpl_ss
     tpl = conv2(tpl, impulse_response, "same")[:, ::tpl_ss]
     wavel_axis = wavel_axis[::tpl_ss]
+
+    if norm :
+        # Each template is normalized by its median
+        tpl = np.array([template/np.median(template) for template in tpl])
+
     #spsf = utils.gaussian_psf(wavel_axis, step_Angle.degree)
     spsf = np.load(psf_directory + 'psfs_pixscale0.025_fov11.25_date_300123.npy')
     spsf = spsf[:, (100-margin):(351+margin), (100-margin):(351+margin)]
@@ -212,7 +217,7 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
     
     value_init = np.load(init_directory + 'init.npy')
 
-    res = quadCrit.run_method(method, niter, perf_crit = 1, calc_crit=True, value_init=value_init)
+    res = quadCrit.run_method(method, niter, perf_crit = 1, calc_crit=False, value_init=value_init)
     x_cube = spectro.get_cube(res.x)
 
     """
