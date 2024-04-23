@@ -299,6 +299,8 @@ class MixingST(LinOp):
         oshape = (len(wavel_axis), len(alpha_axis), len(beta_axis))
         super().__init__(ishape, oshape, "MixingModelST", dtype)
 
+        self.fast_precompute_TST()
+
     def forward(self, maps: array) -> array:
         cube = cythons_files.c_fast_forward_TST(len(self.wavel_axis), self.templates.shape[0], 
                                                 len(self.alpha_axis), len(self.beta_axis),
@@ -326,7 +328,6 @@ class MixingST(LinOp):
                                            len(self.wavel_axis), S, self.templates.astype(dtype=np.float32))
         
         self.TST = TST
-        return TST
 
 
     def mapsToCube(self, maps):
