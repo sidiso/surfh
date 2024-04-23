@@ -87,7 +87,9 @@ def get_IFU(filename):
 
     if (str(channel) + chr(65 + band)) not in pce:
         #pce[str(channel) + chr(65 + band)] = np.random.rand(wavel.size)/10 + 0.5
-        pce[str(channel) + chr(65 + band)] = np.load(PCE_PATH + Path(filename).stem + '.pce.npy')
+        value_pce = np.ones_like(np.load(PCE_PATH + Path(filename).stem + '.pce.npy')) # As PCE is corrected in the pipeline (?), set to 1
+        pce[str(channel) + chr(65 + band)] = value_pce
+        
 
     hdul.close()
     return instru.IFU(

@@ -82,7 +82,7 @@ tpl = conv2(tpl, impulse_response, "same")[:, ::tpl_ss]
 wavel_axis = wavel_axis[::tpl_ss]
 
 # Each template is normalized by its median
-# tpl = np.array([template/np.median(template) for template in tpl])
+tpl = np.array([template/np.median(template) for template in tpl])
 
 if "sim_cube" not in globals():
     print("Compute sim cube")
@@ -138,11 +138,11 @@ print("Time Cython TST = ", e1-t1)
 quadcriterion = fusion_mixing.QuadCriterion_MRS(mu_spectro=1,
                                                 y_spectro=y_cube,
                                                 model_mixing=STModel,
-                                                mu_reg=10e8,
+                                                mu_reg=1e4,
                                                 printing=True,
                                                 gradient="separated")
 
-res = quadcriterion.run_method('lcg', 5000, value_init=0.5, calc_crit = False)
+res = quadcriterion.run_method('lcg', 5000, value_init=0.5, calc_crit = True)
 
 # def plot_maps_share(true_maps, estimated_maps):
 #     n_rows = true_maps.shape[0]
@@ -172,7 +172,7 @@ def plot_maps(estimated_maps):
             fig.colorbar(m, ax=axes[i,j])
 
 
-# path = '/home/nmonnier/Data/JWST/Orion_bar/Mixing_results/TST/'
-# np.save(path + 'init.npy', res.x)
+path = '/home/nmonnier/Data/JWST/Orion_bar/Mixing_results/TST/Norm/'
+np.save(path + 'init.npy', res.x)
 plot_maps(res.x)
 plt.show()

@@ -39,7 +39,8 @@ from surfh.Models import spectrolmm
 @click.option('--method', default='lcg', type=click.STRING)
 @click.option('--margin', default=0, type=click.INT)
 @click.option('--value_init', default=100, type=click.FLOAT)
-def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose, method, margin, value_init):
+@click.option('--norm', default=True, type=click.BOOL)
+def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose, method, margin, value_init, norm):
 
 
 
@@ -54,6 +55,12 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
         slices_directory    = data_dir + 'Single_numpy_slices/'
         psf_directory       = data_dir + 'All_bands_psf/'
         mask_directory      = data_dir + 'Single_mask/'
+
+    if norm :
+        init_directory = '/home/nmonnier/Data/JWST/Orion_bar/Mixing_results/TST/Norm/'
+    else:
+        init_directory = '/home/nmonnier/Data/JWST/Orion_bar/Mixing_results/TST/NotNorm/'
+
 
     mu = str(hyper)
     # mu = mu.split('.')
@@ -83,7 +90,7 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
 
 
     date = str(datetime.date.today())+ '-' + str(datetime.datetime.now().hour) + '-' + str(datetime.datetime.now().minute)
-    result_directory = res_dir + 'Fusion_SD_' + str(sim_data) + '_MC_' + str(multi_chan) + f'_{method}_' + '_Mu_' + mu + '_Init_' + val + '_Nit_' + str(niter) + '_' + date
+    result_directory = res_dir + 'Fusion_SD_' + str(sim_data) + '_MC_' + str(multi_chan) + f'_{method}_' + '_Norm_' + str(norm) +'_Mu_' + mu + '_Init_' + val + '_Nit_' + str(niter) + '_' + date
     Path(result_directory).mkdir(parents=True, exist_ok=True)    
     print(f"Result dir is {result_directory}")
 
@@ -203,7 +210,7 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
                                         printing=True, 
                                         gradient="separated")
     
-    value_init = np.load('/home/nmonnier/Data/JWST/Orion_bar/Mixing_results/TST/update_init_2.npy')
+    value_init = np.load(init_directory + 'init.npy')
 
     res = quadCrit.run_method(method, niter, perf_crit = 1, calc_crit=True, value_init=value_init)
     x_cube = spectro.get_cube(res.x)

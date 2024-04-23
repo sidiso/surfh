@@ -100,7 +100,7 @@ cube[np.where(np.isnan(cube))] = 0
 origin_alpha_axis += channels[0].fov.origin.alpha
 origin_beta_axis += channels[0].fov.origin.beta
 
-spectro = spectrolmm.SpectroLMM(
+spectroModel = spectrolmm.SpectroLMM(
     channels, # List of channels and bands 
     origin_alpha_axis, # Alpha Coordinates of the cube
     origin_beta_axis, # Beta Coordinates of the cube
@@ -115,20 +115,11 @@ spectro = spectrolmm.SpectroLMM(
 data = np.load('/home/nmonnier/Data/JWST/Orion_bar/Single_numpy_slices/' + filename +'.npy')
 data[np.where(np.isnan(data))] = 0
 
+print("Build Cube")
+y_cube = spectroModel.sliceToCube(data)
 
-ref_ad = spectro.adjoint(data)
-ref_fw = spectro.forward(ref_ad)
 
-start = time.time()
-jax_ad = spectro.adjoint_jax(data)
-print(f"Time jax Adjoint = {time.time()-start}")
-start = time.time()
-jax_fw = spectro.forward_jax(jax_ad)
-print(f"Time jax Forward = {time.time()-start}")
 
-p_cube = spectro.sliceToCube(data)
-amaps = spectro.python_lmm_adjoint(p_cube)
-pythoncube = spectro.python_lmm_forward(amaps)
 
 
 # mask = utils.make_mask_FoV(test)
