@@ -129,12 +129,6 @@ data = STModel.forward(maps)
 # ad_data = STModel.adjoint(data)
 # ad_data2 = STModel.c_fast_adjoint(data)
 
-t1 = time.time()
-TST1 = STModel.fast_precompute_TST()
-e1 = time.time()    
-print("Time Cython TST = ", e1-t1)
-
-
 quadcriterion = fusion_mixing.QuadCriterion_MRS(mu_spectro=1,
                                                 y_spectro=y_cube,
                                                 model_mixing=STModel,
@@ -144,35 +138,8 @@ quadcriterion = fusion_mixing.QuadCriterion_MRS(mu_spectro=1,
 
 res = quadcriterion.run_method('lcg', 5000, value_init=0.5, calc_crit = True)
 
-# def plot_maps_share(true_maps, estimated_maps):
-#     n_rows = true_maps.shape[0]
-#     n_col = 2
-    
-#     x = np.copy(estimated_maps)
 
-#     fig, axes = plt.subplots(nrows=n_rows, ncols=n_col, sharex = True, sharey = True)
-#     m = 0
-#     n = 0
-#     for ax in axes.flat:
-#         if (m+n)%2 == 0:
-#             ax.imshow(true_maps[m])
-#             m += 1
-#         else:
-#             ax.imshow(x[n])
-#             n += 1
-
-def plot_maps(estimated_maps):
-    nrow = estimated_maps.shape[0] // 2
-    ncols = estimated_maps.shape[0] // 2
-    fig, axes = plt.subplots(nrows=nrow, ncols=nrow, sharex = True, sharey = True)
-
-    for i in range(nrow):
-        for j in range(ncols):
-            m = axes[i,j].imshow(estimated_maps[i*ncols+j])
-            fig.colorbar(m, ax=axes[i,j])
-
-
-path = '/home/nmonnier/Data/JWST/Orion_bar/Mixing_results/TST/Norm/'
-np.save(path + 'init.npy', res.x)
-plot_maps(res.x)
+# path = '/home/nmonnier/Data/JWST/Orion_bar/Mixing_results/TST/Norm/'
+# np.save(path + 'init.npy', res.x)
+utils.plot_maps(res.x)
 plt.show()

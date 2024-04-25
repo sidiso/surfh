@@ -286,9 +286,3 @@ class SpectroLMM(LinOp):
         plt.legend()
         plt.show()
 
-
-    def close(self):
-        """ Shut down all allocated memory e.g. shared arrays and dictionnaries"""
-        if self._shared_metadata is not None:
-            dico = shared_dict.attach(self._shared_metadata.path)
-            dico.delete() 

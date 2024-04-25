@@ -257,7 +257,7 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
 
 
     value_init = res_init.x
-
+    np.save(result_directory + '/init.npy', res_init.x)
 
     """
     Mis en place de l'algorithme de fusion 
@@ -283,6 +283,6 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
     np.save(result_directory + '/res_time.npy', res_fusion.time) 
     np.save(result_directory + '/res_crit_val.npy', quadCrit_fusion.L_crit_val)
     np.save(result_directory + '/res_cube.npy', x_cube)
-    np.save(result_directory + '/init.npy', res_init.x)
+    
 if __name__ == '__main__':
     launch_fusion()

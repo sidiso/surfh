@@ -30,7 +30,7 @@ from surfh.Models import spectrolmm
 
 @click.command()
 @click.option('--data_dir', default='/home/nmonnier/Data/JWST/Orion_bar/', type=click.STRING, help='Path to data directory')
-@click.option('--res_dir', default='/home/nmonnier/Data/JWST/Orion_bar/fusion_result/', type=click.STRING, help='Path to result directory')
+@click.option('--res_dir', default='/home/nmonnier/Data/JWST/Orion_bar/fusion_result/big/', type=click.STRING, help='Path to result directory')
 @click.option('--hyper', default=0.1, type=click.FLOAT, help='Hyperparameter')
 @click.option('--sim_data', default=True, type=click.BOOL, help='Use simulated or real data')
 @click.option('--niter', default=5, type=click.INT, help='Number of iteration for lcg')
@@ -57,9 +57,9 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
         mask_directory      = data_dir + 'Single_mask/'
 
     if norm :
-        init_directory = '/home/nmonnier/Data/JWST/Orion_bar/Mixing_results/TST/Norm/'
+        init_directory = '/home/nmonnier/Data/JWST/Orion_bar/Mixing_results/TST_big/Norm/'
     else:
-        init_directory = '/home/nmonnier/Data/JWST/Orion_bar/Mixing_results/TST/NotNorm/'
+        init_directory = '/home/nmonnier/Data/JWST/Orion_bar/Mixing_results/TST_big/NotNorm/'
 
 
     mu = str(hyper)

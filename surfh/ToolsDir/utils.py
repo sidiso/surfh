@@ -95,3 +95,14 @@ def apply_mask_FoV(mask, cube):
     masked = mask[np.newaxis,...] * cube
     #masked[np.where(masked == 0)] = np.NaN
     return masked
+
+
+def plot_maps(estimated_maps):
+    nrow = estimated_maps.shape[0] // 2
+    ncols = estimated_maps.shape[0] // 2
+    fig, axes = plt.subplots(nrows=nrow, ncols=nrow, sharex = True, sharey = True)
+
+    for i in range(nrow):
+        for j in range(ncols):
+            m = axes[i,j].imshow(estimated_maps[i*ncols+j])
+            fig.colorbar(m, ax=axes[i,j])
