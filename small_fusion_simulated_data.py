@@ -154,14 +154,11 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
     tpl = conv2(tpl, impulse_response, "same")[:, ::tpl_ss]
     wavel_axis = wavel_axis[::tpl_ss]
 
-    wavel_axis = wavel_axis[919:1279]
-    tpl = tpl[:,919:1279]
 
     #spsf = utils.gaussian_psf(wavel_axis, step_Angle.degree)
     spsf = np.load(psf_directory + 'psfs_pixscale0.025_fov11.25_date_300123.npy')
     spsf = spsf[:, (100-margin):(351+margin), (100-margin):(351+margin)]
-    spsf = spsf[919:1279,:,:]
-
+    
     if "sotf" not in globals():
         print("Compute SPSF")
         sotf = udft.ir2fr(spsf, maps_shape[1:])
@@ -191,6 +188,17 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
         #mask = np.load(mask_directory + Path(file).stem + '.npy')
         #mask = np.ones_like(mask)
 
+    tpl = tpl[:,list_channels[0].wslice(wavel_axis)]
+    spsf = spsf[list_channels[0].wslice(wavel_axis),:,:]
+    wavel_axis = wavel_axis[list_channels[0].wslice(wavel_axis)]
+
+
+    if "sotf" not in globals():
+        print("Compute SPSF")
+        sotf = udft.ir2fr(spsf, maps_shape[1:])
+    if "sim_cube" not in globals():
+        print("Compute sim cube")
+        sim_cube = np.sum(np.expand_dims(maps, 1) * tpl[..., np.newaxis, np.newaxis], axis=0)
 
     origin_alpha_axis += list_channels[0].fov.origin.alpha
     origin_beta_axis += list_channels[0].fov.origin.beta
@@ -218,30 +226,32 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
     y_data_simulated = spectroModel.forward(maps)
     projected_cube_simulated = spectroModel.sliceToCube(y_data_simulated)
 
-    selection_arr = np.where(projected_cube_simulated < 1e-5)
-    fast_selection_arr = np.array(np.where(projected_cube_simulated > 1e-5)).T
+    # selection_arr = np.where(projected_cube_simulated < 1e-5)
+    # fast_selection_arr = np.array(np.where(projected_cube_simulated > 1e-5)).T
 
-    # Création modèle de mélange pour calcul l'init
-    STModel = mixing.MixingST(templates=tpl,
-                            alpha_axis=origin_alpha_axis,
-                            beta_axis=origin_beta_axis,   
-                            wavel_axis=wavel_axis,
-                            selection_arr=selection_arr,
-                            fast_selection_arr=fast_selection_arr)
+    # # Création modèle de mélange pour calcul l'init
+    # STModel = mixing.MixingST(templates=tpl,
+    #                         alpha_axis=origin_alpha_axis,
+    #                         beta_axis=origin_beta_axis,   
+    #                         wavel_axis=wavel_axis,
+    #                         selection_arr=selection_arr,
+    #                         fast_selection_arr=fast_selection_arr)
 
-    # 
-    quadCrit_mixing = fusion_mixing.QuadCriterion_MRS(mu_spectro=1,
-                                                    y_spectro=projected_cube_simulated,
-                                                    model_mixing=STModel,
-                                                    mu_reg=10,
-                                                    printing=True,
-                                                    gradient="separated")
+    # # 
+    # quadCrit_mixing = fusion_mixing.QuadCriterion_MRS(mu_spectro=1,
+    #                                                 y_spectro=projected_cube_simulated,
+    #                                                 model_mixing=STModel,
+    #                                                 mu_reg=10,
+    #                                                 printing=True,
+    #                                                 gradient="separated")
 
 
-    res_init = quadCrit_mixing.run_method('lcg', 5000, value_init=0.5, calc_crit = False)
+    # res_init = quadCrit_mixing.run_method('lcg', 5000, value_init=0.5, calc_crit = False)
 
-    value_init = res_init.x
-    np.save(result_directory + '/init.npy', res_init.x)
+    # value_init = res_init.x
+    # np.save(result_directory + '/init.npy', res_init.x)
+
+    value_init = np.load('/home/nmonnier/Data/JWST/Orion_bar/Mixing_results/TST_small/NotNorm/init.npy')
 
     """
     Mis en place de l'algorithme de fusion 
