@@ -459,7 +459,7 @@ class Channel(LinOp):
                 sliced = self.slicing(gridded, slit_idx)[
                     :, : self.oshape[3] * self.srf : self.srf
                 ]
-                
+
                 out[p_idx, slit_idx, :, :] = self.instr.pce[
                     ..., np.newaxis
                 ]* self.wblur(sliced).sum(axis=2)
@@ -622,6 +622,10 @@ class Channel(LinOp):
 
 
                 gridded += out_slice#self.slicing_Fente2Cube_t(sliced, slit_idx)
+
+
+
+                plt.show()
 
             _otf_sr = udft.ir2fr(np.ones((self.srf, 1)), self.local_shape[1:])[np.newaxis, ...]
             tmp3 = dft(gridded) * _otf_sr.conj()

@@ -100,6 +100,10 @@ cube[np.where(np.isnan(cube))] = 0
 origin_alpha_axis += channels[0].fov.origin.alpha
 origin_beta_axis += channels[0].fov.origin.beta
 
+
+
+
+
 spectroModel = spectrolmm.SpectroLMM(
     channels, # List of channels and bands 
     origin_alpha_axis, # Alpha Coordinates of the cube

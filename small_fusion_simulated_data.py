@@ -249,9 +249,9 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
     # res_init = quadCrit_mixing.run_method('lcg', 5000, value_init=0.5, calc_crit = False)
 
     # value_init = res_init.x
-    # np.save(result_directory + '/init.npy', res_init.x)
 
     value_init = np.load('/home/nmonnier/Data/JWST/Orion_bar/Mixing_results/TST_small/NotNorm/init.npy')
+    np.save(result_directory + '/init.npy', value_init)
 
     """
     Mis en place de l'algorithme de fusion 
