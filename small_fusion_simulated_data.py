@@ -134,7 +134,7 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
     spatial_subsampling = 4
     impulse_response = np.ones((spatial_subsampling, spatial_subsampling)) / spatial_subsampling ** 2
     # Multiply maps to match the mean values of real data
-    maps = np.asarray([conv2(arr, impulse_response)[::spatial_subsampling, ::spatial_subsampling] for arr in maps])*1.162676714255374
+    maps = np.asarray([conv2(arr, impulse_response)[::spatial_subsampling, ::spatial_subsampling] for arr in maps])
     step_Angle = Angle(step, u.arcsec)
 
 

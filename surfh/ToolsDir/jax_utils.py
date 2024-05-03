@@ -5,6 +5,27 @@ import jax.numpy as jnp
 from functools import partial
 
 
+
+@jit
+def lmm_maps2cube(maps, tpls):
+    cube = jnp.sum(
+            jnp.expand_dims(maps, 1) * tpls[..., jnp.newaxis, jnp.newaxis], axis=0
+        )
+    return cube
+
+@jit
+def lmm_cube2maps(cube, tpls):
+    maps = jnp.concatenate(
+            [
+                jnp.sum(cube * tpl[..., jnp.newaxis, jnp.newaxis], axis=0)[jnp.newaxis, ...]
+                for tpl in tpls
+            ],
+            axis=0,
+            )
+    return maps
+
+
+
 @jit # TODO is it useful here?
 def dft(inarray): 
     return jnp.fft.rfftn(inarray, axes=range(-2, 0), norm="ortho")
@@ -30,23 +51,7 @@ def lmm_cube2maps_idft_mult(a, b, tpl, im_shape):
     return lmm_cube2maps(d, tpl)
 
 
-@jit
-def lmm_maps2cube(maps, tpls):
-    cube = jnp.sum(
-            jnp.expand_dims(maps, 1) * tpls[..., jnp.newaxis, jnp.newaxis], axis=0
-        )
-    return cube
 
-@jit
-def lmm_cube2maps(cube, tpls):
-    maps = jnp.concatenate(
-            [
-                jnp.sum(cube * tpl[..., jnp.newaxis, jnp.newaxis], axis=0)[jnp.newaxis, ...]
-                for tpl in tpls
-            ],
-            axis=0,
-            )
-    return maps
 
 
 #### wblur

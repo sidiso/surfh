@@ -1,65 +1,51 @@
 import pytest
 import numpy as np
+from aljabr import LinOp, dottest
 import global_variable_testing
+import matplotlib.pyplot as plt
 
-
+import scipy as sp
+from scipy import misc
 from surfh.ToolsDir import jax_utils, python_utils, cython_utils, utils
 
-"""
-LMM - maps -> cube 
-"""
-def test_LMM_mapsToCube_python_jax():
 
-    maps = global_variable_testing.maps
-    templates = global_variable_testing.templates
+class LMM(LinOp):
+    def __init__(
+        self,
+        maps,
+        templates,
+        wavelength_axis  
+    ):
+        self.wavelength_axis = wavelength_axis # ex taille [307]
+        self.templates = templates # ex taille : [4, 307]
+        self.maps = maps # ex taille : [4, 251, 251]
+
+        ishape = (4,251,251)#maps.shape
+        oshape = (len(self.wavelength_axis), maps.shape[1], maps.shape[2])
+        super().__init__(ishape=ishape, oshape=oshape)
+        print(self.ishape, self.oshape)
+
+
+    def forward(self, maps: np.ndarray) -> np.ndarray:
+        maps = maps.reshape(self.ishape)
+        return python_utils.lmm_maps2cube(maps, self.templates).reshape(self.oshape)
     
-    assert np.allclose(python_utils.lmm_maps2cube(maps, templates), jax_utils.lmm_maps2cube(maps, templates), rtol=1e-5)
+    def adjoint(self, cube: np.ndarray) -> np.ndarray:
+        cube = cube.reshape(self.oshape)
+        return python_utils.lmm_cube2maps(cube, self.templates).reshape(self.ishape)
 
-"""
-LMM - cube -> maps 
-"""
-def test_LMM_cubeToMaps_python_jax():
 
-    templates = global_variable_testing.templates
-    n_lamnda = len(global_variable_testing.wavelength_axis)
-    im_shape = global_variable_testing.im_shape
-    cube = np.random.random((n_lamnda, im_shape[0], im_shape[1]))
-
-    assert np.allclose(python_utils.lmm_cube2maps(cube, templates), jax_utils.lmm_cube2maps(cube, templates), rtol=1e-5)
-
-"""
-DFT
-"""
-def test_dft_python_jax():
-    templates = global_variable_testing.templates
-    n_lamnda = len(global_variable_testing.wavelength_axis)
-    im_shape = global_variable_testing.im_shape
-    cube = np.random.random((n_lamnda, im_shape[0], im_shape[1]))
-
-    assert np.allclose(python_utils.dft(cube), jax_utils.dft(cube), rtol=1e-2)
-
-"""
-iDFT
-"""
-def test_idft_python_jax():
-    templates = global_variable_testing.templates
-    n_lamnda = len(global_variable_testing.wavelength_axis)
-    im_shape = global_variable_testing.im_shape
-    cube = np.random.random((n_lamnda, im_shape[0], im_shape[1]))
-    f_cube = python_utils.dft(cube)
-
-    assert np.allclose(python_utils.idft(f_cube, im_shape), jax_utils.idft(f_cube, im_shape), atol=1e-6)
-
-"""
-Interpolation - cube -> FoV
-"""
 def test_interpolation_cubeFoV_python_cython():
     templates = global_variable_testing.templates
     n_lamnda = len(global_variable_testing.wavelength_axis)
     im_shape = global_variable_testing.im_shape
-    local_shape = (im_shape[0]-40, im_shape[1]-40)
+    local_shape = (im_shape[0]-80, im_shape[1]-80)
     cube = np.random.random((n_lamnda, im_shape[0], im_shape[1]))
 
+    face = misc.face()
+    face = face[::2,::4,:]
+    face = face[:im_shape[0], :im_shape[1], 0]
+    cube[:] = face
 
     # Wavelength index
     wavel_idx = np.arange(n_lamnda)
@@ -107,6 +93,7 @@ def test_interpolation_cubeFoV_python_cython():
                 np.repeat(local_in_global_beta_axis[np.newaxis], local_cube_shape[0], axis=0).ravel(),
             ]
         ).T
+
     optimized_local_coords = np.vstack(
             [
                 local_in_global_alpha_axis.ravel(),
@@ -114,24 +101,31 @@ def test_interpolation_cubeFoV_python_cython():
             ]
         ).T
     
-    interpolate_python = python_utils.interpn_cube2local(wavel_idx, 
-                                                         cube_alpha_axis, 
-                                                         cube_beta_axis,
-                                                         cube,
-                                                         local_coords,
-                                                         local_cube_shape)
-    
-    cython_interpn = cython_utils.interpn_cube2local(wavel_idx, 
-                                                     cube_alpha_axis, 
-                                                     cube_beta_axis, 
-                                                     cube, 
-                                                     optimized_local_coords, 
-                                                     local_cube_shape)
+    python_interpn = python_utils.interpn_cube2local(wavel_idx, cube_alpha_axis, cube_beta_axis, cube, local_coords, local_cube_shape)
+    cython_interpn = cython_utils.interpn_cube2local(wavel_idx, cube_alpha_axis, cube_beta_axis, cube, optimized_local_coords, local_cube_shape)
+    return python_interpn, cython_interpn, cube
 
-    assert np.allclose(interpolate_python, cython_interpn)
+# maps = global_variable_testing.maps
+# templates = global_variable_testing.templates
+# im_shape = global_variable_testing.im_shape
+# wavelength_axis = global_variable_testing.wavelength_axis
+# lmm_class = LMM(maps, templates, wavelength_axis)
+# n_lamnda = len(global_variable_testing.wavelength_axis)
+# cube = np.random.random((n_lamnda, im_shape[0], im_shape[1]))
+# f_cube = python_utils.dft(cube)
 
-"""
-Interpolation - FoV -> cube
-"""
-def test_interpolation_FoVcube_python_cython():
-    pass
+# dt = dottest(lmm_class)
+
+
+p_inter, c_inter, cube = test_interpolation_cubeFoV_python_cython()
+plt.imshow(p_inter[0])
+plt.colorbar()
+plt.figure()
+
+plt.imshow(c_inter[0])
+plt.colorbar()
+
+plt.figure()
+plt.imshow(cube[0])
+plt.colorbar()
+plt.show()

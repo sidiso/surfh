@@ -1,7 +1,8 @@
 import numpy as np
+from surfh.Models import instru
+import udft
 
 im_shape = (251,251)
-
 
 wavelength_axis = np.array([7.51115, 7.51491, 7.51867, 7.52243, 7.52619, 7.52995, 7.53372, 7.53749, 7.54126, 7.54503, 7.5488 , 7.55258, 7.55636,
 7.56013, 7.56391, 7.5677 , 7.57148, 7.57527, 7.57906, 7.58285,7.58664, 7.59043, 7.59423, 7.59803, 7.60183, 7.60563, 7.60943,
@@ -34,4 +35,10 @@ templates = np.array([[0.2*x + 11 for x in range(307)],
 
 
 np.random.seed(19940407)
-maps = np.random.random((4,251,251))
+maps = np.random.random((4,im_shape[0],im_shape[1]))
+
+
+spsf = np.load('/home/nmonnier/Data/JWST/Orion_bar/All_bands_psf/psfs_pixscale0.025_fov11.25_date_300123.npy')[:len(wavelength_axis)]
+spsf = spsf[:, (100-0):(351+0), (100-0):(351+0)]
+sotf = udft.ir2fr(spsf, im_shape)
+                  

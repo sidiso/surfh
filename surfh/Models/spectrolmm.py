@@ -134,7 +134,14 @@ class SpectroLMM(LinOp):
         )
         return cube
     
+
     def forward(self, inarray: array) -> array:
+        return
+
+    def adjoint(self, inarray: array) -> array:
+        return
+
+    def old_forward(self, inarray: array) -> array:
         out = np.zeros(self.oshape)
 
         cube = jax_utils.lmm_maps2cube(inarray, self.tpls)
@@ -156,7 +163,7 @@ class SpectroLMM(LinOp):
         return out 
 
 
-    def adjoint(self, inarray: array) -> array:
+    def old_adjoint(self, inarray: array) -> array:
         cube = np.zeros(
             (self.wavel_axis.shape[0], self.ishape[1], self.ishape[2] // 2 + 1), dtype=np.complex128
         )
