@@ -212,6 +212,29 @@ class Channel(LinOp):
         """ """
         wavel_axis = shared_dict.attach(self._metadata_path)["wavel_axis"]
         return wavel_axis
+    
+    @property
+    def local_alpha_axis(self) -> array:
+        local_alpha_axis = shared_dict.attach(self._metadata_path)["local_alpha_axis"]
+        return local_alpha_axis
+    
+    @property
+    def local_beta_axis(self) -> array:
+        local_beta_axis = shared_dict.attach(self._metadata_path)["local_beta_axis"]
+        return local_beta_axis
+    
+    @property
+    def alpha_axis(self) -> array:
+        alpha_axis = shared_dict.attach(self._metadata_path)["alpha_axis"]
+        return alpha_axis
+    
+    @property
+    def beta_axis(self) -> array:
+        beta_axis = shared_dict.attach(self._metadata_path)["beta_axis"]
+        return beta_axis
+
+
+
 
     def slit_local_fov(self, slit_idx) -> instru.LocalFOV:
         """The FOV of slit `slit_idx` in local ref"""
@@ -220,8 +243,8 @@ class Channel(LinOp):
 
     def slit_slices(self, slit_idx: int) -> Tuple[slice, slice]:
         """The slices of slit `slit_idx` in local axis"""
-        local_alpha_axis = shared_dict.attach(self._metadata_path)["local_alpha_axis"]
-        local_beta_axis = shared_dict.attach(self._metadata_path)["local_beta_axis"]
+        local_alpha_axis = self.local_alpha_axis
+        local_beta_axis  = self.local_beta_axis    
         slices = self.slit_local_fov(slit_idx).to_slices(
             local_alpha_axis, local_beta_axis
         )
@@ -250,8 +273,8 @@ class Channel(LinOp):
 
     def slit_weights(self, slit_idx: int) -> array:
         """The weights of slit `slit_idx` in local axis"""
-        local_alpha_axis = shared_dict.attach(self._metadata_path)["local_alpha_axis"]
-        local_beta_axis = shared_dict.attach(self._metadata_path)["local_beta_axis"]
+        local_alpha_axis = self.local_alpha_axis
+        local_beta_axis  = self.local_beta_axis 
         slices = self.slit_slices(slit_idx)
 
         weights = matrix_op.fov_weight(
@@ -321,10 +344,10 @@ class Channel(LinOp):
     def gridding(self, inarray: array, pointing: instru.Coord) -> array:
         """Returns interpolation of inarray in local referential"""
         # α and β inside the FOV shifted to pointing, in the global ref.
-        local_alpha_axis = shared_dict.attach(self._metadata_path)["local_alpha_axis"]
-        local_beta_axis = shared_dict.attach(self._metadata_path)["local_beta_axis"]
-        alpha_axis = shared_dict.attach(self._metadata_path)["alpha_axis"]
-        beta_axis = shared_dict.attach(self._metadata_path)["beta_axis"]
+        local_alpha_axis = self.local_alpha_axis
+        local_beta_axis  = self.local_beta_axis 
+        alpha_axis       = self.alpha_axis
+        beta_axis        = self.beta_axis
 
         alpha_coord, beta_coord = (self.instr.fov + pointing).local2global(
             local_alpha_axis, local_beta_axis
@@ -351,10 +374,10 @@ class Channel(LinOp):
     def gridding_t(self, inarray: array, pointing: instru.Coord) -> array:
         """Returns interpolation of inarray in global referential"""
         # α and β inside the FOV shifted to pointing, in the global ref.
-        local_alpha_axis = shared_dict.attach(self._metadata_path)["local_alpha_axis"]
-        local_beta_axis = shared_dict.attach(self._metadata_path)["local_beta_axis"]
-        alpha_axis = shared_dict.attach(self._metadata_path)["alpha_axis"]
-        beta_axis = shared_dict.attach(self._metadata_path)["beta_axis"]
+        local_alpha_axis = self.local_alpha_axis
+        local_beta_axis  = self.local_beta_axis 
+        alpha_axis       = self.alpha_axis
+        beta_axis        = self.beta_axis
 
         alpha_coord, beta_coord = (self.instr.fov + pointing).global2local(
             alpha_axis, beta_axis
