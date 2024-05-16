@@ -36,13 +36,14 @@ class SCT_spectro(LinOp):
         self.step_Angle = step_Angle
         
         self.im_shape = (len(self.alpha_axis), len(self.beta_axis)) # ex taille : [251, 251]
+        self.cube_shape = (len(self.wavelength_axis), len(self.alpha_axis), len(self.beta_axis))
 
         local_alpha_axis, local_beta_axis = self.inst.fov.local_coords(step_Angle.degree, 5* step_Angle.degree, 5* step_Angle.degree)
         
         self.local_alpha_axis = local_alpha_axis
         self.local_beta_axis = local_beta_axis
 
-        ishape = (len(self.wavelength_axis), len(alpha_axis), len(beta_axis))
+        ishape = (self.templates.shape[0], len(alpha_axis), len(beta_axis))
         oshape = (len(self.wavelength_axis), len(local_alpha_axis), len(local_beta_axis))
         super().__init__(ishape=ishape, oshape=oshape)
 
@@ -62,7 +63,7 @@ class SCT_spectro(LinOp):
         return np.array(cython_utils.interpn_cube2local(self.wavelength_axis, 
                                                    self.alpha_axis, 
                                                    self.beta_axis, 
-                                                   conv_cube, 
+                                                   np.array(conv_cube).astype(np.float64), 
                                                    optimized_local_coords, 
                                                    self.oshape))
     
@@ -85,7 +86,7 @@ class SCT_spectro(LinOp):
                                                    self.local_beta_axis.ravel(), 
                                                    gridded, 
                                                    optimized_global_coords, 
-                                                   self.ishape))
+                                                   self.cube_shape))
 
 
         conv_cube = jax_utils.idft(jax_utils.dft(gridded_t) * self.sotf.conj(), self.im_shape)

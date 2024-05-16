@@ -8,7 +8,7 @@ from astropy.coordinates import Angle
 import udft
 
 from surfh.Simulation import simulation_data
-from surfh.DottestModels import ST_Model
+from surfh.DottestModels import SCT_Model
 from surfh.ToolsDir import utils
 
 from surfh.Simulation import fusion_CT
@@ -34,7 +34,7 @@ ch2a = instru.IFU(
     name="2A",
 )
 
-spectroModel = ST_Model.ST_spectro(sotf=sotf,
+spectroModel = SCT_Model.SCT_spectro(sotf=sotf,
                                    templates=tpl,
                                    alpha_axis=origin_beta_axis,
                                    beta_axis=origin_beta_axis,
@@ -50,9 +50,9 @@ real_cube = spectroModel.mapsToCube(maps)
 """
 Reconstruction method
 """
-hyperParameter = 1e5
+hyperParameter = 1e4
 method = "lcg"
-niter = 180
+niter = 1000
 value_init = 0
 
 quadCrit_fusion = fusion_CT.QuadCriterion_MRS(mu_spectro=1, 
@@ -70,7 +70,7 @@ utils.plot_maps(res_fusion.x)
 
 y_adj = spectroModel.adjoint(y)
 y_adj_cube = spectroModel.mapsToCube(y_adj)
-utils.plot_3_cube(real_cube, y_adj_cube, y_cube)
+utils.plot_3_cube(real_cube, y_cube, y_cube)
 
 plt.figure()
 xtick = np.arange(len(quadCrit_fusion.L_crit_val))*5

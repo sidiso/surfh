@@ -42,7 +42,7 @@ class ST_spectro(LinOp):
         self.local_alpha_axis = local_alpha_axis
         self.local_beta_axis = local_beta_axis
 
-        ishape = (len(self.wavelength_axis), len(alpha_axis), len(beta_axis))
+        ishape = (self.templates.shape[0], len(alpha_axis), len(beta_axis))
         oshape = (len(self.wavelength_axis), len(local_alpha_axis), len(local_beta_axis))
         super().__init__(ishape=ishape, oshape=oshape)
 
