@@ -412,7 +412,7 @@ cube_out_shape = (len(wavel_idx), len(cube_alpha_axis), len(cube_beta_axis))
 global_coords = np.vstack(
         [
             alpha_coord.ravel(),
-            beta_coord.ravel()
+            beta_coord.ravel()  
         ]
     ).T
 
