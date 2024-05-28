@@ -6,12 +6,13 @@ import matplotlib.pyplot as plt
 
 import scipy as sp
 from scipy import misc
+from surfh.Models import slicer
 from surfh.ToolsDir import jax_utils, python_utils, cython_utils, utils
 from astropy import units as u
 from astropy.coordinates import Angle
 from numpy.random import standard_normal as randn 
 
-from surfh.Models import instru, slicer, newslicer
+from surfh.Models import instru, slicer
 
 from typing import List, Tuple
 from numpy import ndarray as array
@@ -56,18 +57,12 @@ class SlicerModel(LinOp):
                                     local_alpha_axis = self.local_alpha_axis, 
                                     local_beta_axis = self.local_beta_axis)
         
-        self.newslicer = newslicer.newSlicer(self.instr, 
-                                    wavelength_axis = self.wavelength_axis, 
-                                    alpha_axis = self.alpha_axis, 
-                                    beta_axis = self.beta_axis, 
-                                    local_alpha_axis = self.local_alpha_axis, 
-                                    local_beta_axis = self.local_beta_axis)
 
         # Templates (4, Nx, Ny)
         ishape = (len(self.wavelength_axis), len(alpha_axis), len(beta_axis))
         
         # 4D array [Nslit, L, alpha_slit, beta_slit]
-        oshape = (self.instr.n_slit, len(self.wavelength_axis), self.newslicer.npix_slit_alpha_width, self.slicer.npix_beta_slit)
+        oshape = (self.instr.n_slit, len(self.wavelength_axis), self.slicer.npix_slit_alpha_width, self.slicer.npix_slit_beta_width)
 
 
         super().__init__(ishape=ishape, oshape=oshape)
@@ -81,7 +76,7 @@ class SlicerModel(LinOp):
     def forward(self, cube: array) -> array:
         allsliced = np.zeros(self.oshape)
         for slit_idx in range(self.instr.n_slit):
-            sliced = self.newslicer.slicing(cube, slit_idx)
+            sliced = self.slicer.slicing(cube, slit_idx)
             allsliced[slit_idx] = sliced
         return allsliced
 
@@ -90,7 +85,7 @@ class SlicerModel(LinOp):
         cube = np.zeros((len(self.wavelength_axis), self.ishape[1], self.ishape[2]))
         for slit_idx in range(self.instr.n_slit):
             sliced = slices[slit_idx]
-            cube += self.newslicer.slicing_t(sliced, slit_idx, (len(self.wavelength_axis), self.ishape[1], self.ishape[2]))
+            cube += self.slicer.slicing_t(sliced, slit_idx, (len(self.wavelength_axis), self.ishape[1], self.ishape[2]))
         return cube
 
 

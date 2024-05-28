@@ -362,8 +362,8 @@ test_cube_alpha_axis = np.tile(cube_alpha_axis, len(cube_beta_axis))
 test_cube_beta_axis= np.repeat(cube_beta_axis, len(cube_beta_axis))
 
 
-methodfw = 'linear'
-methodad = 'linear'
+methodfw = 'nearest'
+methodad = 'nearest'
 gridata = sp.interpolate.griddata((test_cube_alpha_axis.ravel(), test_cube_beta_axis.ravel()), cube[0].ravel(), (local_alpha_coord, local_beta_coord), method=methodfw)
 degridata = sp.interpolate.griddata((local_alpha_coord.ravel(), local_beta_coord.ravel()), gridata.ravel(), (test_cube_alpha_axis.reshape(251,251), test_cube_beta_axis.reshape(251,251)), method=methodad, fill_value=0)
 
@@ -398,7 +398,8 @@ gridata5   = sp.interpolate.griddata((test_cube_alpha_axis.ravel(), test_cube_be
 degridata5 = sp.interpolate.griddata((local_alpha_coord.ravel(), local_beta_coord.ravel()), gridata5.ravel(), (test_cube_alpha_axis.reshape(251,251), test_cube_beta_axis.reshape(251,251)), method=methodad, fill_value=0)
 degridata5[np.where(degridata< 1e-1)] = 0
 
-utils.plot_3_cube(degridata1[np.newaxis,...], degridata5[np.newaxis,...], (degridata4-degridata5)[np.newaxis,...], slice=0)
+utils.plot_3_cube(degridata1[np.newaxis,...], degridata5[np.newaxis,...], (degridata1-degridata5)[np.newaxis,...], slice=0)
+utils.plot_3_cube(cube, degridata5[np.newaxis,...], (cube[0]-degridata5)[np.newaxis,...], slice=0)
 plt.show()
 
 ################################""""
