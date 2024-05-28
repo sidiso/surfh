@@ -14,7 +14,7 @@ from numpy import ndarray as array
 
 
 
-def test_LMM_python_dottest():
+def test_LMM_dottest():
     """
     Model : y = Ta
 
@@ -22,83 +22,20 @@ def test_LMM_python_dottest():
     T : LMM transformation operator
     a : abondancy maps of size (4, Nx, Ny)
     """
-    class LMM(LinOp):
-        def __init__(
-            self,
-            maps,
-            templates,
-            wavelength_axis  
-        ):
-            self.wavelength_axis = wavelength_axis # ex taille [307]
-            self.templates = templates # ex taille : [4, 307]
-            self.maps = maps # ex taille : [4, 251, 251]
-
-            ishape = (4, maps.shape[1], maps.shape[2])#maps.shape
-            oshape = (len(self.wavelength_axis), maps.shape[1], maps.shape[2])
-            super().__init__(ishape=ishape, oshape=oshape)
-            print(self.ishape, self.oshape)
-
-
-        def forward(self, maps: np.ndarray) -> np.ndarray:
-            return python_utils.lmm_maps2cube(maps, self.templates)
-        
-        def adjoint(self, cube: np.ndarray) -> np.ndarray:
-            return python_utils.lmm_cube2maps(cube, self.templates)
-
 
     maps = global_variable_testing.maps
     templates = global_variable_testing.templates
     im_shape = global_variable_testing.im_shape
     wavelength_axis = global_variable_testing.wavelength_axis
-    lmm_class = LMM(maps, templates, wavelength_axis)
 
-    assert dottest(lmm_class)
+    from surfh.DottestModels import T_Model
 
-def test_LMM_jax_dottest():
-    """
-    Model : y = Ta
-
-    y : Hyperspectral cube of size (L, Nx, Ny)
-    T : LMM transformation operator
-    a : abondancy maps of size (4, Nx, Ny)
-    """
-    class LMM(LinOp):
-        def __init__(
-            self,
-            maps,
-            templates,
-            wavelength_axis  
-        ):
-            self.wavelength_axis = wavelength_axis # ex taille [307]
-            self.templates = templates # ex taille : [4, 307]
-            self.maps = maps # ex taille : [4, 251, 251]
-
-            ishape = (4, maps.shape[1], maps.shape[2])#maps.shape
-            oshape = (len(self.wavelength_axis), maps.shape[1], maps.shape[2])
-            super().__init__(ishape=ishape, oshape=oshape)
-            print(self.ishape, self.oshape)
-
-
-        def forward(self, maps: np.ndarray) -> np.ndarray:
-            maps = maps.reshape(self.ishape)
-            return jax_utils.lmm_maps2cube(maps, self.templates).reshape(self.oshape)
-        
-        def adjoint(self, cube: np.ndarray) -> np.ndarray:
-            cube = cube.reshape(self.oshape)
-            return jax_utils.lmm_cube2maps(cube, self.templates).reshape(self.ishape)
-
-
-    maps = global_variable_testing.maps
-    templates = global_variable_testing.templates
-    im_shape = global_variable_testing.im_shape
-    wavelength_axis = global_variable_testing.wavelength_axis
-    lmm_class = LMM(maps, templates, wavelength_axis)
+    lmm_class = T_Model.T_spectro(maps, templates, wavelength_axis)
 
     assert dottest(lmm_class)
 
 
-
-def test_spatial_conv_python_dottest():
+def test_spatial_conv_dottest():
     """
     Model : y = Cx
 
@@ -106,85 +43,20 @@ def test_spatial_conv_python_dottest():
     C : Convolution operator
     x : Hyperspectral cube of size (L, Nx, Ny)
     """
-    class Conv(LinOp):
-        def __init__(
-            self,
-            sotf,
-            maps,
-            templates,
-            wavelength_axis  
-        ):
-            self.wavelength_axis = wavelength_axis # ex taille [307]
-            self.sotf = sotf
-            self.maps = maps
-
-            ishape = (len(self.wavelength_axis), maps.shape[1], maps.shape[2])#maps.shape
-            oshape = (len(self.wavelength_axis), maps.shape[1], maps.shape[2])
-            super().__init__(ishape=ishape, oshape=oshape)
-            print(self.ishape, self.oshape)
-
-
-        def forward(self, inarray: np.ndarray) -> np.ndarray:
-            return python_utils.idft(python_utils.dft(inarray) * self.sotf, (self.maps.shape[1], self.maps.shape[2]))
-        
-        def adjoint(self, inarray: np.ndarray) -> np.ndarray:
-            return python_utils.idft(python_utils.dft(inarray) * self.sotf.conj(), (self.maps.shape[1], self.maps.shape[2]))
-
-
     maps = global_variable_testing.maps
     templates = global_variable_testing.templates
     im_shape = global_variable_testing.im_shape
     wavelength_axis = global_variable_testing.wavelength_axis
     sotf = global_variable_testing.sotf
-    conv_class = Conv(sotf, maps, templates, wavelength_axis)
+
+    from surfh.DottestModels import C_Model
+
+    conv_class = C_Model.C_spectro(sotf, maps, templates, wavelength_axis)
 
     assert dottest(conv_class)
 
 
-def test_spatial_conv_jax_dottest():
-    """
-    Model : y = Cx
-
-    y : Hyperspectral cube of size (L, Nx, Ny)
-    C : Convolution operator
-    x : Hyperspectral cube of size (L, Nx, Ny)
-    """
-    class Conv(LinOp):
-        def __init__(
-            self,
-            sotf,
-            maps,
-            templates,
-            wavelength_axis  
-        ):
-            self.wavelength_axis = wavelength_axis # ex taille [307]
-            self.sotf = sotf
-            self.maps = maps
-
-            ishape = (len(self.wavelength_axis), maps.shape[1], maps.shape[2])#maps.shape
-            oshape = (len(self.wavelength_axis), maps.shape[1], maps.shape[2])
-            super().__init__(ishape=ishape, oshape=oshape)
-            print(self.ishape, self.oshape)
-
-
-        def forward(self, inarray: np.ndarray) -> np.ndarray:
-            return jax_utils.idft(jax_utils.dft(inarray) * self.sotf, (self.maps.shape[1], self.maps.shape[2]))
-        
-        def adjoint(self, inarray: np.ndarray) -> np.ndarray:
-            return jax_utils.idft(jax_utils.dft(inarray) * self.sotf.conj(), (self.maps.shape[1], self.maps.shape[2]))
-
-
-    maps = global_variable_testing.maps
-    templates = global_variable_testing.templates
-    im_shape = global_variable_testing.im_shape
-    wavelength_axis = global_variable_testing.wavelength_axis
-    sotf = global_variable_testing.sotf
-    conv_class = Conv(sotf, maps, templates, wavelength_axis)
-
-    assert dottest(conv_class)
-
-
-def test_LMMConv_python_dottest():
+def test_CT_dottest():
     """
     Model : y = CTa
 
@@ -193,93 +65,32 @@ def test_LMMConv_python_dottest():
     T : LMM transformation operator
     a : abondancy maps of size (4, Nx, Ny)
     """
-    class LMMConv(LinOp):
-        def __init__(
-            self,
-            sotf,
-            maps,
-            templates,
-            wavelength_axis  
-        ):
-            self.sotf = sotf
-            self.wavelength_axis = wavelength_axis # ex taille [307]
-            self.templates = templates # ex taille : [4, 307]
-            self.maps = maps # ex taille : [4, 251, 251]
-
-            ishape = (4, maps.shape[1], maps.shape[2])#maps.shape
-            oshape = (len(self.wavelength_axis), maps.shape[1], maps.shape[2])
-            super().__init__(ishape=ishape, oshape=oshape)
-            print(self.ishape, self.oshape)
-
-
-        def forward(self, maps: np.ndarray) -> np.ndarray:
-            cube = python_utils.lmm_maps2cube(maps, self.templates)
-            return python_utils.idft(python_utils.dft(cube) * self.sotf, (self.maps.shape[1], self.maps.shape[2]))
-        
-        def adjoint(self, cube: np.ndarray) -> np.ndarray:
-            conv_cube = python_utils.idft(python_utils.dft(cube) * self.sotf.conj(), (self.maps.shape[1], self.maps.shape[2]))
-            return python_utils.lmm_cube2maps(conv_cube, self.templates)
-
-
     maps = global_variable_testing.maps
     templates = global_variable_testing.templates
     im_shape = global_variable_testing.im_shape
     wavelength_axis = global_variable_testing.wavelength_axis
     sotf = global_variable_testing.sotf
 
-    lmmConv_class = LMMConv(sotf, maps, templates, wavelength_axis)
+    step = 0.025 # arcsec
+    step_Angle = Angle(step, u.arcsec)
 
-    assert dottest(lmmConv_class)
+    cube_origin_alpha = 0
+    cube_origin_beta = 0
+    cube_alpha_axis = np.arange(im_shape[0]).astype(np.float64)* step_Angle.degree
+    cube_beta_axis = np.arange(im_shape[1]).astype(np.float64)* step_Angle.degree
+    cube_alpha_axis -= np.mean(cube_alpha_axis)
+    cube_beta_axis -= np.mean(cube_beta_axis)
+    cube_alpha_axis += cube_origin_alpha
+    cube_beta_axis += cube_origin_beta
 
-def test_LMMConv_jax_dottest():
-    """
-    Model : y = CTa
+    from surfh.DottestModels import CT_Model
 
-    y : Hyperspectral cube of size (L, Nx, Ny)
-    C : Convolution operator
-    T : LMM transformation operator
-    a : abondancy maps of size (4, Nx, Ny)
-    """
-    class LMMConv(LinOp):
-        def __init__(
-            self,
-            sotf,
-            maps,
-            templates,
-            wavelength_axis  
-        ):
-            self.sotf = sotf
-            self.wavelength_axis = wavelength_axis # ex taille [307]
-            self.templates = templates # ex taille : [4, 307]
-            self.maps = maps # ex taille : [4, 251, 251]
-
-            ishape = (4, maps.shape[1], maps.shape[2])#maps.shape
-            oshape = (len(self.wavelength_axis), maps.shape[1], maps.shape[2])
-            super().__init__(ishape=ishape, oshape=oshape)
-            print(self.ishape, self.oshape)
-
-
-        def forward(self, maps: np.ndarray) -> np.ndarray:
-            cube = jax_utils.lmm_maps2cube(maps, self.templates)
-            return jax_utils.idft(jax_utils.dft(cube) * self.sotf, (self.maps.shape[1], self.maps.shape[2]))
-        
-        def adjoint(self, cube: np.ndarray) -> np.ndarray:
-            conv_cube = jax_utils.idft(jax_utils.dft(cube) * self.sotf.conj(), (self.maps.shape[1], self.maps.shape[2]))
-            return jax_utils.lmm_cube2maps(conv_cube, self.templates)
-
-
-    maps = global_variable_testing.maps
-    templates = global_variable_testing.templates
-    im_shape = global_variable_testing.im_shape
-    wavelength_axis = global_variable_testing.wavelength_axis
-    sotf = global_variable_testing.sotf
-
-    lmmConv_class = LMMConv(sotf, maps, templates, wavelength_axis)
+    lmmConv_class = CT_Model.CT_spectro(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis)
 
     assert dottest(lmmConv_class)
 
 
-def test_interpn_python_dottest():
+def test_ST_dottest():
     """
     Model : y = STx
 
@@ -392,7 +203,7 @@ def test_interpn_python_dottest():
 
 
 
-def test_slicing_python_dottest():
+def test_LT_dottest():
     """
     Model : y = LTx
 
@@ -401,66 +212,6 @@ def test_slicing_python_dottest():
     T : LMM transformation operator
     x : Hyperspectral cube of size (4, Nx, Ny)
     """
-    class SlicerModel(LinOp):
-        def __init__(
-                    self,
-                    sotf: array,
-                    templates: array,
-                    alpha_axis: array,
-                    beta_axis: array,
-                    wavelength_axis: array,
-                    instr: instru.IFU,  
-                    step_degree: float
-                    ):
-            self.sotf = sotf
-            self.templates = templates
-            self.alpha_axis = alpha_axis
-            self.beta_axis = beta_axis
-            self.wavelength_axis = wavelength_axis
-            self.instr = instr
-            self.step_degree = step_degree
-
-            local_alpha_axis, local_beta_axis = self.instr.fov.local_coords(step_degree, 0, 0)#5* step_degree, 5* step_degree)
-            
-            self.local_alpha_axis = local_alpha_axis
-            self.local_beta_axis = local_beta_axis
-
-            self.slicer = slicer.Slicer(self.instr, 
-                                        wavelength_axis = self.wavelength_axis, 
-                                        alpha_axis = self.alpha_axis, 
-                                        beta_axis = self.beta_axis, 
-                                        local_alpha_axis = self.local_alpha_axis, 
-                                        local_beta_axis = self.local_beta_axis)
-            
-            # Templates (4, Nx, Ny)
-            ishape = (len(self.wavelength_axis), len(alpha_axis), len(beta_axis))
-            
-            # 4D array [Nslit, L, alpha_slit, beta_slit]
-            oshape = (self.instr.n_slit, len(self.wavelength_axis), self.slicer.npix_slit_alpha_width, self.slicer.npix_slit_beta_width)
-
-
-            super().__init__(ishape=ishape, oshape=oshape)
-
-
-        @property
-        def n_alpha(self) -> int:
-            """The number of input pixel inside a slit (along slit dim)"""
-            return self.instr.fov.local.n_alpha(self.step_degree)
-
-        def forward(self, cube: array) -> array:
-            allsliced = np.zeros(self.oshape)
-            for slit_idx in range(self.instr.n_slit):
-                sliced = self.slicer.slicing(cube, slit_idx)
-                allsliced[slit_idx] = sliced
-            return allsliced
-
-
-        def adjoint(self, slices: array) -> array:
-            cube = np.zeros((len(self.wavelength_axis), self.ishape[1], self.ishape[2]))
-            for slit_idx in range(self.instr.n_slit):
-                sliced = slices[slit_idx]
-                cube += self.slicer.slicing_t(sliced, slit_idx, (len(self.wavelength_axis), self.ishape[1], self.ishape[2]))
-            return cube
 
     maps = global_variable_testing.maps
     templates = global_variable_testing.templates
@@ -497,11 +248,13 @@ def test_slicing_python_dottest():
         name="2A"
     )
 
-    sliceModel = SlicerModel(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
+    from surfh.DottestModels import LT_Model
+
+    sliceModel = LT_Model.LT_spectro(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
     assert dottest(sliceModel)
 
 
-def test_spectral_conv_cython_dottest():
+def test_R_dottest():
     """
     Model : y = Rx
 
@@ -512,72 +265,6 @@ def test_spectral_conv_cython_dottest():
     # [λ', α, β] = ∑_λ arr[λ, α, β] wpsf[λ', λ, β]
     # Σ_λ
     """
-    class WBlur(LinOp):
-        def __init__(
-                    self,
-                    sotf: array,
-                    templates: array,
-                    alpha_axis: array,
-                    beta_axis: array,
-                    wavelength_axis: array,
-                    instr: instru.IFU,  
-                    step_degree: float
-                    ):
-            self.sotf = sotf
-            self.templates = templates
-            self.alpha_axis = alpha_axis
-            self.beta_axis = beta_axis
-            self.wavelength_axis = wavelength_axis
-            self.instr = instr
-            self.step_degree = step_degree
-
-            local_alpha_axis, local_beta_axis = self.instr.fov.local_coords(step_degree, 0, 0)#5* step_degree, 5* step_degree)
-            
-            self.local_alpha_axis = local_alpha_axis
-            self.local_beta_axis = local_beta_axis
-
-
-            ishape = (len(self.wavelength_axis), len(alpha_axis), len(beta_axis))#maps.shape
-            oshape = (len(self.instr.wavel_axis), len(alpha_axis), len(beta_axis))
-            super().__init__(ishape=ishape, oshape=oshape)
-            print(self.ishape, self.oshape)
-
-
-        def _wpsf(self, length: int, step: float, wavel_axis: np.ndarray, instr: instru.IFU, wslice) -> np.ndarray:
-            """Return spectral PSF"""
-            # ∈ [0, β_s]
-            beta_in_slit = np.arange(0, length) * step
-            wpsf = instr.spectral_psf(
-                            beta_in_slit - np.mean(beta_in_slit),  # ∈ [-β_s / 2, β_s / 2]
-                            wavel_axis[wslice],
-                            arcsec2micron=instr.wavel_step / instr.det_pix_size,
-                            type='mrs',
-                        )  
-            return wpsf
-
-
-        def forward(self, inarray: np.ndarray) -> np.ndarray:
-            wpsf = self._wpsf(length=inarray.shape[1],
-                    step=step_Angle.degree,
-                    wavel_axis=wavelength_axis,
-                    instr=rchan,
-                    wslice=slice(0, n_lamnda, None)
-                    )
-            return cython_utils.wblur(inarray, wpsf, 1)
-        
-        def adjoint(self, inarray: np.ndarray) -> np.ndarray:
-            wpsf = self._wpsf(length=inarray.shape[1],
-                    step=step_Angle.degree,
-                    wavel_axis=wavelength_axis,
-                    instr=rchan,
-                    wslice=slice(0, n_lamnda, None)
-                    )
-            return cython_utils.wblur_t(inarray, wpsf.conj(), 1)
-
-        def mapsToCube(self, maps):
-            return jax_utils.lmm_maps2cube(maps, self.templates)
-
-
     templates = global_variable_testing.templates
     maps = global_variable_testing.maps
     instr_wavelength_axis = global_variable_testing.wavelength_axis
@@ -620,7 +307,9 @@ def test_spectral_conv_cython_dottest():
         name="2A",
     )
 
-    wblurModel = WBlur(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
+    from surfh.DottestModels import R_Model
+
+    wblurModel = R_Model.R_spectro(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
     cube = wblurModel.mapsToCube(maps)
 
     assert dottest(wblurModel)
@@ -634,100 +323,7 @@ def test_RL_dottest():
     R : Spectral blur operator
     L : Slicing operation
     x : Hyperspectral cube of size (4, Nx, Ny)
-    """
-    class RLModel(LinOp):
-        def __init__(
-                    self,
-                    sotf: array,
-                    templates: array,
-                    alpha_axis: array,
-                    beta_axis: array,
-                    wavelength_axis: array,
-                    instr: instru.IFU,  
-                    step_degree: float
-                    ):
-            self.sotf = sotf
-            self.templates = templates
-            self.alpha_axis = alpha_axis
-            self.beta_axis = beta_axis
-            self.wavelength_axis = wavelength_axis
-            self.instr = instr
-            self.step_degree = step_degree
-
-            local_alpha_axis, local_beta_axis = self.instr.fov.local_coords(step_degree, 0, 0)#5* step_degree, 5* step_degree)
-            
-            self.local_alpha_axis = local_alpha_axis
-            self.local_beta_axis = local_beta_axis
-
-            self.slicer = slicer.Slicer(self.instr, 
-                                        wavelength_axis = self.wavelength_axis, 
-                                        alpha_axis = self.alpha_axis, 
-                                        beta_axis = self.beta_axis, 
-                                        local_alpha_axis = self.local_alpha_axis, 
-                                        local_beta_axis = self.local_beta_axis)
-            
-            # Templates (4, Nx, Ny)
-            ishape = (len(wavelength_axis), len(alpha_axis), len(beta_axis))
-            
-            # 4D array [Nslit, L, alpha_slit, beta_slit]
-            oshape = (self.instr.n_slit, len(self.instr.wavel_axis), self.slicer.npix_slit_alpha_width, self.slicer.npix_slit_beta_width)
-
-
-            super().__init__(ishape=ishape, oshape=oshape)
-
-
-        @property
-        def n_alpha(self) -> int:
-            """The number of input pixel inside a slit (along slit dim)"""
-            return self.instr.fov.local.n_alpha(self.step_degree)
-        
-        @property
-        def beta_step(self) -> float:
-            return self.beta_axis[1] - self.beta_axis[0]
-
-        def _wpsf(self, length: int, step: float, wavel_axis: np.ndarray, instr: instru.IFU, wslice) -> np.ndarray:
-            """Return spectral PSF"""
-            # ∈ [0, β_s]
-            beta_in_slit = np.arange(0, length) * step
-            wpsf = instr.spectral_psf(
-                            beta_in_slit - np.mean(beta_in_slit),  # ∈ [-β_s / 2, β_s / 2]
-                            wavel_axis[wslice],
-                            arcsec2micron=instr.wavel_step / instr.det_pix_size,
-                            type='mrs',
-                        )  
-            return wpsf
-
-        def forward(self, cube: np.ndarray) -> np.ndarray:
-            allsliced = np.zeros(self.oshape)
-            for slit_idx in range(self.instr.n_slit):
-                sliced = self.slicer.slicing(cube, slit_idx)
-            
-                wpsf = self._wpsf(length=sliced.shape[2],
-                        step=self.beta_step,
-                        wavel_axis=self.wavelength_axis,
-                        instr=self.instr,
-                        wslice=slice(0, len(self.wavelength_axis), None)
-                        )
-                blurred_sliced = cython_utils.wblur(sliced, wpsf.conj(), 1)
-                allsliced[slit_idx] = blurred_sliced
-            return allsliced
-        
-        def adjoint(self, inarray: np.ndarray) -> np.ndarray:
-            cube = np.zeros((len(self.wavelength_axis), self.ishape[1], self.ishape[2]))
-            for slit_idx in range(self.instr.n_slit):
-                wpsf = self._wpsf(length=inarray.shape[1],
-                    step=self.beta_step,
-                    wavel_axis=self.wavelength_axis,
-                    instr=self.instr,
-                    wslice=slice(0, len(self.wavelength_axis), None)
-                    )
-                blurred_t_sliced = cython_utils.wblur_t(inarray[slit_idx], wpsf.conj(), 1)
-                cube += self.slicer.slicing_t(blurred_t_sliced, slit_idx, (len(self.wavelength_axis), self.ishape[1], self.ishape[2]))
-
-            return cube
-        
-
-
+    """    
     templates = global_variable_testing.templates
     maps = global_variable_testing.maps
     instr_wavelength_axis = global_variable_testing.wavelength_axis
@@ -770,7 +366,9 @@ def test_RL_dottest():
         name="2A",
     )
 
-    rlModel = RLModel(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
+    from surfh.DottestModels import RL_Model
+
+    rlModel = RL_Model.RL_spectro(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
 
     assert dottest(rlModel, rtol=1e-2, echo=True)
 
@@ -784,101 +382,7 @@ def test_RLT_dottest():
     L : Slicing operation
     x : Hyperspectral cube of size (4, Nx, Ny)
     """
-    class RLTModel(LinOp):
-        def __init__(
-                    self,
-                    sotf: array,
-                    templates: array,
-                    alpha_axis: array,
-                    beta_axis: array,
-                    wavelength_axis: array,
-                    instr: instru.IFU,  
-                    step_degree: float
-                    ):
-            self.sotf = sotf
-            self.templates = templates
-            self.alpha_axis = alpha_axis
-            self.beta_axis = beta_axis
-            self.wavelength_axis = wavelength_axis
-            self.instr = instr
-            self.step_degree = step_degree
-
-            local_alpha_axis, local_beta_axis = self.instr.fov.local_coords(step_degree, 0, 0)#5* step_degree, 5* step_degree)
-            
-            self.local_alpha_axis = local_alpha_axis
-            self.local_beta_axis = local_beta_axis
-
-            self.slicer = slicer.Slicer(self.instr, 
-                                        wavelength_axis = self.wavelength_axis, 
-                                        alpha_axis = self.alpha_axis, 
-                                        beta_axis = self.beta_axis, 
-                                        local_alpha_axis = self.local_alpha_axis, 
-                                        local_beta_axis = self.local_beta_axis)
-            
-            # Templates (4, Nx, Ny)
-            ishape = (self.templates.shape[0], len(alpha_axis), len(beta_axis))
-            
-            # 4D array [Nslit, L, alpha_slit, beta_slit]
-            oshape = (self.instr.n_slit, len(self.instr.wavel_axis), self.slicer.npix_slit_alpha_width, self.slicer.npix_slit_beta_width)
-
-            self.cube_shape = (len(self.wavelength_axis), len(alpha_axis), len(beta_axis))
-
-            super().__init__(ishape=ishape, oshape=oshape)
-
-
-        @property
-        def n_alpha(self) -> int:
-            """The number of input pixel inside a slit (along slit dim)"""
-            return self.instr.fov.local.n_alpha(self.step_degree)
-        
-        @property
-        def beta_step(self) -> float:
-            return self.beta_axis[1] - self.beta_axis[0]
-
-        def _wpsf(self, length: int, step: float, wavel_axis: np.ndarray, instr: instru.IFU, wslice) -> np.ndarray:
-            """Return spectral PSF"""
-            # ∈ [0, β_s]
-            beta_in_slit = np.arange(0, length) * step
-            wpsf = instr.spectral_psf(
-                            beta_in_slit - np.mean(beta_in_slit),  # ∈ [-β_s / 2, β_s / 2]
-                            wavel_axis[wslice],
-                            arcsec2micron=instr.wavel_step / instr.det_pix_size,
-                            type='mrs',
-                        )  
-            return wpsf
-
-        def forward(self, maps: np.ndarray) -> np.ndarray:
-            cube = jax_utils.lmm_maps2cube(maps, self.templates).reshape(self.cube_shape)
-            allsliced = np.zeros(self.oshape)
-            wpsf = self._wpsf(length=self.oshape[3],
-                        step=self.beta_step,
-                        wavel_axis=self.wavelength_axis,
-                        instr=self.instr,
-                        wslice=slice(0, len(self.wavelength_axis), None)
-                        )
-            for slit_idx in range(self.instr.n_slit):
-                sliced = self.slicer.slicing(cube, slit_idx)
-                blurred_sliced = jax_utils.wblur(sliced, wpsf)
-                allsliced[slit_idx] = blurred_sliced
-            return allsliced
-        
-        def adjoint(self, inarray: np.ndarray) -> np.ndarray:
-            cube = np.zeros((len(self.wavelength_axis), self.ishape[1], self.ishape[2]))
-            wpsf = self._wpsf(length=self.oshape[3],
-                    step=self.beta_step,
-                    wavel_axis=self.wavelength_axis,
-                    instr=self.instr,
-                    wslice=slice(0, len(self.wavelength_axis), None)
-                    )
-            for slit_idx in range(self.instr.n_slit):
-                blurred_t_sliced = jax_utils.wblur_t(inarray[slit_idx], wpsf.conj())
-                cube += self.slicer.slicing_t(blurred_t_sliced, slit_idx, (len(self.wavelength_axis), self.ishape[1], self.ishape[2]))
-
-            maps = jax_utils.lmm_cube2maps(cube, self.templates).reshape(self.ishape)
-            return maps
-        
-
-
+    
     im_slice = slice(0,150,None)
     templates = global_variable_testing.templates
     maps = global_variable_testing.maps
@@ -922,7 +426,9 @@ def test_RLT_dottest():
     name="2A",
     )
 
-    rltModel = RLTModel(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
+    from surfh.DottestModels import RLT_Model
+
+    rltModel = RLT_Model.RLT_spectro(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
 
     assert dottest(rltModel, rtol=1e-3, echo=True)
 
@@ -936,110 +442,7 @@ def test_SigRLT_dottest():
     L : Slicing operator
     T : LMM operator
     x : Hyperspectral cube of size (4, Nx, Ny)
-    """
-    class SigRLTModel(LinOp):
-        def __init__(
-                    self,
-                    sotf: array,
-                    templates: array,
-                    alpha_axis: array,
-                    beta_axis: array,
-                    wavelength_axis: array,
-                    instr: instru.IFU,  
-                    step_degree: float
-                    ):
-            self.sotf = sotf
-            self.templates = templates
-            self.alpha_axis = alpha_axis
-            self.beta_axis = beta_axis
-            self.wavelength_axis = wavelength_axis
-            self.instr = instr
-            self.step_degree = step_degree
-
-            local_alpha_axis, local_beta_axis = self.instr.fov.local_coords(step_degree, 0, 0)#5* step_degree, 5* step_degree)
-            
-            self.local_alpha_axis = local_alpha_axis
-            self.local_beta_axis = local_beta_axis
-
-            self.slicer = slicer.Slicer(self.instr, 
-                                        wavelength_axis = self.wavelength_axis, 
-                                        alpha_axis = self.alpha_axis, 
-                                        beta_axis = self.beta_axis, 
-                                        local_alpha_axis = self.local_alpha_axis, 
-                                        local_beta_axis = self.local_beta_axis)
-            
-            # Templates (4, Nx, Ny)
-            ishape = (self.templates.shape[0], len(alpha_axis), len(beta_axis))
-            
-            # 4D array [Nslit, L, alpha_slit, beta_slit]
-            oshape = (self.instr.n_slit, len(self.instr.wavel_axis), self.slicer.npix_slit_alpha_width)
-
-            self.cube_shape = (len(self.wavelength_axis), len(alpha_axis), len(beta_axis))
-
-            super().__init__(ishape=ishape, oshape=oshape)
-
-
-        @property
-        def n_alpha(self) -> int:
-            """The number of input pixel inside a slit (along slit dim)"""
-            return self.instr.fov.local.n_alpha(self.step_degree)
-        
-        @property
-        def beta_step(self) -> float:
-            return self.beta_axis[1] - self.beta_axis[0]
-
-        def _wpsf(self, length: int, step: float, wavel_axis: np.ndarray, instr: instru.IFU, wslice) -> np.ndarray:
-            """Return spectral PSF"""
-            # ∈ [0, β_s]
-            beta_in_slit = np.arange(0, length) * step
-            wpsf = instr.spectral_psf(
-                            beta_in_slit - np.mean(beta_in_slit),  # ∈ [-β_s / 2, β_s / 2]
-                            wavel_axis[wslice],
-                            arcsec2micron=instr.wavel_step / instr.det_pix_size,
-                            type='mrs',
-                        )  
-            return wpsf
-
-        def forward(self, maps: np.ndarray) -> np.ndarray:
-            cube = jax_utils.lmm_maps2cube(maps, self.templates).reshape(self.cube_shape)
-            allsliced = np.zeros(self.oshape)
-            wpsf = self._wpsf(length=self.slicer.npix_slit_beta_width,
-                        step=self.beta_step,
-                        wavel_axis=self.wavelength_axis,
-                        instr=self.instr,
-                        wslice=slice(0, len(self.wavelength_axis), None)
-                        )
-            for slit_idx in range(self.instr.n_slit):
-                sliced = self.slicer.slicing(cube, slit_idx)
-                blurred_sliced_subsampled = jax_utils.wblur_subSampling(sliced, wpsf)
-                allsliced[slit_idx] = blurred_sliced_subsampled
-            return allsliced
-        
-        def adjoint(self, inarray: np.ndarray) -> np.ndarray:
-            cube = np.zeros((len(self.wavelength_axis), self.ishape[1], self.ishape[2]))
-            wpsf = self._wpsf(length=self.slicer.npix_slit_beta_width,
-                    step=self.beta_step,
-                    wavel_axis=self.wavelength_axis,
-                    instr=self.instr,
-                    wslice=slice(0, len(self.wavelength_axis), None)
-                    )
-            for slit_idx in range(self.instr.n_slit):
-                oversampled_sliced = np.repeat(
-                        np.expand_dims(
-                            inarray[slit_idx],
-                            axis=2,
-                        ),
-                        self.slicer.npix_slit_beta_width,
-                        axis=2,
-                    )
-                blurred_t_sliced = jax_utils.wblur_t(oversampled_sliced, wpsf.conj())
-                cube += self.slicer.slicing_t(blurred_t_sliced, slit_idx, (len(self.wavelength_axis), self.ishape[1], self.ishape[2]))
-
-            maps = jax_utils.lmm_cube2maps(cube, self.templates).reshape(self.ishape)
-            return maps
-        
-
-
+    """      
     im_slice = slice(0,150,None)
     templates = global_variable_testing.templates
     maps = global_variable_testing.maps
@@ -1083,7 +486,8 @@ def test_SigRLT_dottest():
     name="2A",
     )
 
-    sigrltModel = SigRLTModel(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
+    from surfh.DottestModels import SigRLT_Model
+    sigrltModel = SigRLT_Model.SigRLT_spectro(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
 
     assert dottest(sigrltModel, rtol=1e-3, echo=True)
  
@@ -1098,112 +502,7 @@ def test_SigRLCT_dottest():
     C : Spatial convolution operator
     T : LMM operator
     x : Hyperspectral cube of size (4, Nx, Ny)
-    """
-    class SigRLCTModel(LinOp):
-        def __init__(
-                    self,
-                    sotf: array,
-                    templates: array,
-                    alpha_axis: array,
-                    beta_axis: array,
-                    wavelength_axis: array,
-                    instr: instru.IFU,  
-                    step_degree: float
-                    ):
-            self.sotf = sotf
-            self.templates = templates
-            self.alpha_axis = alpha_axis
-            self.beta_axis = beta_axis
-            self.wavelength_axis = wavelength_axis
-            self.instr = instr
-            self.step_degree = step_degree
-
-            local_alpha_axis, local_beta_axis = self.instr.fov.local_coords(step_degree, 0, 0)#5* step_degree, 5* step_degree)
-            
-            self.local_alpha_axis = local_alpha_axis
-            self.local_beta_axis = local_beta_axis
-
-            self.slicer = slicer.Slicer(self.instr, 
-                                        wavelength_axis = self.wavelength_axis, 
-                                        alpha_axis = self.alpha_axis, 
-                                        beta_axis = self.beta_axis, 
-                                        local_alpha_axis = self.local_alpha_axis, 
-                                        local_beta_axis = self.local_beta_axis)
-            
-            # Templates (4, Nx, Ny)
-            ishape = (self.templates.shape[0], len(alpha_axis), len(beta_axis))
-            
-            # 4D array [Nslit, L, alpha_slit, beta_slit]
-            oshape = (self.instr.n_slit, len(self.instr.wavel_axis), self.slicer.npix_slit_alpha_width)
-
-            self.cube_shape = (len(self.wavelength_axis), len(alpha_axis), len(beta_axis))
-
-            super().__init__(ishape=ishape, oshape=oshape)
-
-
-        @property
-        def n_alpha(self) -> int:
-            """The number of input pixel inside a slit (along slit dim)"""
-            return self.instr.fov.local.n_alpha(self.step_degree)
-        
-        @property
-        def beta_step(self) -> float:
-            return self.beta_axis[1] - self.beta_axis[0]
-
-        def _wpsf(self, length: int, step: float, wavel_axis: np.ndarray, instr: instru.IFU, wslice) -> np.ndarray:
-            """Return spectral PSF"""
-            # ∈ [0, β_s]
-            beta_in_slit = np.arange(0, length) * step
-            wpsf = instr.spectral_psf(
-                            beta_in_slit - np.mean(beta_in_slit),  # ∈ [-β_s / 2, β_s / 2]
-                            wavel_axis[wslice],
-                            arcsec2micron=instr.wavel_step / instr.det_pix_size,
-                            type='mrs',
-                        )  
-            return wpsf
-
-        
-        def forward(self, maps: np.ndarray) -> np.ndarray:
-            cube = jax_utils.lmm_maps2cube(maps, self.templates).reshape(self.cube_shape)
-            blurred_cube = jax_utils.idft(jax_utils.dft(cube) * self.sotf, (self.ishape[1], self.ishape[2]))
-            allsliced = np.zeros(self.oshape)
-            wpsf = self._wpsf(length=self.slicer.npix_slit_beta_width,
-                        step=self.beta_step,
-                        wavel_axis=self.wavelength_axis,
-                        instr=self.instr,
-                        wslice=slice(0, len(self.wavelength_axis), None)
-                        )
-            for slit_idx in range(self.instr.n_slit):
-                sliced = self.slicer.slicing(blurred_cube, slit_idx)
-                blurred_sliced_subsampled = jax_utils.wblur_subSampling(sliced, wpsf)
-                allsliced[slit_idx] = blurred_sliced_subsampled
-            return allsliced
-        
-        def adjoint(self, inarray: np.ndarray) -> np.ndarray:
-            cube = np.zeros((len(self.wavelength_axis), self.ishape[1], self.ishape[2]))
-            wpsf = self._wpsf(length=self.slicer.npix_slit_beta_width,
-                    step=self.beta_step,
-                    wavel_axis=self.wavelength_axis,
-                    instr=self.instr,
-                    wslice=slice(0, len(self.wavelength_axis), None)
-                    )
-            for slit_idx in range(self.instr.n_slit):
-                oversampled_sliced = np.repeat(
-                        np.expand_dims(
-                            inarray[slit_idx],
-                            axis=2,
-                        ),
-                        self.slicer.npix_slit_beta_width,
-                        axis=2,
-                    )
-                blurred_t_sliced = jax_utils.wblur_t(oversampled_sliced, wpsf.conj())
-                cube += self.slicer.slicing_t(blurred_t_sliced, slit_idx, (len(self.wavelength_axis), self.ishape[1], self.ishape[2]))
-
-            blurred_t_cube = jax_utils.idft(jax_utils.dft(cube) * self.sotf.conj(), (self.ishape[1], self.ishape[2]))
-            maps = jax_utils.lmm_cube2maps(blurred_t_cube, self.templates).reshape(self.ishape)
-            return maps
-        
-
+    """       
     import udft
 
     im_slice = slice(0,150,None)
@@ -1252,7 +551,8 @@ def test_SigRLCT_dottest():
     name="2A",
     )
 
-    sigrlctModel = SigRLCTModel(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
+    from surfh.DottestModels import SigRLCT_Model
+    sigrlctModel = SigRLCT_Model.SigRLCT_spectro(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
 
     assert dottest(sigrlctModel, rtol=1e-3, echo=True)
  

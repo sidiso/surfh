@@ -1,16 +1,8 @@
 import pytest
 import numpy as np
 from aljabr import LinOp, dottest
-import matplotlib.pyplot as plt
 
-import scipy as sp
-from scipy import misc
-from surfh.Models import slicer
-from surfh.ToolsDir import jax_utils, python_utils, cython_utils, utils
-from astropy import units as u
-from astropy.coordinates import Angle
-from numpy.random import standard_normal as randn 
-
+from surfh.ToolsDir import jax_utils, python_utils, cython_utils
 from surfh.Models import instru, slicer
 
 from typing import List, Tuple
@@ -18,16 +10,14 @@ from numpy import ndarray as array
 
 
 """
-Model : y = SigRLTx
+Model : y = RLTx
 
-y : Hyperspectral slices of size (Nslices, L, Sx)
-Sig : Beta subsampling operator
+y : Hyperspectral slices of size (Nslices, L', Sx, Sy)
 R : Spectral blur operator
-L : Slicing operator
-T : LMM operator
+L : Slicing operation
 x : Hyperspectral cube of size (4, Nx, Ny)
 """
-class SigRLT_spectro(LinOp):
+class RL_spectro(LinOp):
     def __init__(
                 self,
                 sotf: array,
@@ -59,12 +49,11 @@ class SigRLT_spectro(LinOp):
                                     local_beta_axis = self.local_beta_axis)
         
         # Templates (4, Nx, Ny)
-        ishape = (self.templates.shape[0], len(alpha_axis), len(beta_axis))
+        ishape = (len(wavelength_axis), len(alpha_axis), len(beta_axis))
         
         # 4D array [Nslit, L, alpha_slit, beta_slit]
-        oshape = (self.instr.n_slit, len(self.instr.wavel_axis), self.slicer.npix_slit_alpha_width)
+        oshape = (self.instr.n_slit, len(self.instr.wavel_axis), self.slicer.npix_slit_alpha_width, self.slicer.npix_slit_beta_width)
 
-        self.cube_shape = (len(self.wavelength_axis), len(alpha_axis), len(beta_axis))
 
         super().__init__(ishape=ishape, oshape=oshape)
 
@@ -90,48 +79,31 @@ class SigRLT_spectro(LinOp):
                     )  
         return wpsf
 
-    def forward(self, maps: np.ndarray) -> np.ndarray:
-        cube = jax_utils.lmm_maps2cube(maps, self.templates).reshape(self.cube_shape)
+    def forward(self, cube: np.ndarray) -> np.ndarray:
         allsliced = np.zeros(self.oshape)
-        wpsf = self._wpsf(length=self.slicer.npix_slit_beta_width,
+        for slit_idx in range(self.instr.n_slit):
+            sliced = self.slicer.slicing(cube, slit_idx)
+        
+            wpsf = self._wpsf(length=sliced.shape[2],
                     step=self.beta_step,
                     wavel_axis=self.wavelength_axis,
                     instr=self.instr,
                     wslice=slice(0, len(self.wavelength_axis), None)
                     )
-        for slit_idx in range(self.instr.n_slit):
-            sliced = self.slicer.slicing(cube, slit_idx)
-            blurred_sliced_subsampled = jax_utils.wblur_subSampling(sliced, wpsf)
-            allsliced[slit_idx] = blurred_sliced_subsampled
+            blurred_sliced = cython_utils.wblur(sliced, wpsf.conj(), 1)
+            allsliced[slit_idx] = blurred_sliced
         return allsliced
     
     def adjoint(self, inarray: np.ndarray) -> np.ndarray:
         cube = np.zeros((len(self.wavelength_axis), self.ishape[1], self.ishape[2]))
-        wpsf = self._wpsf(length=self.slicer.npix_slit_beta_width,
+        for slit_idx in range(self.instr.n_slit):
+            wpsf = self._wpsf(length=inarray.shape[1],
                 step=self.beta_step,
                 wavel_axis=self.wavelength_axis,
                 instr=self.instr,
                 wslice=slice(0, len(self.wavelength_axis), None)
                 )
-        for slit_idx in range(self.instr.n_slit):
-            oversampled_sliced = np.repeat(
-                        np.expand_dims(
-                            inarray[slit_idx],
-                            axis=2,
-                        ),
-                        self.slicer.npix_slit_beta_width,
-                        axis=2,
-                    )
-            blurred_t_sliced = jax_utils.wblur_t(oversampled_sliced, wpsf.conj())
+            blurred_t_sliced = cython_utils.wblur_t(inarray[slit_idx], wpsf.conj(), 1)
             cube += self.slicer.slicing_t(blurred_t_sliced, slit_idx, (len(self.wavelength_axis), self.ishape[1], self.ishape[2]))
 
-        maps = jax_utils.lmm_cube2maps(cube, self.templates).reshape(self.ishape)
-        return maps
-    
-    def cubeTomaps(self, cube):
-        return jax_utils.lmm_cube2maps(cube, self.templates)
-    
-    def mapsToCube(self, maps):
-        return jax_utils.lmm_maps2cube(maps, self.templates)
-    
-
+        return cube

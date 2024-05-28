@@ -224,12 +224,12 @@ wavelength_axis = np.array([7.51115, 7.51491, 7.51867, 7.52243, 7.52619, 7.52995
 8.69621, 8.70056, 8.70491, 8.70927, 8.71362, 8.71798, 8.72234,8.7267 , 8.73107, 8.73544, 8.7398 , 8.74417, 8.74855, 8.75292])
 
 
-templates = np.array([[0.2*x + 11 for x in range(307)],
-                        [0.3*x + 15 for x in range(307)],
-                        [0.4*x + 16 for x in range(307)],
-                        [0.5*x + 17 for x in range(307)]])
+templates = np.array([[0.2*x + 11 for x in range(len(wavelength_axis))],
+                        [0.3*x + 15 for x in range(len(wavelength_axis))],
+                        [0.4*x + 16 for x in range(len(wavelength_axis))],
+                        [0.5*x + 17 for x in range(len(wavelength_axis))]])
 
-
+       
 np.random.seed(19940407)
 maps = np.random.random((4,im_shape[0],im_shape[1]))
 
