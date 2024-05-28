@@ -55,9 +55,18 @@ def lmm_cube2maps_idft_mult(a, b, tpl, im_shape):
 
 
 #### wblur
-
 @jit
 def wblur(arr, wpsf):
+    return jnp.sum(
+            # in [1, λ, α, β]
+            jnp.expand_dims(arr, axis=0)
+            # wpsf in [λ', λ, 1, β]
+            * jnp.expand_dims(wpsf, axis=2),
+            axis=1,
+        )
+
+@jit
+def wblur_subSampling(arr, wpsf):
     return jnp.sum(jnp.sum(
             # in [1, λ, α, β]
             jnp.expand_dims(arr, axis=0)
@@ -68,6 +77,16 @@ def wblur(arr, wpsf):
 
 @jit
 def wblur_t(arr, wpsf):
+    return jnp.sum(
+        # in [λ', 1, α, β]
+        jnp.expand_dims(arr, axis=1)
+        # wpsf in [λ', λ, 1, β]
+        * jnp.expand_dims(wpsf, axis=2),
+        axis=0,
+    )
+
+@jit
+def wblur_t_overSampling(arr, wpsf):
     return jnp.sum(
         # in [λ', 1, α, β]
         jnp.expand_dims(arr, axis=1)

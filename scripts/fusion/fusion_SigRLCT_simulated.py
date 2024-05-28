@@ -1,8 +1,19 @@
+import matplotlib.pyplot as plt
 import numpy as np
-from surfh.Models import instru
+
+from scipy.signal import convolve2d as conv2
+from astropy.io import fits
+from astropy import units as u
+from astropy.coordinates import Angle
 import udft
 
-im_shape = (251,251)
+from surfh.Simulation import simulation_data
+from surfh.DottestModels import SigRLCT_Model
+from surfh.ToolsDir import utils
+
+from surfh.Simulation import fusion_CT
+from surfh.Models import instru
+from surfh.ToolsDir import fusion_mixing
 
 chan_wavelength_axis = np.array([7.51065023, 7.51195023, 7.51325023, 7.51455023, 7.51585023,
        7.51715023, 7.51845023, 7.51975023, 7.52105023, 7.52235023,
@@ -200,46 +211,73 @@ chan_wavelength_axis = np.array([7.51065023, 7.51195023, 7.51325023, 7.51455023,
        8.76515023, 8.76645023, 8.76775023, 8.76905023, 8.77035023])
 
 
-wavelength_axis = np.array([7.51115, 7.51491, 7.51867, 7.52243, 7.52619, 7.52995, 7.53372, 7.53749, 7.54126, 7.54503, 7.5488 , 7.55258, 7.55636,
-7.56013, 7.56391, 7.5677 , 7.57148, 7.57527, 7.57906, 7.58285,7.58664, 7.59043, 7.59423, 7.59803, 7.60183, 7.60563, 7.60943,
-7.61324, 7.61705, 7.62086, 7.62467, 7.62848, 7.6323 , 7.63611,7.63993, 7.64375, 7.64758, 7.6514 , 7.65523, 7.65906, 7.66289,
-7.66672, 7.67055, 7.67439, 7.67823, 7.68207, 7.68591, 7.68975,7.6936 , 7.69745, 7.7013 , 7.70515, 7.709  , 7.71286, 7.71671,
-7.72057, 7.72444, 7.7283 , 7.73216, 7.73603, 7.7399 , 7.74377,7.74764, 7.75152, 7.7554 , 7.75927, 7.76315, 7.76704, 7.77092,
-7.77481, 7.7787 , 7.78259, 7.78648, 7.79037, 7.79427, 7.79817,7.80207, 7.80597, 7.80987, 7.81378, 7.81769, 7.8216 , 7.82551,
-7.82942, 7.83334, 7.83726, 7.84117, 7.8451 , 7.84902, 7.85294,7.85687, 7.8608 , 7.86473, 7.86867, 7.8726 , 7.87654, 7.88048,
-7.88442, 7.88836, 7.89231, 7.89626, 7.9002 , 7.90416, 7.90811,7.91206, 7.91602, 7.91998, 7.92394, 7.9279 , 7.93187, 7.93583,
-7.9398 , 7.94377, 7.94775, 7.95172, 7.9557 , 7.95968, 7.96366,7.96764, 7.97163, 7.97561, 7.9796 , 7.98359, 7.98759, 7.99158,
-7.99558, 7.99958, 8.00358, 8.00758, 8.01158, 8.01559, 8.0196 ,8.02361, 8.02762, 8.03164, 8.03565, 8.03967, 8.04369, 8.04772,
-8.05174, 8.05577, 8.0598 , 8.06383, 8.06786, 8.0719 , 8.07593,8.07997, 8.08401, 8.08806, 8.0921 , 8.09615, 8.1002 , 8.10425,
-8.1083 , 8.11236, 8.11641, 8.12047, 8.12453, 8.1286 , 8.13266,8.13673, 8.1408 , 8.14487, 8.14894, 8.15302, 8.1571 , 8.16118,
-8.16526, 8.16934, 8.17343, 8.17751, 8.1816 , 8.1857 , 8.18979,8.19389, 8.19798, 8.20208, 8.20619, 8.21029, 8.2144 , 8.2185 ,
-8.22261, 8.22673, 8.23084, 8.23496, 8.23908, 8.2432 , 8.24732,8.25144, 8.25557, 8.2597 , 8.26383, 8.26796, 8.2721 , 8.27624,
-8.28037, 8.28452, 8.28866, 8.2928 , 8.29695, 8.3011 , 8.30525,8.30941, 8.31356, 8.31772, 8.32188, 8.32604, 8.33021, 8.33437,
-8.33854, 8.34271, 8.34688, 8.35106, 8.35523, 8.35941, 8.36359,8.36778, 8.37196, 8.37615, 8.38034, 8.38453, 8.38872, 8.39292,
-8.39711, 8.40131, 8.40552, 8.40972, 8.41392, 8.41813, 8.42234,8.42656, 8.43077, 8.43499, 8.4392 , 8.44342, 8.44765, 8.45187,
-8.4561 , 8.46033, 8.46456, 8.46879, 8.47303, 8.47727, 8.48151,8.48575, 8.48999, 8.49424, 8.49849, 8.50274, 8.50699, 8.51124,
-8.5155 , 8.51976, 8.52402, 8.52828, 8.53255, 8.53681, 8.54108,8.54536, 8.54963, 8.55391, 8.55818, 8.56246, 8.56675, 8.57103,
-8.57532, 8.57961, 8.5839 , 8.58819, 8.59248, 8.59678, 8.60108,8.60538, 8.60969, 8.61399, 8.6183 , 8.62261, 8.62692, 8.63124,
-8.63555, 8.63987, 8.64419, 8.64852, 8.65284, 8.65717, 8.6615 ,8.66583, 8.67016, 8.6745 , 8.67884, 8.68318, 8.68752, 8.69187,
-8.69621, 8.70056, 8.70491, 8.70927, 8.71362, 8.71798, 8.72234,8.7267 , 8.73107, 8.73544, 8.7398 , 8.74417, 8.74855, 8.75292])
+"""
+Create Model and simulation
+"""
+origin_alpha_axis, origin_beta_axis, wavel_axis, sotf, maps, templates = simulation_data.get_simulation_data(8) # subsampling to reduce dim of maps
 
+step = 0.025 # arcsec
+step_Angle = Angle(step, u.arcsec)
 
-templates = np.array([[0.2*x + 11 for x in range(307)],
-                        [0.3*x + 15 for x in range(307)],
-                        [0.4*x + 16 for x in range(307)],
-                        [0.5*x + 17 for x in range(307)]])
+origin_alpha_width = origin_alpha_axis[-1] - origin_alpha_axis[0]
+origin_beta_width = origin_beta_axis[-1] - origin_beta_axis[0]
 
-
-np.random.seed(19940407)
-maps = np.random.random((4,im_shape[0],im_shape[1]))
-
-
-spsf = np.load('/home/nmonnier/Data/JWST/Orion_bar/All_bands_psf/psfs_pixscale0.025_fov11.25_date_300123.npy')[:len(wavelength_axis)]
-spsf = spsf[:, (100-0):(351+0), (100-0):(351+0)]
-sotf = udft.ir2fr(spsf, im_shape)
-
+origin_alpha_width_arcsec = origin_alpha_width*3600
+origin_beta_width_arcsec = origin_beta_width*3600
 
 grating_resolution = np.mean([2990, 3110])
 spec_blur = instru.SpectralBlur(grating_resolution)
 
-                  
+# Def Channel spec.
+rchan = instru.IFU(
+    fov=instru.FOV((origin_alpha_width_arcsec-0.125)/3600, (origin_beta_width_arcsec-0.125)/3600, origin=instru.Coord(0, 0), angle=0),
+    det_pix_size=0.196,
+    n_slit=17,
+    w_blur=spec_blur,
+    pce=None,
+    wavel_axis=chan_wavelength_axis,
+    name="2A",
+)
+
+spectroModel = SigRLCT_Model.SigRLCTModel(sotf, templates, origin_alpha_axis, origin_beta_axis, wavel_axis, rchan, step_Angle.degree)
+
+y = spectroModel.forward(maps)
+real_cube = spectroModel.mapsToCube(maps)
+
+
+"""
+Reconstruction method
+"""
+hyperParameter = 1e5
+method = "lcg"
+niter = 1000
+value_init = 0
+
+quadCrit_fusion = fusion_CT.QuadCriterion_MRS(mu_spectro=1, 
+                                                    y_spectro=np.copy(y), 
+                                                    model_spectro=spectroModel, 
+                                                    mu_reg=hyperParameter, 
+                                                    printing=True, 
+                                                    gradient="separated"
+                                                    )
+
+res_fusion = quadCrit_fusion.run_method(method, niter, perf_crit = 1, calc_crit=True, value_init=value_init)
+
+
+y_cube = spectroModel.mapsToCube(res_fusion.x)
+
+utils.plot_maps(res_fusion.x)
+
+y_adj = spectroModel.adjoint(y)
+y_adj_cube = spectroModel.mapsToCube(y_adj)
+utils.plot_3_cube(real_cube, y_cube, y_cube)
+
+plt.figure()
+xtick = np.arange(len(quadCrit_fusion.L_crit_val))*5
+plt.plot(xtick, quadCrit_fusion.L_crit_val)
+plt.yscale("log")
+plt.xticks(fontsize=20)
+plt.yticks(fontsize=20)
+
+plt.show()
+

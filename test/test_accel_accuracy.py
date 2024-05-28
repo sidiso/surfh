@@ -229,7 +229,7 @@ def test_interpolation_FoV2cube_python_cython():
             ]
         ).T
 
-    c_degridded = python_utils.interpn_local2cube(wavel_idx, 
+    p_degridded = python_utils.interpn_local2cube(wavel_idx, 
                                             local_alpha_axis.ravel(), 
                                             local_beta_axis.ravel(), 
                                             c_gridded, 
@@ -243,4 +243,137 @@ def test_interpolation_FoV2cube_python_cython():
                                             optimized_global_coords, 
                                             cube_out_shape)
 
-    assert np.allclose(c_degridded, c_degridded)
+    assert np.allclose(p_degridded, c_degridded)
+
+
+"""
+Spectral blur 
+"""
+def test_wblur_python_cython_jax():
+
+    def _wpsf(length: int, step: float, wavel_axis: np.ndarray, instr: instru.IFU, wslice) -> np.ndarray:
+            """Return spectral PSF"""
+            # ∈ [0, β_s]
+            beta_in_slit = np.arange(0, length) * step
+            wpsf = instr.spectral_psf(
+                            beta_in_slit - np.mean(beta_in_slit),  # ∈ [-β_s / 2, β_s / 2]
+                            wavel_axis[wslice],
+                            arcsec2micron=instr.wavel_step / instr.det_pix_size,
+                            type='mrs',
+                        )  
+            return wpsf
+
+
+    templates = global_variable_testing.templates
+    instr_wavelength_axis = global_variable_testing.wavelength_axis
+    n_lamnda = 200
+    cube_walength_step = (instr_wavelength_axis[1]-instr_wavelength_axis[0])*2 # Set arbitrary wavel_axis 
+    wavelength_axis = np.arange(instr_wavelength_axis[0], instr_wavelength_axis[-1], cube_walength_step)
+    n_lamnda = len(wavelength_axis)
+
+    im_shape = global_variable_testing.im_shape
+    local_shape = (im_shape[0]-100, im_shape[1]-100)
+
+    cube = np.random.random((n_lamnda, im_shape[0]-150, im_shape[1]-150)) # Make smaller cube for easier memory computation
+    out_cube = np.zeros_like(cube)
+
+    step = 0.025 # arcsec
+    step_Angle = Angle(step, u.arcsec)
+
+
+    grating_resolution = global_variable_testing.grating_resolution
+    spec_blur = global_variable_testing.spec_blur
+
+    # Def Channel spec.
+    rchan = instru.IFU(
+        fov=instru.FOV(2.0/3600, 2.8/3600, origin=instru.Coord(0, 0), angle=45),
+        det_pix_size=0.196,
+        n_slit=17,
+        w_blur=spec_blur,
+        pce=None,
+        wavel_axis=instr_wavelength_axis,
+        name="2A",
+    )
+
+    wpsf = _wpsf(length=cube.shape[1],
+                    step=step_Angle.degree,
+                    wavel_axis=wavelength_axis,
+                    instr=rchan,
+                    wslice=slice(0, n_lamnda, None)
+                    )
+
+
+
+    python_wblurred_cube = python_utils.wblur(cube, wpsf)
+    cython_wblurred_cube = cython_utils.wblur(cube, wpsf, 1)
+    jax_wblurred_cube = jax_utils.wblur(cube, wpsf)
+
+    assert np.allclose(python_wblurred_cube, cython_wblurred_cube)
+    assert np.allclose(python_wblurred_cube, jax_wblurred_cube)
+
+
+def test_wblur_t_python_cython_jax():
+
+    def _wpsf(length: int, step: float, wavel_axis: np.ndarray, instr: instru.IFU, wslice) -> np.ndarray:
+            """Return spectral PSF"""
+            # ∈ [0, β_s]
+            beta_in_slit = np.arange(0, length) * step
+            wpsf = instr.spectral_psf(
+                            beta_in_slit - np.mean(beta_in_slit),  # ∈ [-β_s / 2, β_s / 2]
+                            wavel_axis[wslice],
+                            arcsec2micron=instr.wavel_step / instr.det_pix_size,
+                            type='mrs',
+                        )  
+            return wpsf
+
+
+    templates = global_variable_testing.templates
+    instr_wavelength_axis = global_variable_testing.wavelength_axis
+    n_lamnda = 200
+    cube_walength_step = (instr_wavelength_axis[1]-instr_wavelength_axis[0])*2 # Set arbitrary wavel_axis 
+    wavelength_axis = np.arange(instr_wavelength_axis[0], instr_wavelength_axis[-1], cube_walength_step)
+    n_lamnda = len(wavelength_axis)
+
+    im_shape = global_variable_testing.im_shape
+    local_shape = (im_shape[0]-100, im_shape[1]-100)
+
+    cube = np.random.random((n_lamnda, im_shape[0]-150, im_shape[1]-150)) # Make smaller cube for easier memory computation
+    out_cube = np.zeros_like(cube)
+
+    step = 0.025 # arcsec
+    step_Angle = Angle(step, u.arcsec)
+
+
+    grating_resolution = global_variable_testing.grating_resolution
+    spec_blur = global_variable_testing.spec_blur
+
+    # Def Channel spec.
+    rchan = instru.IFU(
+        fov=instru.FOV(2.0/3600, 2.8/3600, origin=instru.Coord(0, 0), angle=45),
+        det_pix_size=0.196,
+        n_slit=17,
+        w_blur=spec_blur,
+        pce=None,
+        wavel_axis=instr_wavelength_axis,
+        name="2A",
+    )
+
+    wpsf = _wpsf(length=cube.shape[1],
+                    step=step_Angle.degree,
+                    wavel_axis=wavelength_axis,
+                    instr=rchan,
+                    wslice=slice(0, n_lamnda, None)
+                    )
+
+
+
+    python_wblurred_cube = python_utils.wblur(cube, wpsf)
+    cython_wblurred_cube = cython_utils.wblur(cube, wpsf, 1)
+    jax_wblurred_cube = jax_utils.wblur(cube, wpsf)
+
+    t_python_wblurred_cube = python_utils.wblur_t(python_wblurred_cube, wpsf.conj())
+    t_cython_wblurred_cube = cython_utils.wblur_t(python_wblurred_cube, wpsf.conj(), 1)
+    t_jax_wblurred_cube = jax_utils.wblur_t(python_wblurred_cube, wpsf.conj())
+
+    assert np.allclose(t_python_wblurred_cube, t_cython_wblurred_cube)
+    assert np.allclose(t_python_wblurred_cube, t_jax_wblurred_cube)

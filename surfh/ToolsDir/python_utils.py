@@ -133,3 +133,48 @@ def interpn_local2cube(wavel_index: np.ndarray,
                                 bounds_error=False,
                                 fill_value=0,
                                 ).reshape(global_shape)
+
+def wblur(inarray: np.ndarray, wpsf: np.ndarray) -> np.ndarray:
+    """Apply blurring in λ axis
+    Parameters
+    ----------
+    arr: array-like
+      Input of shape [λ, α, β].
+    wpsf: array-like
+      Wavelength PSF of shape [λ', λ, β]
+    Returns
+    -------
+    out: array-like
+      A wavelength blurred array in [λ', α, β].
+    """
+    return np.sum(
+        # in [1, λ, α, β]
+        np.expand_dims(inarray, axis=0)
+        # wpsf in [λ', λ, 1, β]
+        * np.expand_dims(wpsf, axis=2),
+        axis=1,
+    )
+
+
+def wblur_t(inarray: np.ndarray, wpsf: np.ndarray) -> np.ndarray:
+    """Apply transpose of blurring in λ axis
+    Parameters
+    ----------
+    arr: array-like
+      Input of shape [λ', α, β].
+    wpsf: array-like
+      Wavelength PSF of shape [λ', λ, β]
+    Returns
+    -------
+    out: array-like
+      A wavelength blurred array in [λ, α, β].
+    """
+    # [λ, α, β] = ∑_λ' arr[λ', α, β] wpsf[λ', λ]
+    # Σ_λ'
+    return np.sum(
+        # in [λ', 1, α, β]
+        np.expand_dims(inarray, axis=1)
+        # wpsf in [λ', λ, 1, β]
+        * np.expand_dims(wpsf, axis=2),
+        axis=0,
+    )

@@ -10,7 +10,8 @@ from surfh.ToolsDir import cython_2D_interpolation, matrix_op, jax_utils
 
 
 # TODO Jax version : precompute slices 
-class newSlicer():
+# TODO Fix last colunm of beta not taking into account
+class Slicer():
 
     def __init__(self,
                  instr: instru.IFU,
@@ -60,6 +61,7 @@ class newSlicer():
         weights = self.get_slit_weights(slit_idx=slit_idx, slices=slices)   
         return gridded_cube[:, slices[0], slices[1]] * weights
 
+    # TODO Faut-il mettre les `weights` ici aussi ?
     def slicing_t(
         self,
         slit: array,
@@ -70,11 +72,10 @@ class newSlicer():
         out = np.zeros(local_shape)
         slices = self.get_slit_slices(slit_idx)
         weights = self.get_slit_weights(slit_idx, slices)
-        out[:, slices[0], slices[1]] = slit 
+        out[:, slices[0], slices[1]] = slit * weights
         return out
 
 
-    
     def slit_local_fov(self, slit_idx: int):
         """The FOV of slit `slit_idx` in local ref"""
         slit_fov = self.instr.slit_fov[slit_idx]
@@ -129,6 +130,12 @@ class newSlicer():
                     slices = (slices[0], slice(slices[1].start + 1, slices[1].stop))
             else:
                 slices = (slices[0], slice(slices[1].start, slices[1].stop - 1))
+
+        if (slices[0].stop - slices[0].start) > self.npix_slit_alpha_width:
+            slices = (slice(slices[0].start, slices[0].stop - 1), slices[1])
+        elif (slices[0].stop - slices[0].start) < self.npix_slit_alpha_width:
+            slices = (slice(slices[0].start, slices[0].stop + 1), slices[1])
+
         return slices
 
 

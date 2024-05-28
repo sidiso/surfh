@@ -1,5 +1,7 @@
 import numpy as np
 from surfh.ToolsDir import cython_2D_interpolation
+from surfh.ToolsDir import cythons_files
+
 
 
 """
@@ -55,3 +57,53 @@ def interpn_local2cube(wavel_index, local_alpha_axis, local_beta_axis, cube, glo
                                               bounds_error=False, 
                                               fill_value=0,).reshape(global_shape)
 
+"""
+Spectral blurring
+"""
+def wblur(arr: np.ndarray, wpsf: np.ndarray, num_threads: int) -> np.ndarray:
+    """Apply blurring in λ axis
+
+    Parameters
+    ----------
+    arr: array-like
+      Input of shape [λ, α, β].
+    wpsf: array-like
+      Wavelength PSF of shape [λ', λ, β]
+
+    Returns
+    -------
+    out: array-like
+      A wavelength blurred array in [λ', α, β].
+    """
+    # [λ', α, β] = ∑_λ arr[λ, α, β] wpsf[λ', λ, β]
+    # Σ_λ
+    #arr = np.moveaxis(arr, 0, -1)
+    result_array = cythons_files.c_wblur(np.ascontiguousarray(arr).astype(np.float64), 
+                                         np.ascontiguousarray(wpsf).astype(np.float64), 
+                                         wpsf.shape[1], arr.shape[1], 
+                                         arr.shape[2], wpsf.shape[0],
+                                         num_threads)
+    return result_array
+
+
+def wblur_t(arr: np.ndarray, wpsf: np.ndarray, num_threads: int) -> np.ndarray:
+    """Apply transpose of blurring in λ axis
+
+    Parameters
+    ----------
+    arr: array-like
+      Input of shape [λ', α, β].
+    wpsf: array-like
+      Wavelength PSF of shape [λ', λ, β]
+
+    Returns
+    -------
+    out: array-like
+      A wavelength blurred array in [λ, α, β].
+    """
+    # [λ, α, β] = ∑_λ' arr[λ', α, β] wpsf[λ', λ]
+    # Σ_λ'
+    result_array = cythons_files.c_wblur_t(arr, wpsf, wpsf.shape[1], 
+                                           arr.shape[1], arr.shape[2], 
+                                           wpsf.shape[0], num_threads)
+    return result_array

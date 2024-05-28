@@ -281,7 +281,7 @@ class FOV:
     angle: float = 0
 
     def local_coords(
-        self, step: float, alpha_margin: float = 0, beta_margin: float = 0
+        self, step: float, alpha_margin: float = 0, beta_margin: float = 0,
     ) -> Tuple[array, array]:
         """Returns regular Cartesian coordinates inside the FOV in self referential"""
 
@@ -302,7 +302,6 @@ class FOV:
             -self.beta_width / 2 - beta_margin, self.beta_width + 2 * beta_margin, step
         )
 
-        print("Length local alpha axis = ", len(alpha_axis))
         return alpha_axis, beta_axis
 
     def local2global(self, alpha_coords, beta_coords):
