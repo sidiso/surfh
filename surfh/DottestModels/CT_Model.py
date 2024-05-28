@@ -6,7 +6,7 @@ from surfh.ToolsDir import jax_utils, python_utils
 
 
 
-class CT_spectro(LinOp):
+class spectroCT(LinOp):
     """
     Model : y = CTa
 

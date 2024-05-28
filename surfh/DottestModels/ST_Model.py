@@ -8,7 +8,7 @@ from surfh.Models import instru
 
 
 
-class ST_spectro(LinOp):
+class spectroST(LinOp):
     """
     Model : y = STa
 

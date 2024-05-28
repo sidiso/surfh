@@ -19,7 +19,7 @@ x : Hyperspectral cube of size (L, Nx, Ny)
 # [λ', α, β] = ∑_λ arr[λ, α, β] wpsf[λ', λ, β]
 # Σ_λ
 """
-class R_spectro(LinOp):
+class spectroR(LinOp):
     def __init__(
                 self,
                 sotf: array,

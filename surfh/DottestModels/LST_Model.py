@@ -9,7 +9,7 @@ from surfh.Models import instru, slicer
 
 
 
-class LST_spectro(LinOp):
+class spectroLST(LinOp):
     """
     Model : y = STa
 

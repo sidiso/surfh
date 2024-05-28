@@ -17,7 +17,7 @@ R : Spectral blur operator
 L : Slicing operation
 x : Hyperspectral cube of size (4, Nx, Ny)
 """
-class RL_spectro(LinOp):
+class spectroRL(LinOp):
     def __init__(
                 self,
                 sotf: array,

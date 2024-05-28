@@ -6,7 +6,7 @@ from aljabr import LinOp, dottest
 from surfh.ToolsDir import jax_utils, python_utils, cython_utils
 from surfh.Models import instru
 
-class SCT_spectro(LinOp):
+class spectroSCT(LinOp):
     """
     Model : y = STa
 

@@ -30,7 +30,7 @@ def test_LMM_dottest():
 
     from surfh.DottestModels import T_Model
 
-    lmm_class = T_Model.T_spectro(maps, templates, wavelength_axis)
+    lmm_class = T_Model.spectroT(maps, templates, wavelength_axis)
 
     assert dottest(lmm_class)
 
@@ -51,7 +51,7 @@ def test_spatial_conv_dottest():
 
     from surfh.DottestModels import C_Model
 
-    conv_class = C_Model.C_spectro(sotf, maps, templates, wavelength_axis)
+    conv_class = C_Model.spectroC(sotf, maps, templates, wavelength_axis)
 
     assert dottest(conv_class)
 
@@ -85,7 +85,7 @@ def test_CT_dottest():
 
     from surfh.DottestModels import CT_Model
 
-    lmmConv_class = CT_Model.CT_spectro(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis)
+    lmmConv_class = CT_Model.spectroCT(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis)
 
     assert dottest(lmmConv_class)
 
@@ -250,7 +250,7 @@ def test_LT_dottest():
 
     from surfh.DottestModels import LT_Model
 
-    sliceModel = LT_Model.LT_spectro(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
+    sliceModel = LT_Model.spectroLT(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
     assert dottest(sliceModel)
 
 
@@ -309,7 +309,7 @@ def test_R_dottest():
 
     from surfh.DottestModels import R_Model
 
-    wblurModel = R_Model.R_spectro(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
+    wblurModel = R_Model.spectroR(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
     cube = wblurModel.mapsToCube(maps)
 
     assert dottest(wblurModel)
@@ -368,7 +368,7 @@ def test_RL_dottest():
 
     from surfh.DottestModels import RL_Model
 
-    rlModel = RL_Model.RL_spectro(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
+    rlModel = RL_Model.spectroRL(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
 
     assert dottest(rlModel, rtol=1e-2, echo=True)
 
@@ -428,7 +428,7 @@ def test_RLT_dottest():
 
     from surfh.DottestModels import RLT_Model
 
-    rltModel = RLT_Model.RLT_spectro(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
+    rltModel = RLT_Model.spectroRLT(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
 
     assert dottest(rltModel, rtol=1e-3, echo=True)
 
@@ -487,7 +487,7 @@ def test_SigRLT_dottest():
     )
 
     from surfh.DottestModels import SigRLT_Model
-    sigrltModel = SigRLT_Model.SigRLT_spectro(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
+    sigrltModel = SigRLT_Model.spectroSigRLT(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
 
     assert dottest(sigrltModel, rtol=1e-3, echo=True)
  
@@ -552,7 +552,7 @@ def test_SigRLCT_dottest():
     )
 
     from surfh.DottestModels import SigRLCT_Model
-    sigrlctModel = SigRLCT_Model.SigRLCT_spectro(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
+    sigrlctModel = SigRLCT_Model.spectroSigRLCT(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
 
     assert dottest(sigrlctModel, rtol=1e-3, echo=True)
  

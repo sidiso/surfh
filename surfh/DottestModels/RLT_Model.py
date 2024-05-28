@@ -16,7 +16,7 @@ from surfh.Models import instru, slicer
 from typing import List, Tuple
 from numpy import ndarray as array
 
-class RLT_spectro(LinOp):
+class spectroRLT(LinOp):
     def __init__(
                 self,
                 sotf: array,

@@ -28,7 +28,7 @@ C : Spatial convolution operator
 T : LMM operator
 x : Hyperspectral cube of size (4, Nx, Ny)
 """
-class SigRLSCTModel(LinOp):
+class spectroSigRLSCT(LinOp):
     def __init__(
                 self,
                 sotf: array,

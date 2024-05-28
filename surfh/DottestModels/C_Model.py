@@ -4,7 +4,7 @@ from aljabr import LinOp, dottest
 
 from surfh.ToolsDir import jax_utils, python_utils
 
-class C_spectro(LinOp):
+class spectroC(LinOp):
     def __init__(
         self,
         sotf,

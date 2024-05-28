@@ -17,7 +17,7 @@ L : Slicing operation
 T : LMM transformation operator
 x : Hyperspectral cube of size (4, Nx, Ny)
 """
-class LT_spectro(LinOp):
+class spectroLT(LinOp):
     def __init__(
                 self,
                 sotf: array,
