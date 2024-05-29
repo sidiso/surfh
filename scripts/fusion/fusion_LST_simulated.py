@@ -34,7 +34,7 @@ ch2a = instru.IFU(
     name="2A",
 )
 
-spectroModel = LST_Model.LST_spectro(sotf=sotf,
+spectroModel = LST_Model.spectroLST(sotf=sotf,
                                    templates=tpl,
                                    alpha_axis=origin_beta_axis,
                                    beta_axis=origin_beta_axis,

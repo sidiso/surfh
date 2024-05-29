@@ -11,6 +11,7 @@ from surfh.Models import instru
 from astropy import units as u
 from astropy.coordinates import Angle
 from numpy.random import standard_normal as randn
+from surfh.ToolsDir import nearest_neighbor_interpolation
 
 
 def _check_points(points):
@@ -567,3 +568,15 @@ gridded_t_coord = interpn( (local_alpha_axis, local_beta_axis),
                         fill_value=0,)
 
 proj_cube = gridded[:,gridded_t_coord[:,0].astype(int), gridded_t_coord[:,1].astype(int)].reshape(307,251,251)
+
+
+test_cube_alpha_axis = np.tile(cube_alpha_axis, len(cube_beta_axis))
+test_cube_beta_axis= np.repeat(cube_beta_axis, len(cube_beta_axis))
+
+# gridata = griddata((test_cube_alpha_axis.ravel(), test_cube_beta_axis.ravel()), cube[0].ravel(), (local_alpha_coord, local_beta_coord))
+# degridata = griddata((local_alpha_coord.ravel(), local_beta_coord.ravel()), gridata.ravel(), (test_cube_alpha_axis.reshape(251,251), test_cube_beta_axis.reshape(251,251)))
+indexes = nearest_neighbor_interpolation.griddata((test_cube_alpha_axis.ravel(), test_cube_beta_axis.ravel()), cube[0].ravel(), (local_alpha_coord, local_beta_coord))
+gridata = cube[0].ravel()[indexes].reshape(local_alpha_coord.shape[0], local_alpha_coord.shape[1])
+
+indexes_t = nearest_neighbor_interpolation.griddata((local_alpha_coord.ravel(), local_beta_coord.ravel()), gridata.ravel(), (test_cube_alpha_axis.reshape(251,251), test_cube_beta_axis.reshape(251,251)))
+degridata = gridata.ravel()[indexes_t].reshape(251,251)

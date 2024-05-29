@@ -2,6 +2,8 @@ import pytest
 import numpy as np
 from numpy import ndarray as array
 from aljabr import LinOp, dottest
+from math import ceil
+
 
 from surfh.ToolsDir import jax_utils, python_utils, cython_utils
 from surfh.Models import instru

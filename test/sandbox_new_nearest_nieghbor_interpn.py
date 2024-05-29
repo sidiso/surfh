@@ -12,247 +12,110 @@ from astropy import units as u
 from astropy.coordinates import Angle
 from numpy.random import standard_normal as randn
 from scipy.spatial import cKDTree
+from surfh.ToolsDir import nearest_neighbor_interpolation
+
+# def tmp_test_interpolation_FoV2cube_python_cython():
+templates = global_variable_testing.templates
+n_lamnda = len(global_variable_testing.wavelength_axis)
+im_shape = global_variable_testing.im_shape
+local_shape = (im_shape[0]-100, im_shape[1]-100)
+cube = np.random.random((n_lamnda, im_shape[0], im_shape[1]))
+out_cube = np.zeros_like(cube)
+
+face = misc.face()
+face = face[::2,::4,:]
+face = face[:im_shape[0], :im_shape[1], 0]
+cube[:] = face
+
+# Wavelength index
+wavel_idx = np.arange(n_lamnda)
+
+step = 0.025 # arcsec
+step_Angle = Angle(step, u.arcsec)
+
+# Cube Coordinates
+cube_origin_alpha = 0
+cube_origin_beta = 0
+cube_alpha_axis = np.arange(im_shape[0]).astype(np.float64)* step_Angle.degree
+cube_beta_axis = np.arange(im_shape[1]).astype(np.float64)* step_Angle.degree
+cube_alpha_axis -= np.mean(cube_alpha_axis)
+cube_beta_axis -= np.mean(cube_beta_axis)
+cube_alpha_axis += cube_origin_alpha
+cube_beta_axis += cube_origin_beta
+cube_shape = cube.shape
+
+# Def Channel spec.
+ch2a = instru.IFU(
+    fov=instru.FOV(2.0/3600, 2.8/3600, origin=instru.Coord(0, 0), angle=45),
+    det_pix_size=0.196,
+    n_slit=17,
+    w_blur=None,
+    pce=None,
+    wavel_axis=None,
+    name="2A",
+)
+
+local_alpha_axis, local_beta_axis = ch2a.fov.local_coords(step_Angle.degree, 5* step_Angle.degree, 5* step_Angle.degree)
+local_alpha_coord, local_beta_coord = (ch2a.fov).local2global(
+        local_alpha_axis, local_beta_axis
+    )
+local_out_shape = (len(wavel_idx),) + local_alpha_coord.shape
 
 
-def griddata(points, values, xi, method='linear', fill_value=np.nan,
-             rescale=False):
+local_coords = np.vstack(
+        [
+            np.repeat(
+                np.repeat(wavel_idx.reshape((-1, 1, 1)), local_out_shape[1], axis=1),
+                local_out_shape[2],
+                axis=2,
+            ).ravel(),
+            np.repeat(local_alpha_coord[np.newaxis], local_out_shape[0], axis=0).ravel(),
+            np.repeat(local_beta_coord[np.newaxis], local_out_shape[0], axis=0).ravel(),
+        ]
+    ).T
 
-    points = _ndim_coords_from_arrays(points)
 
-    if points.ndim < 2:
-        ndim = points.ndim
-    else:
-        ndim = points.shape[-1]
-
-    ip = NearestNDInterpolator(points, values, rescale=rescale)
-    return ip(xi)
+optimized_local_coords = np.vstack(
+        [
+            local_alpha_coord.ravel(),
+            local_beta_coord.ravel()
+        ]
+    ).T 
 
 
-def _ndim_coords_from_arrays(points, ndim=None):
-    """
-    Convert a tuple of coordinate arrays to a (..., ndim)-shaped array.
 
-    """
-    j = n = 0
+gridded = cython_utils.interpn_cube2local(wavel_idx, 
+                                                    cube_alpha_axis, 
+                                                    cube_beta_axis, 
+                                                    cube, 
+                                                    optimized_local_coords, 
+                                                    local_out_shape)
 
-    if isinstance(points, tuple) and len(points) == 1:
-        # handle argument tuple
-        points = points[0]
-    if isinstance(points, tuple):
-        p = np.broadcast_arrays(*points)
-        n = len(p)
-        for j in range(1, n):
-            if p[j].shape != p[0].shape:
-                raise ValueError("coordinate arrays do not have the same shape")
-        points = np.empty(p[0].shape + (len(points),), dtype=float)
-        for j, item in enumerate(p):
-            points[...,j] = item
-    else:
-        points = np.asanyarray(points)
-        if points.ndim == 1:
-            if ndim is None:
-                points = points.reshape(-1, 1)
-            else:
-                points = points.reshape(-1, ndim)
-    return points
+test_cube_alpha_axis = np.tile(cube_alpha_axis, len(cube_beta_axis))
+test_cube_beta_axis= np.repeat(cube_beta_axis, len(cube_beta_axis))
 
-class NDInterpolatorBase:
-    def __init__(self, points, values, fill_value=np.nan, ndim=None,
-                 rescale=False, need_contiguous=True, need_values=True):
-        """
-        Check shape of points and values arrays, and reshape values to
-        (npoints, nvalues).  Ensure the `points` and values arrays are
-        C-contiguous, and of correct type.
-        """
+# gridata = griddata((test_cube_alpha_axis.ravel(), test_cube_beta_axis.ravel()), cube[0].ravel(), (local_alpha_coord, local_beta_coord))
+# degridata = griddata((local_alpha_coord.ravel(), local_beta_coord.ravel()), gridata.ravel(), (test_cube_alpha_axis.reshape(251,251), test_cube_beta_axis.reshape(251,251)))
+indexes = nearest_neighbor_interpolation.griddata((test_cube_alpha_axis.ravel(), test_cube_beta_axis.ravel()), cube[0].ravel(), (local_alpha_coord, local_beta_coord))
+wavel_indexes = np.tile(indexes, (len(wavel_idx),1)).reshape(len(wavel_idx), len(indexes)) + ((wavel_idx[...,np.newaxis])*cube[0].size )
+gridata = cube.ravel()[wavel_indexes].reshape(len(wavel_idx), local_alpha_coord.shape[0], local_alpha_coord.shape[1])
 
-        self.tri = None
+indexes_t = nearest_neighbor_interpolation.griddata((local_alpha_coord.ravel(), local_beta_coord.ravel()), gridata[0].ravel(), (test_cube_alpha_axis.reshape(251,251), test_cube_beta_axis.reshape(251,251)))
+wavel_indexes_t = np.tile(indexes_t, (len(wavel_idx),1)).reshape(len(wavel_idx), len(indexes_t)) + ((wavel_idx[...,np.newaxis])*local_alpha_coord.shape[0]* local_alpha_coord.shape[1] )
+degridata = gridata.ravel()[wavel_indexes_t].reshape(len(wavel_idx), 251,251)
 
-        points = _ndim_coords_from_arrays(points)
-
-        if need_contiguous:
-            points = np.ascontiguousarray(points, dtype=np.float64)
-
-        if not rescale:
-            self.scale = None
-            self.points = points
+mask = np.zeros_like(cube[0])
+mask.ravel()[indexes] = 1
+nmask = np.zeros_like(mask)
+for i in range(1,cube.shape[1]-1):
+    for j in range(1, cube.shape[2]-1):
+        if mask[i,j] == 1:
+            nmask[i,j] = 1
         else:
-            # scale to unit cube centered at 0
-            self.offset = np.mean(points, axis=0)
-            self.points = points - self.offset
-            self.scale = np.ptp(points, axis=0)
-            self.scale[~(self.scale > 0)] = 1.0  # avoid division by 0
-            self.points /= self.scale
-        
-        self._calculate_triangulation(self.points)
-        
-        if need_values or values is not None:
-            self._set_values(values, fill_value, need_contiguous, ndim)
-        else:
-            self.values = None
+            if mask[i-1, j-1] == 1 or mask[i, j-1] == 1 \
+                or mask[i+1, j-1] == 1 or mask[i-1, j] == 1\
+                or mask[i-1, j+1] == 1 or mask[i+1, j+1] == 1\
+                or mask[i, j+1] == 1 or mask[i+1, j] == 1:
+                nmask[i,j] = 1
 
-    def _calculate_triangulation(self, points):
-        pass
-
-    def _set_values(self, values, fill_value=np.nan, need_contiguous=True, ndim=None):
-        values = np.asarray(values)
-        _check_init_shape(self.points, values, ndim=ndim)
-
-        self.values_shape = values.shape[1:]
-        if values.ndim == 1:
-            self.values = values[:,None]
-        elif values.ndim == 2:
-            self.values = values
-        else:
-            self.values = values.reshape(values.shape[0],
-                                            np.prod(values.shape[1:]))
-        
-        # Complex or real?
-        self.is_complex = np.issubdtype(self.values.dtype, np.complexfloating)
-        if self.is_complex:
-            if need_contiguous:
-                self.values = np.ascontiguousarray(self.values,
-                                                    dtype=np.complex128)
-            self.fill_value = complex(fill_value)
-        else:
-            if need_contiguous:
-                self.values = np.ascontiguousarray(
-                    self.values, dtype=np.float64
-                )
-            self.fill_value = float(fill_value)
-
-    def _check_call_shape(self, xi):
-        xi = np.asanyarray(xi)
-        if xi.shape[-1] != self.points.shape[1]:
-            raise ValueError("number of dimensions in xi does not match x")
-        return xi
-
-    def _scale_x(self, xi):
-        if self.scale is None:
-            return xi
-        else:
-            return (xi - self.offset) / self.scale
-
-    def _preprocess_xi(self, *args):
-        xi = _ndim_coords_from_arrays(args, ndim=self.points.shape[1])
-        xi = self._check_call_shape(xi)
-        interpolation_points_shape = xi.shape
-        xi = xi.reshape(-1, xi.shape[-1])
-        xi = np.ascontiguousarray(xi, dtype=np.float64)
-        return self._scale_x(xi), interpolation_points_shape
-
-
-    def __call__(self, *args):
-        """
-        interpolator(xi)
-
-        Evaluate interpolator at given points.
-
-        Parameters
-        ----------
-        x1, x2, ... xn: array-like of float
-            Points where to interpolate data at.
-            x1, x2, ... xn can be array-like of float with broadcastable shape.
-            or x1 can be array-like of float with shape ``(..., ndim)``
-        """
-        xi, interpolation_points_shape = self._preprocess_xi(*args)
-
-        if self.is_complex:
-            r = self._evaluate_complex(xi)
-        else:
-            r = self._evaluate_double(xi)
-
-        return np.asarray(r).reshape(interpolation_points_shape[:-1] + self.values_shape)
-
-
-def _check_init_shape(points, values, ndim=None):
-    """
-    Check shape of points and values arrays
-
-    """
-    if values.shape[0] != points.shape[0]:
-        raise ValueError("different number of values and points")
-    if points.ndim != 2:
-        raise ValueError("invalid shape for input data points")
-    if points.shape[1] < 2:
-        raise ValueError("input data must be at least 2-D")
-    if ndim is not None and points.shape[1] != ndim:
-        raise ValueError("this mode of interpolation available only for "
-                         "%d-D data" % ndim)
-
-class NearestNDInterpolator(NDInterpolatorBase):
-    def __init__(self, x, y, rescale=False, tree_options=None):
-        NDInterpolatorBase.__init__(self, x, y, rescale=rescale,
-                                    need_contiguous=False,
-                                    need_values=False)
-        if tree_options is None:
-            tree_options = dict()
-        self.tree = cKDTree(self.points, **tree_options)
-        self.values = np.asarray(y)
-
-    def __call__(self, *args, **query_options):
-        """
-        Evaluate interpolator at given points.
-
-        Parameters
-        ----------
-        x1, x2, ... xn : array-like of float
-            Points where to interpolate data at.
-            x1, x2, ... xn can be array-like of float with broadcastable shape.
-            or x1 can be array-like of float with shape ``(..., ndim)``
-        **query_options
-            This allows ``eps``, ``p``, ``distance_upper_bound``, and ``workers``
-            being passed to the cKDTree's query function to be explicitly set.
-            See `scipy.spatial.cKDTree.query` for an overview of the different options.
-
-            .. versionadded:: 1.12.0
-
-        """
-        # For the sake of enabling subclassing, NDInterpolatorBase._set_xi performs
-        # some operations which are not required by NearestNDInterpolator.__call__, 
-        # hence here we operate on xi directly, without calling a parent class function.
-        xi = _ndim_coords_from_arrays(args, ndim=self.points.shape[1])
-        xi = self._check_call_shape(xi)
-        xi = self._scale_x(xi)
-
-        # We need to handle two important cases:
-        # (1) the case where xi has trailing dimensions (..., ndim), and
-        # (2) the case where y has trailing dimensions
-        # We will first flatten xi to deal with case (1),
-        # do the computation in flattened array while retaining y's dimensionality,
-        # and then reshape the interpolated values back to match xi's shape.
-
-        # Flatten xi for the query
-        xi_flat = xi.reshape(-1, xi.shape[-1])
-        original_shape = xi.shape
-        flattened_shape = xi_flat.shape
-
-        # if distance_upper_bound is set to not be infinite,
-        # then we need to consider the case where cKDtree
-        # does not find any points within distance_upper_bound to return.
-        # It marks those points as having infinte distance, which is what will be used
-        # below to mask the array and return only the points that were deemed
-        # to have a close enough neighbor to return something useful.
-        dist, i = self.tree.query(xi_flat, **query_options)
-        valid_mask = np.isfinite(dist)
-
-        # create a holder interp_values array and fill with nans.
-        if self.values.ndim > 1:
-            interp_shape = flattened_shape[:-1] + self.values.shape[1:]
-        else:
-            interp_shape = flattened_shape[:-1]
-
-        if np.issubdtype(self.values.dtype, np.complexfloating):
-            interp_values = np.full(interp_shape, np.nan, dtype=self.values.dtype)
-        else:
-            interp_values = np.full(interp_shape, np.nan)
-
-        interp_values[valid_mask] = self.values[i[valid_mask], ...]
-
-        if self.values.ndim > 1:
-            new_shape = original_shape[:-1] + self.values.shape[1:]
-        else:
-            new_shape = original_shape[:-1]
-        interp_values = interp_values.reshape(new_shape)
-
-        return interp_values
-
+plt.imshow(cube[0]*nmask-degridata*nmask)

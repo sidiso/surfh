@@ -239,7 +239,7 @@ rchan = instru.IFU(
     name="2A",
 )
 
-spectroModel = SigRLCT_Model.SigRLCTModel(sotf, templates, origin_alpha_axis, origin_beta_axis, wavel_axis, rchan, step_Angle.degree)
+spectroModel = SigRLCT_Model.spectroSigRLCT(sotf, templates, origin_alpha_axis, origin_beta_axis, wavel_axis, rchan, step_Angle.degree)
 
 y = spectroModel.forward(maps)
 real_cube = spectroModel.mapsToCube(maps)

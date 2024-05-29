@@ -239,7 +239,7 @@ rchan = instru.IFU(
     name="2A",
 )
 
-spectroModel = SigRLSCT_Model.SigRLSCTModel(sotf, templates, origin_alpha_axis, origin_beta_axis, wavel_axis, rchan, step_Angle.degree)
+spectroModel = SigRLSCT_Model.spectroSigRLSCT(sotf, templates, origin_alpha_axis, origin_beta_axis, wavel_axis, rchan, step_Angle.degree)
 
 y = spectroModel.forward(maps)
 real_cube = spectroModel.mapsToCube(maps)
@@ -250,7 +250,7 @@ Reconstruction method
 """
 hyperParameter = 1e6
 method = "lcg"
-niter = 50
+niter = 1000
 value_init = 0
 
 quadCrit_fusion = fusion_CT.QuadCriterion_MRS(mu_spectro=1, 

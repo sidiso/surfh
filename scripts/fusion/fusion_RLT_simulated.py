@@ -8,7 +8,7 @@ from astropy.coordinates import Angle
 import udft
 
 from surfh.Simulation import simulation_data
-from surfh.DottestModels import RLT_Model
+from surfh.DottestModels import RLT_Model, LT_Model
 from surfh.ToolsDir import utils
 
 from surfh.Simulation import fusion_CT
@@ -235,11 +235,11 @@ rchan = instru.IFU(
     n_slit=17,
     w_blur=spec_blur,
     pce=None,
-    wavel_axis=chan_wavelength_axis,
+    wavel_axis=wavel_axis,
     name="2A",
 )
 
-spectroModel = RLT_Model.RLTModel(sotf, templates, origin_alpha_axis, origin_beta_axis, wavel_axis, rchan, step_Angle.degree)
+spectroModel = LT_Model.spectroLT(sotf, templates, origin_alpha_axis, origin_beta_axis, wavel_axis, rchan, step_Angle.degree)
 
 y = spectroModel.forward(maps)
 real_cube = spectroModel.mapsToCube(maps)
@@ -250,7 +250,7 @@ Reconstruction method
 """
 hyperParameter = 0
 method = "lcg"
-niter = 1000
+niter = 10
 value_init = 0
 
 quadCrit_fusion = fusion_CT.QuadCriterion_MRS(mu_spectro=1, 
