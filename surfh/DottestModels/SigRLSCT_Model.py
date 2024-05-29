@@ -193,7 +193,7 @@ class spectroSigRLSCT(LinOp):
                                                    self.cube_shape)
         
         blurred_t_cube = jax_utils.idft(jax_utils.dft(degridded) * self.sotf.conj(), (self.ishape[1], self.ishape[2]))
-        maps = jax_utils.lmm_cube2maps(blurred_t_cube, self.templates).reshape(self.ishape)
+        maps = jax_utils.lmm_cube2maps(degridded, self.templates).reshape(self.ishape)
         return maps
     
     def cubeTomaps(self, cube):

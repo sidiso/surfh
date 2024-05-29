@@ -8,7 +8,7 @@ from astropy.coordinates import Angle
 import udft
 
 from surfh.Simulation import simulation_data
-from surfh.DottestModels import SigRLSCT_Model
+from surfh.DottestModels import MO_SigRLSCT_Model
 from surfh.ToolsDir import utils
 
 from surfh.Simulation import fusion_CT
@@ -239,7 +239,21 @@ rchan = instru.IFU(
     name="2A",
 )
 
-spectroModel = SigRLSCT_Model.spectroSigRLSCT(sotf, templates, origin_alpha_axis, origin_beta_axis, wavel_axis, rchan, step_Angle.degree)
+main_pointing = instru.Coord(0, 0)
+P1 = instru.Coord((rchan.det_pix_size/3600)/4, rchan.slit_beta_width/4)
+# P2 = instru.Coord(-(rchan.det_pix_size/3600)/2, rchan.slit_beta_width/2)
+# P3 = instru.Coord((rchan.det_pix_size/3600)/2, -rchan.slit_beta_width/2)
+P4 = instru.Coord(-(rchan.det_pix_size/3600)/4, -rchan.slit_beta_width/4)
+pointings = instru.CoordList([P1, P4]).pix(step_Angle.degree)
+
+spectroModel = MO_SigRLSCT_Model.spectroSigRLSCT(sotf, 
+                                              templates, 
+                                              origin_alpha_axis, 
+                                              origin_beta_axis, 
+                                              wavel_axis, 
+                                              rchan, 
+                                              step_Angle.degree, 
+                                              pointings)
 
 y = spectroModel.forward(maps)
 real_cube = spectroModel.mapsToCube(maps)
@@ -248,9 +262,9 @@ real_cube = spectroModel.mapsToCube(maps)
 """
 Reconstruction method
 """
-hyperParameter = 1e7
+hyperParameter = 0
 method = "lcg"
-niter = 1000
+niter = 8
 value_init = 0
 
 quadCrit_fusion = fusion_CT.QuadCriterion_MRS(mu_spectro=1, 
