@@ -375,5 +375,6 @@ def test_wblur_t_python_cython_jax():
     t_cython_wblurred_cube = cython_utils.wblur_t(python_wblurred_cube, wpsf.conj(), 1)
     t_jax_wblurred_cube = jax_utils.wblur_t(python_wblurred_cube, wpsf.conj())
 
-    assert np.allclose(t_python_wblurred_cube, t_cython_wblurred_cube)
     assert np.allclose(t_python_wblurred_cube, t_jax_wblurred_cube)
+    assert np.allclose(t_python_wblurred_cube, t_cython_wblurred_cube)
+    

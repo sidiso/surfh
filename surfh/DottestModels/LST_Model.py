@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy import ndarray as array
 from aljabr import LinOp, dottest
+from math import ceil
 
 from surfh.ToolsDir import jax_utils, python_utils, cython_utils
 from surfh.Models import instru, slicer
@@ -50,10 +51,16 @@ class spectroLST(LinOp):
                                         beta_axis = self.beta_axis, 
                                         local_alpha_axis = self.local_alpha_axis, 
                                         local_beta_axis = self.local_beta_axis)
-        
+
+
+        # Super resolution factor (in alpha dim)
+        self.srf = instru.get_srf(
+            self.instr.det_pix_size,
+            self.step_Angle*3600,
+        )
+
         self.local_shape =(len(self.wavelength_axis), len(local_alpha_axis), len(local_beta_axis))
         self.cube_shape = (len(self.wavelength_axis), len(self.alpha_axis), len(self.beta_axis))
-
 
         ishape = (self.templates.shape[0], len(alpha_axis), len(beta_axis))
         oshape = (self.instr.n_slit, len(self.wavelength_axis), self.slicer.npix_slit_alpha_width, self.slicer.npix_slit_beta_width)

@@ -2,6 +2,7 @@ import pytest
 import numpy as np
 from aljabr import LinOp, dottest
 import matplotlib.pyplot as plt
+from math import ceil
 
 import scipy as sp
 from scipy import misc
@@ -47,15 +48,26 @@ class spectroRLT(LinOp):
                                     local_alpha_axis = self.local_alpha_axis, 
                                     local_beta_axis = self.local_beta_axis)
         
+        # Super resolution factor (in alpha dim)
+        self.srf = instru.get_srf(
+            [self.instr.det_pix_size],
+            self.step_degree*3600,
+        )[0]
+        print(f'Super Resolution factor is set to {self.srf}')
+        
         # Templates (4, Nx, Ny)
         ishape = (self.templates.shape[0], len(alpha_axis), len(beta_axis))
         
         # 4D array [Nslit, L, alpha_slit, beta_slit]
-        oshape = (self.instr.n_slit, len(self.instr.wavel_axis), self.slicer.npix_slit_alpha_width, self.slicer.npix_slit_beta_width)
+        oshape = (self.instr.n_slit, len(self.instr.wavel_axis), ceil(self.slicer.npix_slit_alpha_width / self.srf), self.slicer.npix_slit_beta_width)
 
         self.cube_shape = (len(self.wavelength_axis), len(alpha_axis), len(beta_axis))
+        self.imshape = (len(alpha_axis), len(beta_axis))
 
         super().__init__(ishape=ishape, oshape=oshape)
+
+        # Convolution kernel used to cumulate or dupplicate oversampled pixels during slitting operator L
+        self._otf_sr =python_utils.udft.ir2fr(np.ones((self.srf, 1)), self.ishape[1:])[np.newaxis, ...]
 
 
     @property
@@ -82,31 +94,39 @@ class spectroRLT(LinOp):
     def forward(self, maps: np.ndarray) -> np.ndarray:
         cube = jax_utils.lmm_maps2cube(maps, self.templates).reshape(self.cube_shape)
         allsliced = np.zeros(self.oshape)
-        wpsf = self._wpsf(length=self.oshape[3],
-                    step=self.beta_step,
-                    wavel_axis=self.wavelength_axis,
-                    instr=self.instr,
-                    wslice=slice(0, len(self.wavelength_axis), None)
-                    )
+        wpsf = self._wpsf(length=self.slicer.npix_slit_beta_width,
+                step=self.beta_step,
+                wavel_axis=self.wavelength_axis,
+                instr=self.instr,
+                wslice=slice(0, len(self.wavelength_axis), None)
+                )
+        
+        sum_cube = jax_utils.idft(
+            jax_utils.dft(cube) * self._otf_sr,
+            self.imshape,
+        )
+
         for slit_idx in range(self.instr.n_slit):
-            sliced = self.slicer.slicing(cube, slit_idx)
-            blurred_sliced = jax_utils.wblur(sliced, wpsf)#cython_utils.wblur(sliced.astype(np.float64), (wpsf.conj()).astype(np.float64), 24)
-            allsliced[slit_idx] = blurred_sliced
+            sliced = self.slicer.slicing(sum_cube, slit_idx)
+            blurred_sliced = jax_utils.wblur(sliced, wpsf)
+            allsliced[slit_idx] = blurred_sliced[:, : self.oshape[2] * self.srf : self.srf,:]
         return allsliced
     
     def adjoint(self, inarray: np.ndarray) -> np.ndarray:
         cube = np.zeros((len(self.wavelength_axis), self.ishape[1], self.ishape[2]))
-        wpsf = self._wpsf(length=self.oshape[3],
+        wpsf = self._wpsf(length=self.slicer.npix_slit_beta_width,
                 step=self.beta_step,
                 wavel_axis=self.wavelength_axis,
                 instr=self.instr,
                 wslice=slice(0, len(self.wavelength_axis), None)
                 )
         for slit_idx in range(self.instr.n_slit):
-            blurred_t_sliced = jax_utils.wblur_t(inarray[slit_idx], wpsf.conj())#cython_utils.wblur_t(, 24)
+            blurred_t_sliced = np.zeros(self.slicer.get_slit_shape_t())
+            blurred_t_sliced[:,: self.oshape[2] * self.srf : self.srf,:] = jax_utils.wblur_t(inarray[slit_idx], wpsf.conj())
             cube += self.slicer.slicing_t(blurred_t_sliced, slit_idx, (len(self.wavelength_axis), self.ishape[1], self.ishape[2]))
 
-        maps = jax_utils.lmm_cube2maps(cube, self.templates).reshape(self.ishape)
+        sum_t_cube = jax_utils.idft(jax_utils.dft(cube) * self._otf_sr.conj(), self.ishape[1:])
+        maps = jax_utils.lmm_cube2maps(sum_t_cube, self.templates).reshape(self.ishape)
         return maps
     
     def cubeTomaps(self, cube):

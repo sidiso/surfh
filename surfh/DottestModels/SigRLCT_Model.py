@@ -10,6 +10,8 @@ from surfh.ToolsDir import jax_utils, python_utils, cython_utils, utils
 from astropy import units as u
 from astropy.coordinates import Angle
 from numpy.random import standard_normal as randn 
+from math import ceil
+
 
 from surfh.Models import instru, slicer
 
@@ -59,15 +61,26 @@ class spectroSigRLCT(LinOp):
                                     local_alpha_axis = self.local_alpha_axis, 
                                     local_beta_axis = self.local_beta_axis)
         
+        # Super resolution factor (in alpha dim)
+        self.srf = instru.get_srf(
+            [self.instr.det_pix_size],
+            self.step_degree*3600,
+        )[0]
+        print(f'Super Resolution factor is set to {self.srf}')
+
         # Templates (4, Nx, Ny)
         ishape = (self.templates.shape[0], len(alpha_axis), len(beta_axis))
         
         # 4D array [Nslit, L, alpha_slit, beta_slit]
-        oshape = (self.instr.n_slit, len(self.instr.wavel_axis), self.slicer.npix_slit_alpha_width)
+        oshape = (self.instr.n_slit, len(self.instr.wavel_axis), ceil(self.slicer.npix_slit_alpha_width / self.srf))
 
         self.cube_shape = (len(self.wavelength_axis), len(alpha_axis), len(beta_axis))
+        self.imshape = (len(alpha_axis), len(beta_axis))
 
         super().__init__(ishape=ishape, oshape=oshape)
+
+        # Convolution kernel used to cumulate or dupplicate oversampled pixels during slitting operator L
+        self._otf_sr =python_utils.udft.ir2fr(np.ones((self.srf, 1)), self.ishape[1:])[np.newaxis, ...]
 
 
     @property
@@ -104,12 +117,16 @@ class spectroSigRLCT(LinOp):
                     instr=self.instr,
                     wslice=slice(0, len(self.wavelength_axis), None)
                     )
+        sum_cube = jax_utils.idft(
+            jax_utils.dft(blurred_cube) * self._otf_sr,
+            self.imshape,
+        )
         for slit_idx in range(self.instr.n_slit):
             #L
-            sliced = self.slicer.slicing(blurred_cube, slit_idx)
+            sliced = self.slicer.slicing(sum_cube, slit_idx)
             # SigR
             blurred_sliced_subsampled = jax_utils.wblur_subSampling(sliced, wpsf)
-            allsliced[slit_idx] = blurred_sliced_subsampled
+            allsliced[slit_idx] = blurred_sliced_subsampled[:, : self.oshape[2] * self.srf : self.srf]
         return allsliced
     
     def adjoint(self, inarray: np.ndarray) -> np.ndarray:
@@ -129,10 +146,12 @@ class spectroSigRLCT(LinOp):
                     self.slicer.npix_slit_beta_width,
                     axis=2,
                 )
-            blurred_t_sliced = jax_utils.wblur_t(oversampled_sliced, wpsf.conj())
+            blurred_t_sliced = np.zeros(self.slicer.get_slit_shape_t())
+            blurred_t_sliced[:,: self.oshape[2] * self.srf : self.srf,:] = jax_utils.wblur_t(oversampled_sliced, wpsf.conj())
             cube += self.slicer.slicing_t(blurred_t_sliced, slit_idx, (len(self.wavelength_axis), self.ishape[1], self.ishape[2]))
 
-        blurred_t_cube = jax_utils.idft(jax_utils.dft(cube) * self.sotf.conj(), (self.ishape[1], self.ishape[2]))
+        sum_t_cube = jax_utils.idft(jax_utils.dft(cube) * self._otf_sr.conj(), self.ishape[1:])
+        blurred_t_cube = jax_utils.idft(jax_utils.dft(sum_t_cube) * self.sotf.conj(), (self.ishape[1], self.ishape[2]))
         maps = jax_utils.lmm_cube2maps(blurred_t_cube, self.templates).reshape(self.ishape)
         return maps
     

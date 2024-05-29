@@ -99,73 +99,6 @@ def test_ST_dottest():
     T : LMM transformation operator
     x : Hyperspectral cube of size (4, Nx, Ny)
     """
-    class Interpn(LinOp):
-        def __init__(
-                    self,
-                    sotf: array,
-                    templates: array,
-                    alpha_axis: array,
-                    beta_axis: array,
-                    wavelength_axis: array,
-                    instr: instru.IFU,  
-                    step_Angle: float
-                    ):
-            self.sotf = sotf
-            self.templates = templates
-            self.alpha_axis = alpha_axis
-            self.beta_axis = beta_axis
-            self.wavelength_axis = wavelength_axis
-            self.inst = instr
-            self.step_Angle = step_Angle
-
-            local_alpha_axis, local_beta_axis = self.inst.fov.local_coords(step_Angle.degree, 5* step_Angle.degree, 5* step_Angle.degree)
-            
-            self.local_alpha_axis = local_alpha_axis
-            self.local_beta_axis = local_beta_axis
-
-            ishape = (len(self.wavelength_axis), len(alpha_axis), len(beta_axis))
-            oshape = (len(self.wavelength_axis), len(local_alpha_axis), len(local_beta_axis))
-
-
-            super().__init__(ishape=ishape, oshape=oshape)
-
-        def forward(self, cube: np.ndarray) -> np.ndarray:
-            local_alpha_coord, local_beta_coord = self.inst.fov.local2global(
-                                                        self.local_alpha_axis, self.local_beta_axis
-                                                        )
-            optimized_local_coords = np.vstack(
-                                            [
-                                                local_alpha_coord.ravel(),
-                                                local_beta_coord.ravel()
-                                            ]
-                                            ).T 
-            return cython_utils.interpn_cube2local(self.wavelength_axis, 
-                                                   self.alpha_axis, 
-                                                   self.beta_axis, 
-                                                   cube, 
-                                                   optimized_local_coords, 
-                                                   self.oshape)
-        
-        def adjoint(self, fov: np.ndarray) -> np.ndarray:
-            
-            alpha_coord, beta_coord = self.inst.fov.global2local(
-                    self.alpha_axis, self.beta_axis
-                    )
-            
-            optimized_global_coords = np.vstack(
-                [
-                    alpha_coord.ravel(),
-                    beta_coord.ravel()
-                ]
-                ).T
-            
-            return cython_utils.interpn_local2cube(self.wavelength_axis, 
-                                                   self.local_alpha_axis.ravel(), 
-                                                   self.local_beta_axis.ravel(), 
-                                                   fov, 
-                                                   optimized_global_coords, 
-                                                   self.ishape)
-
     maps = global_variable_testing.maps
     templates = global_variable_testing.templates
     im_shape = global_variable_testing.im_shape
@@ -197,7 +130,60 @@ def test_ST_dottest():
         name="2A",
     )
 
-    interpn_class = Interpn(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, ch2a, step_Angle)
+    from surfh.DottestModels import ST_Model
+
+    interpn_class = ST_Model.spectroST(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, ch2a, step_Angle)
+
+    #print(dottest(interpn_class, num=10, echo=True))
+
+    assert dottest(interpn_class)
+
+
+def test_ST_NN_dottest():
+    """
+    Model : y = STx
+
+    y : Hyperspectral cube of size (L, Nx, Ny)
+    S : Interpolation operator using nearest neighbor approach
+    T : LMM transformation operator
+    x : Hyperspectral cube of size (4, Nx, Ny)
+    """
+    maps = global_variable_testing.maps
+    templates = global_variable_testing.templates
+    im_shape = global_variable_testing.im_shape
+    wavelength_axis = global_variable_testing.wavelength_axis
+    sotf = global_variable_testing.sotf
+
+    step = 0.025 # arcsec
+    step_Angle = Angle(step, u.arcsec)
+
+    cube_origin_alpha = 0
+    cube_origin_beta = 0
+    cube_alpha_axis = np.arange(im_shape[0]).astype(np.float64)* step_Angle.degree
+    cube_beta_axis = np.arange(im_shape[1]).astype(np.float64)* step_Angle.degree
+    cube_alpha_axis -= np.mean(cube_alpha_axis)
+    cube_beta_axis -= np.mean(cube_beta_axis)
+    cube_alpha_axis += cube_origin_alpha
+    cube_beta_axis += cube_origin_beta
+
+    
+
+    # Def Channel spec.
+    ch2a = instru.IFU(
+        fov=instru.FOV(2.0/3600, 2.8/3600, origin=instru.Coord(0, 0), angle=45),
+        det_pix_size=0.196,
+        n_slit=17,
+        w_blur=None,
+        pce=None,
+        wavel_axis=None,
+        name="2A",
+    )
+
+    from surfh.DottestModels import ST_Model
+
+    interpn_class = ST_Model.spectroSnearestT(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, ch2a, step_Angle)
+
+    #print(dottest(interpn_class, num=10, echo=True))
 
     assert dottest(interpn_class)
 
@@ -251,6 +237,8 @@ def test_LT_dottest():
     from surfh.DottestModels import LT_Model
 
     sliceModel = LT_Model.spectroLT(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
+    
+    # print(dottest(sliceModel, num=10, echo=True))
     assert dottest(sliceModel)
 
 
@@ -369,8 +357,8 @@ def test_RL_dottest():
     from surfh.DottestModels import RL_Model
 
     rlModel = RL_Model.spectroRL(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
-
-    assert dottest(rlModel, rtol=1e-2, echo=True)
+    # print(dottest(rlModel, num=10, echo=True))
+    assert dottest(rlModel, echo=True)
 
 
 def test_RLT_dottest():
@@ -430,7 +418,7 @@ def test_RLT_dottest():
 
     rltModel = RLT_Model.spectroRLT(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
 
-    assert dottest(rltModel, rtol=1e-3, echo=True)
+    assert dottest(rltModel, echo=True)
 
 def test_SigRLT_dottest():
     """
@@ -489,7 +477,7 @@ def test_SigRLT_dottest():
     from surfh.DottestModels import SigRLT_Model
     sigrltModel = SigRLT_Model.spectroSigRLT(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
 
-    assert dottest(sigrltModel, rtol=1e-3, echo=True)
+    assert dottest(sigrltModel, echo=True)
  
 def test_SigRLCT_dottest():
     """
@@ -554,5 +542,137 @@ def test_SigRLCT_dottest():
     from surfh.DottestModels import SigRLCT_Model
     sigrlctModel = SigRLCT_Model.spectroSigRLCT(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
 
-    assert dottest(sigrlctModel, rtol=1e-3, echo=True)
+    assert dottest(sigrlctModel, echo=True)
  
+
+def test_SigRLSCT_dottest():
+    """
+    Model : y = SigRLCTx
+
+    y : Hyperspectral slices of size (Nslices, L, Sx)
+    Sig : Beta subsampling operator
+    R : Spectral blur operator
+    L : Slicing operator
+    C : Spatial convolution operator
+    T : LMM operator
+    x : Hyperspectral cube of size (4, Nx, Ny)
+    """       
+    import udft
+
+    templates = global_variable_testing.templates
+    maps = global_variable_testing.maps
+
+    instr_wavelength_axis = global_variable_testing.chan_wavelength_axis
+    wavelength_axis = global_variable_testing.wavelength_axis
+    n_lamnda = len(wavelength_axis)
+
+    spsf = global_variable_testing.spsf
+    sotf = udft.ir2fr(spsf, (maps.shape[1], maps.shape[2]))
+
+    im_shape = global_variable_testing.im_shape
+
+    cube = np.random.random((n_lamnda, im_shape[0], im_shape[1])) # Make smaller cube for easier memory computation
+    out_cube = np.zeros_like(cube)
+
+    step = 0.025 # arcsec
+    step_Angle = Angle(step, u.arcsec)
+
+    cube_origin_alpha = 0
+    cube_origin_beta = 0
+    cube_alpha_axis = np.arange(cube.shape[1]).astype(np.float64)* step_Angle.degree
+    cube_beta_axis = np.arange(cube.shape[2]).astype(np.float64)* step_Angle.degree
+    cube_alpha_axis -= np.mean(cube_alpha_axis)
+    cube_beta_axis -= np.mean(cube_beta_axis)
+    cube_alpha_axis += cube_origin_alpha
+    cube_beta_axis += cube_origin_beta
+
+
+    grating_resolution = global_variable_testing.grating_resolution
+    spec_blur = global_variable_testing.spec_blur
+
+    # Def Channel spec.
+    rchan = instru.IFU(
+    fov=instru.FOV(4.0/3600, 4.8/3600, origin=instru.Coord(0, 0), angle=8.2),
+    det_pix_size=0.196,
+    n_slit=17,
+    w_blur=spec_blur,
+    pce=None,
+    wavel_axis=instr_wavelength_axis,
+    name="2A",
+    )
+
+    from surfh.DottestModels import SigRLSCT_Model
+    sigrlctModel = SigRLSCT_Model.spectroSigRLSCT(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
+
+
+    print(dottest(sigrlctModel, num=10, echo=True))
+
+    # assert dottest(sigrlctModel, rtol=1e-3, echo=True)
+
+
+def test_SigRLSCT_NN_dottest():
+    """
+    Model : y = SigRLCTx
+
+    y : Hyperspectral slices of size (Nslices, L, Sx)
+    Sig : Beta subsampling operator
+    R : Spectral blur operator
+    L : Slicing operator
+    S : Interpolation operator using nearest neighbor approach
+    C : Spatial convolution operator
+    T : LMM operator
+    x : Hyperspectral cube of size (4, Nx, Ny)
+    """       
+    import udft
+
+    templates = global_variable_testing.templates
+    maps = global_variable_testing.maps
+
+    instr_wavelength_axis = global_variable_testing.chan_wavelength_axis
+    wavelength_axis = global_variable_testing.wavelength_axis
+    n_lamnda = len(wavelength_axis)
+
+    spsf = global_variable_testing.spsf
+    sotf = udft.ir2fr(spsf, (maps.shape[1], maps.shape[2]))
+
+    im_shape = global_variable_testing.im_shape
+
+    cube = np.random.random((n_lamnda, im_shape[0], im_shape[1])) # Make smaller cube for easier memory computation
+    out_cube = np.zeros_like(cube)
+
+    step = 0.025 # arcsec
+    step_Angle = Angle(step, u.arcsec)
+
+    cube_origin_alpha = 0
+    cube_origin_beta = 0
+    cube_alpha_axis = np.arange(cube.shape[1]).astype(np.float64)* step_Angle.degree
+    cube_beta_axis = np.arange(cube.shape[2]).astype(np.float64)* step_Angle.degree
+    cube_alpha_axis -= np.mean(cube_alpha_axis)
+    cube_beta_axis -= np.mean(cube_beta_axis)
+    cube_alpha_axis += cube_origin_alpha
+    cube_beta_axis += cube_origin_beta
+
+
+    grating_resolution = global_variable_testing.grating_resolution
+    spec_blur = global_variable_testing.spec_blur
+
+    # Def Channel spec.
+    rchan = instru.IFU(
+    fov=instru.FOV(4.0/3600, 4.8/3600, origin=instru.Coord(0, 0), angle=8.2),
+    det_pix_size=0.196,
+    n_slit=17,
+    w_blur=spec_blur,
+    pce=None,
+    wavel_axis=instr_wavelength_axis,
+    name="2A",
+    )
+
+
+    from surfh.DottestModels import SigRLSCT_Model
+    sigrlctModel = SigRLSCT_Model.spectroSigRLSCT_NN(sotf, templates, cube_alpha_axis, cube_beta_axis, wavelength_axis, rchan, step_Angle.degree)
+
+    print(dottest(sigrlctModel, num=10, echo=True))
+
+    # assert dottest(sigrlctModel, rtol=1e-3, echo=True)
+
+test_SigRLSCT_NN_dottest()

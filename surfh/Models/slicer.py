@@ -46,6 +46,9 @@ class Slicer():
     
     @property
     def npix_slit_alpha_width(self):
+        """
+        Number of oversampled pixel in alpha dim
+        """
         step = self.local_alpha_axis[1] - self.local_alpha_axis[0]
         npix = int(ceil((self.slit_alpha_width / 2) / step)) - int(
             floor(-self.slit_alpha_width / 2 / step)
@@ -163,3 +166,15 @@ class Slicer():
             weights[:, -1] = 1
 
         return weights[np.newaxis, ...]
+
+    def get_slit_shape(self):
+        slices = self.get_slit_slices(0)
+        slice_alpha, slice_beta = slices
+        shape = (len(self.instr.wavel_axis), slice_alpha.stop - slice_alpha.start, slice_beta.stop - slice_beta.start)
+        return shape
+    
+    def get_slit_shape_t(self):
+        slices = self.get_slit_slices(0)
+        slice_alpha, slice_beta = slices
+        shape = (len(self.wavelength_axis), slice_alpha.stop - slice_alpha.start, slice_beta.stop - slice_beta.start)
+        return shape

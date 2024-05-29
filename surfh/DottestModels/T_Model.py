@@ -1,6 +1,8 @@
 import pytest
 import numpy as np
 from aljabr import LinOp, dottest
+from math import ceil
+
 
 from surfh.ToolsDir import jax_utils, python_utils
 

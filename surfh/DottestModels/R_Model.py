@@ -4,6 +4,8 @@ from aljabr import LinOp, dottest
 
 from surfh.ToolsDir import jax_utils, python_utils, cython_utils
 from surfh.Models import instru, slicer
+from math import ceil
+
 
 from typing import List, Tuple
 from numpy import ndarray as array
