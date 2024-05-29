@@ -15,6 +15,8 @@ from surfh.Simulation import fusion_CT
 from surfh.Models import instru
 from surfh.ToolsDir import fusion_mixing
 
+import pathlib
+
 chan_wavelength_axis = np.array([7.51065023, 7.51195023, 7.51325023, 7.51455023, 7.51585023,
        7.51715023, 7.51845023, 7.51975023, 7.52105023, 7.52235023,
        7.52365023, 7.52495023, 7.52625023, 7.52755023, 7.52885023,
@@ -241,10 +243,10 @@ rchan = instru.IFU(
 
 main_pointing = instru.Coord(0, 0)
 P1 = instru.Coord((rchan.det_pix_size/3600)/4, rchan.slit_beta_width/4)
-# P2 = instru.Coord(-(rchan.det_pix_size/3600)/2, rchan.slit_beta_width/2)
-# P3 = instru.Coord((rchan.det_pix_size/3600)/2, -rchan.slit_beta_width/2)
+P2 = instru.Coord(-(rchan.det_pix_size/3600)/4, rchan.slit_beta_width/4)
+P3 = instru.Coord((rchan.det_pix_size/3600)/4, -rchan.slit_beta_width/4)
 P4 = instru.Coord(-(rchan.det_pix_size/3600)/4, -rchan.slit_beta_width/4)
-pointings = instru.CoordList([P1, P4]).pix(step_Angle.degree)
+pointings = instru.CoordList([P1, P2, P3, P4]).pix(step_Angle.degree)
 
 spectroModel = MO_SigRLSCT_Model.spectroSigRLSCT(sotf, 
                                               templates, 
@@ -262,9 +264,9 @@ real_cube = spectroModel.mapsToCube(maps)
 """
 Reconstruction method
 """
-hyperParameter = 0
+hyperParameter = 1e5
 method = "lcg"
-niter = 8
+niter = 200
 value_init = 0
 
 quadCrit_fusion = fusion_CT.QuadCriterion_MRS(mu_spectro=1, 
@@ -294,4 +296,12 @@ plt.xticks(fontsize=20)
 plt.yticks(fontsize=20)
 
 plt.show()
+
+result_path = '/home/nmonnier/Data/JWST/Orion_bar/fusion_result/simulated/'
+result_dir = f'nit_{str(niter)}_mu_{str(hyperParameter)}/'
+path = pathlib.Path(result_path+result_dir)
+path.mkdir(parents=True, exist_ok=True)
+np.save(path / 'res_x.npy', res_fusion.x)
+np.save(path / 'res_cube.npy', y_cube)
+np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
 

@@ -161,16 +161,16 @@ class spectroSigRLSCT(LinOp):
                                                 self.cube_shape)
         return global_cube
 
-
+    
     def forward(self, maps: np.ndarray) -> np.ndarray:
         # T
         cube = jax_utils.lmm_maps2cube(maps, self.templates).reshape(self.cube_shape)
         # C
-        # blurred_cube = jax_utils.idft(jax_utils.dft(cube) * self.sotf, (self.ishape[1], self.ishape[2]))
+        blurred_cube = jax_utils.idft(jax_utils.dft(cube) * self.sotf, (self.ishape[1], self.ishape[2]))
         allsliced = np.zeros(self.oshape)
         
         for p_idx, pointing in enumerate(self.pointings):
-            gridded = self.gridding(cube, pointing) 
+            gridded = self.gridding(blurred_cube, pointing) 
             sum_cube = jax_utils.idft(
                 jax_utils.dft(gridded) * self._otf_sr,
                 self.local_cube_shape[1:],
@@ -205,8 +205,8 @@ class spectroSigRLSCT(LinOp):
             degridded = self.gridding_t(np.array(sum_t_cube, dtype=np.float64), pointing)
             global_cube += degridded
 
-        # blurred_t_cube = jax_utils.idft(jax_utils.dft(global_cube) * self.sotf.conj(), (self.ishape[1], self.ishape[2]))
-        maps = jax_utils.lmm_cube2maps(global_cube, self.templates).reshape(self.ishape)
+        blurred_t_cube = jax_utils.idft(jax_utils.dft(global_cube) * self.sotf.conj(), (self.ishape[1], self.ishape[2]))
+        maps = jax_utils.lmm_cube2maps(blurred_t_cube, self.templates).reshape(self.ishape)
         return maps
     
     def cubeTomaps(self, cube):
