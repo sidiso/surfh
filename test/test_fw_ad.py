@@ -612,7 +612,7 @@ def test_SigRLSCT_dottest():
 
 def test_SigRLSCT_NN_dottest():
     """
-    Model : y = SigRLCTx
+    Model : y = SigRLSCTx
 
     y : Hyperspectral slices of size (Nslices, L, Sx)
     Sig : Beta subsampling operator
@@ -675,4 +675,165 @@ def test_SigRLSCT_NN_dottest():
 
     # assert dottest(sigrlctModel, rtol=1e-3, echo=True)
 
-test_SigRLSCT_NN_dottest()
+
+def test_MO_SigRLSCT_dottest():
+    """
+    Model : y = SigRLSCTx
+
+    y : Hyperspectral slices of size (Nslices, L, Sx)
+    Sig : Beta subsampling operator
+    R : Spectral blur operator
+    L : Slicing operator
+    S : Interpolation operator 
+    C : Spatial convolution operator
+    T : LMM operator
+    x : Hyperspectral cube of size (4, Nx, Ny)
+    """       
+    import udft
+
+    templates = global_variable_testing.templates
+    maps = global_variable_testing.maps
+
+    instr_wavelength_axis = global_variable_testing.chan_wavelength_axis
+    wavelength_axis = global_variable_testing.wavelength_axis
+    n_lamnda = len(wavelength_axis)
+
+    spsf = global_variable_testing.spsf
+    sotf = udft.ir2fr(spsf, (maps.shape[1], maps.shape[2]))
+
+    im_shape = global_variable_testing.im_shape
+
+    cube = np.random.random((n_lamnda, im_shape[0], im_shape[1])) # Make smaller cube for easier memory computation
+    out_cube = np.zeros_like(cube)
+
+    step = 0.025 # arcsec
+    step_Angle = Angle(step, u.arcsec)
+
+    cube_origin_alpha = 0
+    cube_origin_beta = 0
+    cube_alpha_axis = np.arange(cube.shape[1]).astype(np.float64)* step_Angle.degree
+    cube_beta_axis = np.arange(cube.shape[2]).astype(np.float64)* step_Angle.degree
+    cube_alpha_axis -= np.mean(cube_alpha_axis)
+    cube_beta_axis -= np.mean(cube_beta_axis)
+    cube_alpha_axis += cube_origin_alpha
+    cube_beta_axis += cube_origin_beta
+
+
+    grating_resolution = global_variable_testing.grating_resolution
+    spec_blur = global_variable_testing.spec_blur
+    
+    # Def Channel spec.
+    rchan = instru.IFU(
+    fov=instru.FOV(4.0/3600, 4.8/3600, origin=instru.Coord(0, 0), angle=8.2),
+    det_pix_size=0.196,
+    n_slit=17,
+    w_blur=spec_blur,
+    pce=None,
+    wavel_axis=instr_wavelength_axis,
+    name="2A",
+)
+
+    main_pointing = instru.Coord(0, 0)
+    P1 = instru.Coord((rchan.det_pix_size/3600)/4, rchan.slit_beta_width/4)
+    P2 = instru.Coord(-(rchan.det_pix_size/3600)/4, rchan.slit_beta_width/4)
+    P3 = instru.Coord((rchan.det_pix_size/3600)/4, -rchan.slit_beta_width/4)
+    P4 = instru.Coord(-(rchan.det_pix_size/3600)/4, -rchan.slit_beta_width/4)
+    pointings = instru.CoordList([P1, P2, P3, P4]).pix(step_Angle.degree)
+
+
+    from surfh.DottestModels import MO_SigRLSCT_Model
+    MOsigrlctModel = MO_SigRLSCT_Model.spectroSigRLSCT(sotf, 
+                                                     templates, 
+                                                     cube_alpha_axis, 
+                                                     cube_beta_axis, 
+                                                     wavelength_axis, 
+                                                     rchan, 
+                                                     step_Angle.degree,
+                                                     pointings)
+
+    print(dottest(MOsigrlctModel, num=10, echo=True))
+
+    # assert dottest(sigrlctModel, rtol=1e-3, echo=True)
+
+
+def test_MO_SigRLSCT_shiftConv_dottest():
+    """
+    Model : y = SigRLSCTx
+
+    y : Hyperspectral slices of size (Nslices, L, Sx)
+    Sig : Beta subsampling operator
+    R : Spectral blur operator
+    L : Slicing operator
+    S : Interpolation operator 
+    C : Spatial convolution operator
+    T : LMM operator
+    x : Hyperspectral cube of size (4, Nx, Ny)
+    """       
+    import udft
+
+    templates = global_variable_testing.templates
+    maps = global_variable_testing.maps
+
+    instr_wavelength_axis = global_variable_testing.chan_wavelength_axis
+    wavelength_axis = global_variable_testing.wavelength_axis
+    n_lamnda = len(wavelength_axis)
+
+    spsf = global_variable_testing.spsf
+    sotf = udft.ir2fr(spsf, (maps.shape[1], maps.shape[2]))
+
+    im_shape = global_variable_testing.im_shape
+
+    cube = np.random.random((n_lamnda, im_shape[0], im_shape[1])) # Make smaller cube for easier memory computation
+    out_cube = np.zeros_like(cube)
+
+    step = 0.025 # arcsec
+    step_Angle = Angle(step, u.arcsec)
+
+    cube_origin_alpha = 0
+    cube_origin_beta = 0
+    cube_alpha_axis = np.arange(cube.shape[1]).astype(np.float64)* step_Angle.degree
+    cube_beta_axis = np.arange(cube.shape[2]).astype(np.float64)* step_Angle.degree
+    cube_alpha_axis -= np.mean(cube_alpha_axis)
+    cube_beta_axis -= np.mean(cube_beta_axis)
+    cube_alpha_axis += cube_origin_alpha
+    cube_beta_axis += cube_origin_beta
+
+
+    grating_resolution = global_variable_testing.grating_resolution
+    spec_blur = global_variable_testing.spec_blur
+    
+    # Def Channel spec.
+    rchan = instru.IFU(
+    fov=instru.FOV(4.0/3600, 4.8/3600, origin=instru.Coord(0, 0), angle=8.2),
+    det_pix_size=0.196,
+    n_slit=17,
+    w_blur=spec_blur,
+    pce=None,
+    wavel_axis=instr_wavelength_axis,
+    name="2A",
+)
+
+    main_pointing = instru.Coord(0, 0)
+    P1 = instru.Coord((rchan.det_pix_size/3600)/4, rchan.slit_beta_width/4)
+    P2 = instru.Coord(-(rchan.det_pix_size/3600)/4, rchan.slit_beta_width/4)
+    P3 = instru.Coord((rchan.det_pix_size/3600)/4, -rchan.slit_beta_width/4)
+    P4 = instru.Coord(-(rchan.det_pix_size/3600)/4, -rchan.slit_beta_width/4)
+    pointings = instru.CoordList([P1, P2, P3, P4]).pix(step_Angle.degree)
+
+
+    from surfh.DottestModels import MO_SigRLSCT_Model
+    MOsigrlctModel = MO_SigRLSCT_Model.spectroSigRLSCT_corrected(sotf, 
+                                                     templates, 
+                                                     cube_alpha_axis, 
+                                                     cube_beta_axis, 
+                                                     wavelength_axis, 
+                                                     rchan, 
+                                                     step_Angle.degree,
+                                                     pointings)
+
+    print(dottest(MOsigrlctModel, num=10, echo=True))
+
+    # assert dottest(sigrlctModel, rtol=1e-3, echo=True)
+
+# test_MO_SigRLSCT_dottest()
+test_MO_SigRLSCT_shiftConv_dottest()
