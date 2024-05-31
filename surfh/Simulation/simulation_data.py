@@ -58,24 +58,26 @@ def get_simulation_data(spatial_subsampling=4):
     tpl = conv2(tpl, impulse_response, "same")[:, ::tpl_ss]
     wavel_axis = wavel_axis[::tpl_ss]
 
-    sim_slice = slice(945, 1256, None) # Slice corresponding to chan 2A
+    
+    spsf = np.load('/home/nmonnier/Data/JWST/Orion_bar/All_bands_psf/psfs_pixscale0.025_fov11.25_date_300123.npy')#[sim_slice]
+    # sim_slice = slice(945, 1256, None) # Slice corresponding to chan 2A
 
-    wavel_axis = wavel_axis[sim_slice]
-    tpl = tpl[:,sim_slice]
-    spsf = np.load('/home/nmonnier/Data/JWST/Orion_bar/All_bands_psf/psfs_pixscale0.025_fov11.25_date_300123.npy')[sim_slice]
+    # wavel_axis = wavel_axis[sim_slice]
+    # tpl = tpl[:,sim_slice]
+    
 
-    # Select PSF to be the same shape as maps
-    idx = spsf.shape[1]//2 # Center of the spsf
-    N = maps.shape[1] # Size of the window
-    if N%2:
-        stepidx = N//2
-    else:
-        stepidx = int(N/2) - 1
-    start = min(max(idx-stepidx, 0), spsf.shape[1]-N)
-    #spsf = spsf[:, (100-0):(351+0), (100-0):(351+0)]
-    spsf = spsf[:, start:start+N, start:start+N]
-    sotf = udft.ir2fr(spsf, maps_shape[1:])
+    # # Select PSF to be the same shape as maps
+    # idx = spsf.shape[1]//2 # Center of the spsf
+    # N = maps.shape[1] # Size of the window
+    # if N%2:
+    #     stepidx = N//2
+    # else:
+    #     stepidx = int(N/2) - 1
+    # start = min(max(idx-stepidx, 0), spsf.shape[1]-N)
+    # #spsf = spsf[:, (100-0):(351+0), (100-0):(351+0)]
+    # spsf = spsf[:, start:start+N, start:start+N]
+    # sotf = udft.ir2fr(spsf, maps_shape[1:])
 
-    return origin_beta_axis, origin_beta_axis, wavel_axis, sotf, maps, tpl
+    return origin_beta_axis, origin_beta_axis, wavel_axis, spsf, maps, tpl
 
 
