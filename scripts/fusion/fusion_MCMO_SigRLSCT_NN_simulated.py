@@ -88,7 +88,7 @@ P3 = instru.Coord((ch2a.det_pix_size/3600)/4, -ch2a.slit_beta_width/4)
 P4 = instru.Coord(-(ch2a.det_pix_size/3600)/4, -ch2a.slit_beta_width/4)
 pointings = instru.CoordList([P1, P2, P3, P4]).pix(step_Angle.degree)
 
-spectroModel = MCMO_SigRLSCT_Model.spectroSigRLSCT(sotf, 
+spectroModel = MCMO_SigRLSCT_Model.spectroSigRLSCT_NN(sotf, 
                                               templates, 
                                               origin_alpha_axis, 
                                               origin_beta_axis, 
@@ -96,16 +96,30 @@ spectroModel = MCMO_SigRLSCT_Model.spectroSigRLSCT(sotf,
                                               [ch1c, ch2a], 
                                               step_Angle.degree, 
                                               pointings)
-
+spectroModel.make_mask(maps)
 y = spectroModel.forward(maps)
 adj = spectroModel.adjoint(y)
 real_cube = spectroModel.mapsToCube(maps)
+
+spectroModel2 = MCMO_SigRLSCT_Model.spectroSigRLSCT(sotf, 
+                                              templates, 
+                                              origin_alpha_axis, 
+                                              origin_beta_axis, 
+                                              wavel_axis, 
+                                              [ch1c, ch2a], 
+                                              step_Angle.degree, 
+                                              pointings)
+y2 = spectroModel2.forward(maps)
+adj2 = spectroModel2.adjoint(y2)
+real_cube2 = spectroModel2.mapsToCube(maps)
+
+
 """
 Reconstruction method
 """
 hyperParameter = 1e7
 method = "lcg"
-niter = 15
+niter = 200
 value_init = 0
 
 quadCrit_fusion = fusion_CT.QuadCriterion_MRS(mu_spectro=1, 
@@ -134,10 +148,9 @@ plt.yscale("log")
 plt.xticks(fontsize=20)
 plt.yticks(fontsize=20)
 
-plt.show()
 
 result_path = '/home/nmonnier/Data/JWST/Orion_bar/fusion_result/simulated/'
-result_dir = f'MC_{len(spectroModel.instrs)}_MO_{len(pointings)}_nit_{str(niter)}_mu_{str(hyperParameter)}/'
+result_dir = f'NN_True_MC_{len(spectroModel.instrs)}_MO_{len(pointings)}_nit_{str(niter)}_mu_{str(hyperParameter)}/'
 path = pathlib.Path(result_path+result_dir)
 path.mkdir(parents=True, exist_ok=True)
 np.save(path / 'res_x.npy', res_fusion.x)
@@ -145,7 +158,7 @@ np.save(path / 'res_cube.npy', y_cube)
 np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
 
 
-# mask = spectroModel.make_mask(maps)
+plt.show()
 
 
 

@@ -65,6 +65,7 @@ class Slicer():
         return gridded_cube[:, slices[0], slices[1]] * weights
 
     # TODO Faut-il mettre les `weights` ici aussi ?
+    
     def slicing_t(
         self,
         slit: array,
