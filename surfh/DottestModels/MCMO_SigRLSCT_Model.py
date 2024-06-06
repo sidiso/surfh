@@ -12,6 +12,7 @@ from astropy.coordinates import Angle
 from numpy.random import standard_normal as randn 
 
 from surfh.Models import instru, slicer
+from surfh.DottestModels import MCMO_SigRLSCT_Channel_Model
 from math import ceil
 
 
@@ -332,8 +333,8 @@ class spectroSigRLSCT_NN():
         self.alpha_axis = alpha_axis
         self.beta_axis = beta_axis
         self.wavelength_axis = wavelength_axis
-        self.instrs = instrs
         self.step_degree = step_degree
+        self.instrs = [instr.pix(self.step_degree) for instr in instrs]
 
 
         self.list_local_alpha_axis = []
@@ -376,17 +377,10 @@ class spectroSigRLSCT_NN():
         self._idx = np.cumsum([0] + [np.prod(oshape) for oshape in self.instrs_oshape])
         oshape = (self._idx[-1],)
 
-        # Mask shapes 
-        self._slit_mask_idx = np.cumsum([0] + [np.prod(oshape[1:]) for oshape in self.instrs_oshape for p in range(len(self.pointings))])
-        self.slit_masks_shape = (self._slit_mask_idx[-1],)
-
         self.list_instr_cube_shape = [(self.list_wslice[idx].stop - self.list_wslice[idx].start, 
                                         len(self.alpha_axis), 
                                         len(self.beta_axis)) for idx, _ in enumerate(self.instrs) for p in range(len(self.pointings))]
         
-        self._mask_idx = np.cumsum([0] + [np.prod(instr_cube_shape) for instr_cube_shape in self.list_instr_cube_shape])
-        self.masks_shape = (self._mask_idx[-1],)
-
         self.cube_shape = (len(self.wavelength_axis), len(alpha_axis), len(beta_axis))
 
         # self.local_cube_shape = (len(self.wavelength_axis), len(self.local_alpha_axis), len(self.local_beta_axis))
@@ -417,6 +411,21 @@ class spectroSigRLSCT_NN():
 
         self.list_gridding_t_indexes = []
         self.precompute_griding_t_indexes()
+
+        self.channels = [
+            MCMO_SigRLSCT_Channel_Model.Channel(
+                instr,
+                alpha_axis,
+                beta_axis,
+                wavelength_axis,
+                srf,
+                pointings,
+                step_degree
+            )
+            for srf, instr in zip(self.srfs, instrs)
+        ]
+
+
     
     @property
     def alpha_step(self) -> float:
@@ -517,60 +526,18 @@ class spectroSigRLSCT_NN():
         # C
         blurred_cube = jax_utils.idft(jax_utils.dft(cube) * self.sotf, (self.ishape[1], self.ishape[2]))
         out = np.zeros(self.oshape)
-        for ch_idx, chan in enumerate(self.instrs):
-            chan_out = np.zeros(self.instrs_oshape[ch_idx])
-            for p_idx, pointing in enumerate(self.pointings):
-                gridded = self.NN_gridding(blurred_cube[self.list_wslice[ch_idx]], pointing, ch_idx, p_idx) 
-                sum_cube = jax_utils.idft(
-                    jax_utils.dft_mult(gridded, self.list_otf_sr[ch_idx]),
-                    self.list_local_im_shape[ch_idx],
-                )
-                for slit_idx in range(chan.n_slit):
-                    #L
-                    sliced = self.list_slicer[ch_idx].slicing(sum_cube, slit_idx)
-                    # SigR
-                    blurred_sliced_subsampled = jax_utils.wblur_subSampling(sliced, self.list_wpsf[ch_idx])
-                    chan_out[p_idx, slit_idx] = blurred_sliced_subsampled[:, : self.instrs_oshape[ch_idx][3] * self.srfs[ch_idx] : self.srfs[ch_idx]]
-            out[self._idx[ch_idx] : self._idx[ch_idx + 1]] = chan_out.ravel()
+        for ch_idx, chan in enumerate(self.channels):
+            out[self._idx[ch_idx] : self._idx[ch_idx + 1]] = chan.forward(blurred_cube)
         return out
    
 
     def adjoint(self, inarray: np.ndarray) -> np.ndarray:
         global_cube = np.zeros(self.cube_shape)
+        print(global_cube.shape)
 
-        for ch_idx, chan in enumerate(self.instrs):
-            inter_cube = np.zeros((self.list_wslice[ch_idx].stop-self.list_wslice[ch_idx].start, len(self.alpha_axis), len(self.beta_axis)))
-            for p_idx, pointing in enumerate(self.pointings):
-                local_cube = np.zeros((self.list_wslice[ch_idx].stop-self.list_wslice[ch_idx].start,  
-                                       len(self.list_local_alpha_axis[ch_idx]), 
-                                       len(self.list_local_beta_axis[ch_idx])))
-                for slit_idx in range(chan.n_slit):
-                    oversampled_sliced = np.repeat(
-                            np.expand_dims(
-                                np.reshape(inarray[self._idx[ch_idx] : self._idx[ch_idx + 1]], self.instrs_oshape[ch_idx])[p_idx, slit_idx],
-                                axis=2,
-                            ),
-                            self.list_slicer[ch_idx].npix_slit_beta_width,
-                            axis=2,
-                        )
-                    blurred_t_sliced = np.zeros(self.list_slicer[ch_idx].get_slit_shape_t())
-                    blurred_t_sliced[:,: self.instrs_oshape[ch_idx][3] * self.srfs[ch_idx] : self.srfs[ch_idx],:] = jax_utils.wblur_t(oversampled_sliced, self.list_wpsf[ch_idx].conj())
-                    tmp = self.list_slicer[ch_idx].slicing_t(blurred_t_sliced, slit_idx, 
-                                                                     (self.list_wslice[ch_idx].stop-self.list_wslice[ch_idx].start, 
-                                                                      len(self.list_local_alpha_axis[ch_idx]), 
-                                                                      len(self.list_local_beta_axis[ch_idx])))
-
-                    local_cube += tmp
-
-                sum_t_cube = jax_utils.idft(jax_utils.dft(local_cube) * self.list_otf_sr[ch_idx].conj(), 
-                                            self.list_local_im_shape[ch_idx])
-
-                degridded = self.NN_gridding_t(np.array(sum_t_cube, dtype=np.float64), pointing, ch_idx, p_idx)
-                inter_cube += degridded*self.nmask[ch_idx, p_idx]
-
-            global_cube[self.list_wslice[ch_idx]] += inter_cube
+        for ch_idx, chan in enumerate(self.channels):
+            global_cube[self.list_wslice[ch_idx]] += chan.adjoint(inarray[self._idx[ch_idx] : self._idx[ch_idx + 1]],)
         blurred_t_cube = jax_utils.idft(jax_utils.dft_mult(global_cube, self.sotf.conj()), (self.ishape[1], self.ishape[2]))
-        
         maps = jax_utils.lmm_cube2maps(blurred_t_cube, self.templates).reshape(self.ishape)
         return maps
     
