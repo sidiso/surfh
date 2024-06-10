@@ -86,14 +86,14 @@ class Channel():
                 wslice=self.wslice
                 )
 
-        self.nmask = np.zeros((len(self.pointings), self.imshape[0], self.imshape[1]))
-        self.precompute_mask()
+        # self.nmask = np.zeros((len(self.pointings), self.imshape[0], self.imshape[1]))
+        # self.precompute_mask()
 
-        self.list_gridding_indexes = []
-        self.precompute_griding_indexes()
+        # self.list_gridding_indexes = []
+        # self.precompute_griding_indexes()
 
-        self.list_gridding_t_indexes = []
-        self.precompute_griding_t_indexes()
+        # self.list_gridding_t_indexes = []
+        # self.precompute_griding_t_indexes()
 
 
 
@@ -141,7 +141,8 @@ class Channel():
                                                    (blurred_cube.shape[0], len(self.local_alpha_axis), len(self.local_beta_axis)))
         
         return gridded
-    
+
+
     def gridding_t(self, local_cube: array, pointing: instru.Coord) -> array:
         alpha_coord, beta_coord = (self.instr.fov + pointing).global2local(
                 self.alpha_axis, self.beta_axis
@@ -228,6 +229,33 @@ class Channel():
 
         return inter_cube
 
+    def sliceToCube(self, data):
+        inter_cube = np.zeros((self.wslice.stop-self.wslice.start, len(self.alpha_axis), len(self.beta_axis)))
+        local_cube = np.zeros((self.wslice.stop-self.wslice.start,
+                                self.local_im_shape[0],
+                                self.local_im_shape[1]))
+        for slit_idx in range(self.instr.n_slit):
+            oversampled_sliced = np.repeat(
+                    np.expand_dims(
+                        np.reshape(data, 
+                                    self.oshape)[0, slit_idx],
+                        axis=2,
+                    ),
+                    self.slicer.npix_slit_beta_width,
+                    axis=2,
+                )
+            blurred_t_sliced = np.zeros(self.slicer.get_slit_shape_t())
+            blurred_t_sliced[:,: self.oshape[3] * self.srf : self.srf,:] = jax_utils.wblur_t(oversampled_sliced, self.wpsf.conj())
+            tmp = self.slicer.slicing_t(blurred_t_sliced, slit_idx, (self.wslice.stop-self.wslice.start,
+                                                                    self.local_im_shape[0],
+                                                                    self.local_im_shape[1]))
+            local_cube += tmp
+
+        sum_t_cube = jax_utils.idft(jax_utils.dft(local_cube) * self._otf_sr.conj(), 
+                                    self.local_im_shape)
+
+        degridded = self.gridding_t(np.array(sum_t_cube, dtype=np.float64), self.pointings[0])
+        inter_cube += degridded
 
 
     def precompute_mask(self):

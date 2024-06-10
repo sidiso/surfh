@@ -316,7 +316,7 @@ C : Spatial convolution operator
 T : LMM operator
 x : Hyperspectral cube of size (4, Nx, Ny)
 """  
-class spectroSigRLSCT_NN():
+class spectroSigRLSCT_NN(LinOp):
     def __init__(
                 self,
                 sotf: array,
@@ -387,30 +387,24 @@ class spectroSigRLSCT_NN():
         self.list_local_im_shape = [(len(self.list_local_alpha_axis[idx]), len(self.list_local_beta_axis[idx])) for idx, _ in enumerate(self.instrs)]
         self.imshape = (len(alpha_axis), len(beta_axis))
 
-        # super().__init__(ishape=ishape, oshape=oshape)
-        self.ishape = tuple(ishape)
-        self.oshape = tuple(oshape)
+        super().__init__(ishape=ishape, oshape=oshape)
+        # self.ishape = tuple(ishape)
+        # self.oshape = tuple(oshape)
 
         # # Convolution kernel used to cumulate or dupplicate oversampled pixels during slitting operator L
         self.list_otf_sr = [python_utils.udft.ir2fr(
                                             np.ones((self.srfs[idx], 1)), self.list_local_im_shape[idx]
                                             )[np.newaxis, ...] 
                                             for idx, _ in enumerate(self.instrs)]
-        self.list_wpsf = [self._wpsf(length=self.list_slicer[idx].npix_slit_beta_width,
-                step=self.beta_step,
-                wavel_axis=self.wavelength_axis,
-                instr=instr,
-                wslice=self.list_wslice[idx]
-                ) for idx, instr in enumerate(self.instrs)]
         
-        self.nmask = np.zeros((len(self.instrs), len(self.pointings), self.imshape[0], self.imshape[1]))
-        self.precompute_mask()
+        # self.nmask = np.zeros((len(self.instrs), len(self.pointings), self.imshape[0], self.imshape[1]))
+        # self.precompute_mask()
 
-        self.list_gridding_indexes = []
-        self.precompute_griding_indexes()
+        # self.list_gridding_indexes = []
+        # self.precompute_griding_indexes()
 
-        self.list_gridding_t_indexes = []
-        self.precompute_griding_t_indexes()
+        # self.list_gridding_t_indexes = []
+        # self.precompute_griding_t_indexes()
 
         self.channels = [
             MCMO_SigRLSCT_Channel_Model.Channel(
@@ -527,7 +521,7 @@ class spectroSigRLSCT_NN():
         blurred_cube = jax_utils.idft(jax_utils.dft(cube) * self.sotf, (self.ishape[1], self.ishape[2]))
         out = np.zeros(self.oshape)
         for ch_idx, chan in enumerate(self.channels):
-            out[self._idx[ch_idx] : self._idx[ch_idx + 1]] = chan.forward(blurred_cube)
+            out[self._idx[ch_idx] : self._idx[ch_idx + 1]] = chan.forward(cube)
         return out
    
 
@@ -537,8 +531,9 @@ class spectroSigRLSCT_NN():
 
         for ch_idx, chan in enumerate(self.channels):
             global_cube[self.list_wslice[ch_idx]] += chan.adjoint(inarray[self._idx[ch_idx] : self._idx[ch_idx + 1]],)
+
         blurred_t_cube = jax_utils.idft(jax_utils.dft_mult(global_cube, self.sotf.conj()), (self.ishape[1], self.ishape[2]))
-        maps = jax_utils.lmm_cube2maps(blurred_t_cube, self.templates).reshape(self.ishape)
+        maps = jax_utils.lmm_cube2maps(global_cube, self.templates).reshape(self.ishape)
         return maps
     
     def cubeTomaps(self, cube):
@@ -596,3 +591,9 @@ class spectroSigRLSCT_NN():
                 
                                 
                 self.nmask[chan_idx, p_idx] = nmask
+
+
+    def sliceToCube(self, chan):
+        global_cube = np.zeros(self.cube_shape)
+        print(global_cube.shape)
+        
