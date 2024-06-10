@@ -22,9 +22,9 @@ import pathlib
 """
 Create Model and simulation
 """
-origin_alpha_axis, origin_beta_axis, wavel_axis, spsf, maps, templates = simulation_data.get_simulation_data() # subsampling to reduce dim of maps
+origin_alpha_axis, origin_beta_axis, wavel_axis, spsf, maps, templates = simulation_data.get_simulation_data(3) # subsampling to reduce dim of maps
 
-indexes = np.where((wavel_axis>wavelength_mrs.get_mrs_wavelength('1c')[0]) & (wavel_axis<wavelength_mrs.get_mrs_wavelength('2a')[-1]))[0]
+indexes = np.where((wavel_axis>wavelength_mrs.get_mrs_wavelength('1a')[0]) & (wavel_axis<wavelength_mrs.get_mrs_wavelength('2c')[-1]))[0]
 sim_slice = slice(indexes[0], indexes[-1], None) # Slice corresponding to chan 2A
 
 #nwavel_axis = wavel_axis.copy()
@@ -43,6 +43,7 @@ start = min(max(idx-stepidx, 0), spsf.shape[1]-N)
 spsf = spsf[:, start:start+N, start:start+N]
 sotf = udft.ir2fr(spsf, maps.shape[1:])
 
+print("maps shape = ", maps.shape)
 
 
 
@@ -55,6 +56,31 @@ origin_beta_width = origin_beta_axis[-1] - origin_beta_axis[0]
 origin_alpha_width_arcsec = origin_alpha_width*3600
 origin_beta_width_arcsec = origin_beta_width*3600
 
+grating_resolution_1a = np.mean([3320, 3710])
+spec_blur_1a = instru.SpectralBlur(grating_resolution_1a)
+# Def Channel spec.
+ch1a = instru.IFU(
+    fov=instru.FOV(3.2/3600, 3.7/3600, origin=instru.Coord(0, 0), angle=8.2),
+    det_pix_size=0.196,
+    n_slit=21,
+    w_blur=spec_blur_1a,
+    pce=None,
+    wavel_axis=wavelength_mrs.get_mrs_wavelength('1a'),
+    name="1A",
+)
+
+grating_resolution_1b = np.mean([3190, 3750])
+spec_blur_1b = instru.SpectralBlur(grating_resolution_1b)
+# Def Channel spec.
+ch1b = instru.IFU(
+    fov=instru.FOV(3.2/3600, 3.7/3600, origin=instru.Coord(0, 0), angle=8.2),
+    det_pix_size=0.196,
+    n_slit=21,
+    w_blur=spec_blur_1b,
+    pce=None,
+    wavel_axis=wavelength_mrs.get_mrs_wavelength('1b'),
+    name="1B",
+)
 
 grating_resolution_1c = np.mean([3100, 3610])
 spec_blur_1c = instru.SpectralBlur(grating_resolution_1c)
@@ -81,19 +107,56 @@ ch2a = instru.IFU(
     name="2A",
 )
 
-main_pointing = instru.Coord(0, 0)
-P1 = instru.Coord((ch2a.det_pix_size/3600)/4, ch2a.slit_beta_width/4)
-P2 = instru.Coord(-(ch2a.det_pix_size/3600)/4, ch2a.slit_beta_width/4)
-P3 = instru.Coord((ch2a.det_pix_size/3600)/4, -ch2a.slit_beta_width/4)
-P4 = instru.Coord(-(ch2a.det_pix_size/3600)/4, -ch2a.slit_beta_width/4)
-pointings = instru.CoordList([P1, P2, P3, P4]).pix(step_Angle.degree)
+grating_resolution_2b = np.mean([2750, 3170])
+spec_blur_2b = instru.SpectralBlur(grating_resolution_2b)
+ch2b = instru.IFU(
+    fov=instru.FOV(4.0/3600, 4.8/3600, origin=instru.Coord(0, 0), angle=8.2),
+    det_pix_size=0.196,
+    n_slit=17,
+    w_blur=spec_blur_2b,
+    pce=None,
+    wavel_axis=wavelength_mrs.get_mrs_wavelength('2b'),
+    name="2B",
+)
 
-spectroModel = MCMO_SigRLSCT_Model.spectroSigRLSCT(sotf, 
+
+grating_resolution_2c = np.mean([2990, 3110])
+spec_blur_2c = instru.SpectralBlur(grating_resolution_2c)
+ch2c = instru.IFU(
+    fov=instru.FOV(4.0/3600, 4.8/3600, origin=instru.Coord(0, 0), angle=8.2),
+    det_pix_size=0.196,
+    n_slit=17,
+    w_blur=spec_blur_2a,
+    pce=None,
+    wavel_axis=wavelength_mrs.get_mrs_wavelength('2c'),
+    name="2C",
+)
+
+grating_resolution_3a = np.mean([2990, 3110])
+spec_blur_3a = instru.SpectralBlur(grating_resolution_3a)
+ch3a = instru.IFU(
+    fov=instru.FOV(5.5/3600, 6.2/3600, origin=instru.Coord(0, 0), angle=7.5),
+    det_pix_size=0.245,
+    n_slit=16,
+    w_blur=spec_blur_3a,
+    pce=None,
+    wavel_axis=wavelength_mrs.get_mrs_wavelength('3a'),
+    name="3A",
+)
+
+main_pointing = instru.Coord(-(ch2a.det_pix_size/3600)*1, (ch2a.det_pix_size/3600)*1)
+P1 = main_pointing + instru.Coord((ch2a.det_pix_size/3600)/4, ch2a.slit_beta_width/4)
+P2 = main_pointing + instru.Coord(-(ch2a.det_pix_size/3600)/4, ch2a.slit_beta_width/4)
+P3 = main_pointing + instru.Coord((ch2a.det_pix_size/3600)/4, -ch2a.slit_beta_width/4)
+P4 = main_pointing + instru.Coord(-(ch2a.det_pix_size/3600)/4, -ch2a.slit_beta_width/4)
+pointings = instru.CoordList([P1, P2]).pix(step_Angle.degree)
+
+spectroModel = MCMO_SigRLSCT_Model.spectroSigRLSCT_NN(sotf, 
                                               templates, 
                                               origin_alpha_axis, 
                                               origin_beta_axis, 
                                               wavel_axis, 
-                                              [ch1c, ch2a], 
+                                              [ch1a, ch1b, ch1c, ch2a, ch2b, ch2c], 
                                               step_Angle.degree, 
                                               pointings)
 
@@ -136,13 +199,13 @@ plt.yticks(fontsize=20)
 
 plt.show()
 
-result_path = '/home/nmonnier/Data/JWST/Orion_bar/fusion_result/simulated/'
-result_dir = f'MC_{len(spectroModel.instrs)}_MO_{len(pointings)}_nit_{str(niter)}_mu_{str(hyperParameter)}/'
-path = pathlib.Path(result_path+result_dir)
-path.mkdir(parents=True, exist_ok=True)
-np.save(path / 'res_x.npy', res_fusion.x)
-np.save(path / 'res_cube.npy', y_cube)
-np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
+# result_path = '/home/nmonnier/Data/JWST/Orion_bar/fusion_result/simulated/'
+# result_dir = f'MC_{len(spectroModel.instrs)}_MO_{len(pointings)}_nit_{str(niter)}_mu_{str(hyperParameter)}/'
+# path = pathlib.Path(result_path+result_dir)
+# path.mkdir(parents=True, exist_ok=True)
+# np.save(path / 'res_x.npy', res_fusion.x)
+# np.save(path / 'res_cube.npy', y_cube)
+# np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
 
 
 # mask = spectroModel.make_mask(maps)

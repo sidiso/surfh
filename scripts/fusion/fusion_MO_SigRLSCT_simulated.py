@@ -24,7 +24,7 @@ Create Model and simulation
 """
 origin_alpha_axis, origin_beta_axis, wavel_axis, spsf, maps, templates = simulation_data.get_simulation_data() # subsampling to reduce dim of maps
 
-indexes = np.where((wavel_axis>wavelength_mrs.get_mrs_wavelength('1c')[0]) & (wavel_axis<wavelength_mrs.get_mrs_wavelength('2a')[-1]))[0]
+indexes = np.where((wavel_axis>wavelength_mrs.get_mrs_wavelength('2a')[0]) & (wavel_axis<wavelength_mrs.get_mrs_wavelength('2a')[-1]))[0]
 sim_slice = slice(indexes[0], indexes[-1], None) # Slice corresponding to chan 2A
 
 #nwavel_axis = wavel_axis.copy()
@@ -64,7 +64,7 @@ rchan = instru.IFU(
     n_slit=17,
     w_blur=spec_blur,
     pce=None,
-    wavel_axis=wavel_axis<wavelength_mrs.get_mrs_wavelength('2a'),
+    wavel_axis=wavelength_mrs.get_mrs_wavelength('2a'),
     name="2A",
 )
 
@@ -84,20 +84,20 @@ spectroModel = MO_SigRLSCT_Model.spectroSigRLSCT(sotf,
                                               step_Angle.degree, 
                                               pointings)
 
-spectroModel_corrected = MO_SigRLSCT_Model.spectroSigRLSCT_corrected(sotf, 
-                                              templates, 
-                                              origin_alpha_axis, 
-                                              origin_beta_axis, 
-                                              wavel_axis, 
-                                              rchan, 
-                                              step_Angle.degree, 
-                                              pointings)
+# spectroModel_corrected = MO_SigRLSCT_Model.spectroSigRLSCT_corrected(sotf, 
+#                                               templates, 
+#                                               origin_alpha_axis, 
+#                                               origin_beta_axis, 
+#                                               wavel_axis, 
+#                                               rchan, 
+#                                               step_Angle.degree, 
+#                                               pointings)
 
 y = spectroModel.forward(maps)
-yc = spectroModel_corrected(maps)
+# yc = spectroModel_corrected(maps)
 
-adj = spectroModel.adjoint(y)
-adjc = spectroModel_corrected.adjoint(yc)
+# adj = spectroModel.adjoint(y)
+# adjc = spectroModel_corrected.adjoint(yc)
 
 real_cube = spectroModel.mapsToCube(maps)
 
@@ -105,38 +105,38 @@ real_cube = spectroModel.mapsToCube(maps)
 """
 Reconstruction method
 """
-# hyperParameter = 1e7
-# method = "lcg"
-# niter = 2
-# value_init = 0
+hyperParameter = 1e7
+method = "lcg"
+niter = 10
+value_init = 0
 
-# quadCrit_fusion = fusion_CT.QuadCriterion_MRS(mu_spectro=1, 
-#                                                     y_spectro=np.copy(y), 
-#                                                     model_spectro=spectroModel, 
-#                                                     mu_reg=hyperParameter, 
-#                                                     printing=True, 
-#                                                     gradient="separated"
-#                                                     )
+quadCrit_fusion = fusion_CT.QuadCriterion_MRS(mu_spectro=1, 
+                                                    y_spectro=np.copy(y), 
+                                                    model_spectro=spectroModel, 
+                                                    mu_reg=hyperParameter, 
+                                                    printing=True, 
+                                                    gradient="separated"
+                                                    )
 
-# res_fusion = quadCrit_fusion.run_method(method, niter, perf_crit = 1, calc_crit=True, value_init=value_init)
+res_fusion = quadCrit_fusion.run_method(method, niter, perf_crit = 1, calc_crit=True, value_init=value_init)
 
 
-# y_cube = spectroModel.mapsToCube(res_fusion.x)
+y_cube = spectroModel.mapsToCube(res_fusion.x)
 
-# utils.plot_maps(res_fusion.x)
+utils.plot_maps(res_fusion.x)
 
-# y_adj = spectroModel.adjoint(y)
-# y_adj_cube = spectroModel.mapsToCube(y_adj)
-# utils.plot_3_cube(real_cube, y_cube, y_cube)
+y_adj = spectroModel.adjoint(y)
+y_adj_cube = spectroModel.mapsToCube(y_adj)
+utils.plot_3_cube(real_cube, y_cube, y_cube)
 
-# plt.figure()
-# xtick = np.arange(len(quadCrit_fusion.L_crit_val))*5
-# plt.plot(xtick, quadCrit_fusion.L_crit_val)
-# plt.yscale("log")
-# plt.xticks(fontsize=20)
-# plt.yticks(fontsize=20)
+plt.figure()
+xtick = np.arange(len(quadCrit_fusion.L_crit_val))*5
+plt.plot(xtick, quadCrit_fusion.L_crit_val)
+plt.yscale("log")
+plt.xticks(fontsize=20)
+plt.yticks(fontsize=20)
 
-# plt.show()
+plt.show()
 
 # result_path = '/home/nmonnier/Data/JWST/Orion_bar/fusion_result/simulated/'
 # result_dir = f'MO_{len(pointings)}_nit_{str(niter)}_mu_{str(hyperParameter)}/'
