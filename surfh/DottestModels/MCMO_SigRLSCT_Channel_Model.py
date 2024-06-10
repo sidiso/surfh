@@ -19,6 +19,7 @@ from typing import List, Tuple
 from numpy import ndarray as array
 
 import jax
+from jax import numpy as jnp
 from functools import partial
 
 
@@ -119,25 +120,67 @@ class Channel():
                     )  
         return wpsf
 
-    def NN_gridding(self, blurred_cube: array, p_idx: int) -> array:
-        wavel_indexes = self.list_gridding_indexes[p_idx]
+
+    def gridding(self, blurred_cube: array, pointing: instru.Coord) -> array:
+
+        local_alpha_coord, local_beta_coord = (self.instr.fov + pointing).local2global(
+                                                        self.local_alpha_axis, self.local_beta_axis
+                                                        )
+        optimized_local_coords = np.vstack(
+                                            [
+                                                local_alpha_coord.ravel(),
+                                                local_beta_coord.ravel()
+                                            ]
+                                            ).T 
+        # S
+        gridded = cython_utils.interpn_cube2local(np.arange(blurred_cube.shape[0]).astype(np.float64), 
+                                                   self.alpha_axis, 
+                                                   self.beta_axis, 
+                                                   np.array(blurred_cube).astype(np.float64), 
+                                                   optimized_local_coords, 
+                                                   (blurred_cube.shape[0], len(self.local_alpha_axis), len(self.local_beta_axis)))
+        
+        return gridded
+    
+    def gridding_t(self, local_cube: array, pointing: instru.Coord) -> array:
+        alpha_coord, beta_coord = (self.instr.fov + pointing).global2local(
+                self.alpha_axis, self.beta_axis
+                )
+        
+        optimized_global_coords = np.vstack(
+                [
+                    alpha_coord.ravel(),
+                    beta_coord.ravel()
+                ]
+                ).T
+
+        global_cube = cython_utils.interpn_local2cube(np.arange(local_cube.shape[0]), 
+                                                self.local_alpha_axis.ravel(), 
+                                                self.local_beta_axis.ravel(), 
+                                                np.array(local_cube, dtype=np.float64), 
+                                                optimized_global_coords, 
+                                                (len(np.arange(local_cube.shape[0])), len(self.alpha_axis), len(self.beta_axis)))
+        return global_cube
+
+    def NN_gridding(self, blurred_cube: array, wavel_indexes: array) -> array:
         gridded = blurred_cube.ravel()[wavel_indexes].reshape(self.instr_cube_shape[0], 
                                                               len(self.local_alpha_axis), 
                                                               len(self.local_beta_axis))
         return gridded
 
-    def NN_gridding_t(self, local_cube: array, p_idx: int) -> array:
-        wavel_indexes_t = self.list_gridding_t_indexes[p_idx]
+    
+    def NN_gridding_t(self, local_cube: array, wavel_indexes_t: array) -> array:
         degridded = local_cube.ravel()[wavel_indexes_t].reshape(local_cube.shape[0],
                                                                 len(self.alpha_axis), 
                                                                 len(self.beta_axis))
         return degridded
 
-    @jax.jit
+    
     def forward(self, blurred_cube):
         chan_out = np.zeros(self.oshape)
         for p_idx, pointing in enumerate(self.pointings):
-            gridded = self.NN_gridding(blurred_cube[self.wslice], p_idx) 
+            # gridded = self.NN_gridding(blurred_cube[self.wslice], self.list_gridding_indexes[p_idx]) 
+            gridded = self.gridding(blurred_cube[self.wslice], pointing) 
             sum_cube = jax_utils.idft(
                 jax_utils.dft_mult(gridded, self._otf_sr),
                 self.local_im_shape,
@@ -146,11 +189,12 @@ class Channel():
                 #L
                 sliced = self.slicer.slicing(sum_cube, slit_idx)
                 # SigR
-                blurred_sliced_subsampled = jax_utils.wblur_subSampling(sliced, self.wpsf)
-                chan_out[p_idx, slit_idx] = blurred_sliced_subsampled[:, : self.oshape[3] * self.srf : self.srf]
+                # blurred_sliced_subsampled = jax_utils.wblur_subSampling(sliced, self.wpsf)[:, : self.oshape[3] * self.srf : self.srf]
+                chan_out[p_idx, slit_idx] = jax_utils.wblur_subSampling(sliced, self.wpsf)[:, : self.oshape[3] * self.srf : self.srf]
 
         return chan_out.ravel()
 
+    
     def adjoint(self, inarray: np.ndarray) -> np.ndarray:
 
         inter_cube = np.zeros((self.wslice.stop-self.wslice.start, len(self.alpha_axis), len(self.beta_axis)))
@@ -178,8 +222,9 @@ class Channel():
             sum_t_cube = jax_utils.idft(jax_utils.dft(local_cube) * self._otf_sr.conj(), 
                                         self.local_im_shape)
 
-            degridded = self.NN_gridding_t(np.array(sum_t_cube, dtype=np.float64), p_idx)
-            inter_cube += degridded*self.nmask[p_idx]
+            # degridded = self.NN_gridding_t(np.array(sum_t_cube, dtype=np.float64), self.list_gridding_t_indexes[p_idx])
+            degridded = self.gridding_t(np.array(sum_t_cube, dtype=np.float64), pointing)
+            inter_cube += degridded#*self.nmask[p_idx]
 
         return inter_cube
 
