@@ -22,9 +22,9 @@ import pathlib
 """
 Create Model and simulation
 """
-origin_alpha_axis, origin_beta_axis, wavel_axis, spsf, maps, templates = simulation_data.get_simulation_data(3) # subsampling to reduce dim of maps
+origin_alpha_axis, origin_beta_axis, wavel_axis, spsf, maps, templates = simulation_data.get_simulation_data(3, 20) # subsampling to reduce dim of maps
 
-indexes = np.where((wavel_axis>wavelength_mrs.get_mrs_wavelength('1a')[0]) & (wavel_axis<wavelength_mrs.get_mrs_wavelength('2c')[-1]))[0]
+indexes = np.where((wavel_axis>wavelength_mrs.get_mrs_wavelength('2c')[0]) & (wavel_axis<wavelength_mrs.get_mrs_wavelength('3a')[-1]))[0]
 sim_slice = slice(indexes[0], indexes[-1], None) # Slice corresponding to chan 2A
 
 #nwavel_axis = wavel_axis.copy()
@@ -44,7 +44,7 @@ spsf = spsf[:, start:start+N, start:start+N]
 sotf = udft.ir2fr(spsf, maps.shape[1:])
 
 print("maps shape = ", maps.shape)
-
+print("spsf shape = ", maps.shape)
 
 
 step = 0.025 # arcsec
@@ -120,7 +120,7 @@ ch2b = instru.IFU(
 )
 
 
-grating_resolution_2c = np.mean([2990, 3110])
+grating_resolution_2c = np.mean([2860, 3300])
 spec_blur_2c = instru.SpectralBlur(grating_resolution_2c)
 ch2c = instru.IFU(
     fov=instru.FOV(4.0/3600, 4.8/3600, origin=instru.Coord(0, 0), angle=8.2),
@@ -132,7 +132,7 @@ ch2c = instru.IFU(
     name="2C",
 )
 
-grating_resolution_3a = np.mean([2990, 3110])
+grating_resolution_3a = np.mean([2530, 2880])
 spec_blur_3a = instru.SpectralBlur(grating_resolution_3a)
 ch3a = instru.IFU(
     fov=instru.FOV(5.5/3600, 6.2/3600, origin=instru.Coord(0, 0), angle=7.5),
@@ -144,7 +144,7 @@ ch3a = instru.IFU(
     name="3A",
 )
 
-main_pointing = instru.Coord(-(ch2a.det_pix_size/3600)*1, (ch2a.det_pix_size/3600)*1)
+main_pointing = instru.Coord(0,0)
 P1 = main_pointing + instru.Coord((ch2a.det_pix_size/3600)/4, ch2a.slit_beta_width/4)
 P2 = main_pointing + instru.Coord(-(ch2a.det_pix_size/3600)/4, ch2a.slit_beta_width/4)
 P3 = main_pointing + instru.Coord((ch2a.det_pix_size/3600)/4, -ch2a.slit_beta_width/4)
@@ -156,7 +156,7 @@ spectroModel = MCMO_SigRLSCT_Model.spectroSigRLSCT_NN(sotf,
                                               origin_alpha_axis, 
                                               origin_beta_axis, 
                                               wavel_axis, 
-                                              [ch1a, ch1b, ch1c, ch2a, ch2b, ch2c], 
+                                              [ch3a], 
                                               step_Angle.degree, 
                                               pointings)
 
@@ -166,7 +166,7 @@ real_cube = spectroModel.mapsToCube(maps)
 """
 Reconstruction method
 """
-hyperParameter = 1e7
+hyperParameter = 1e6
 method = "lcg"
 niter = 15
 value_init = 0

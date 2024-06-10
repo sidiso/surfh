@@ -9,7 +9,7 @@ import udft
 
 
 
-def get_simulation_data(spatial_subsampling=4):
+def get_simulation_data(spatial_subsampling=4, margin=0):
     def orion():
         """Rerturn maps, templates, spatial step and wavelength"""
         maps = fits.open("./cube_orion/abundances_orion.fits")[0].data
@@ -36,11 +36,34 @@ def get_simulation_data(spatial_subsampling=4):
 
 
     maps, tpl, step, wavel_axis = orion()
+
+    origin_size_axe = 0
+    if margin != 0:
+        origin_size_axe = maps[0,::spatial_subsampling, ::spatial_subsampling].shape[1]
+        spatial_subsampling = spatial_subsampling - 1
+
+    if origin_size_axe + 2*margin > maps.shape[1]:
+        raise Exception(f"The margin is too large !!")
+        
     spatial_subsampling = spatial_subsampling
     impulse_response = np.ones((spatial_subsampling, spatial_subsampling)) / spatial_subsampling ** 2
     # Multiply maps to match the mean values of real data
     maps = np.asarray([conv2(arr, impulse_response)[::spatial_subsampling, ::spatial_subsampling] for arr in maps])
     step_Angle = Angle(step, u.arcsec)
+
+    if margin != 0:
+        new_size_axe = maps.shape[1]
+
+        # Select maps to be the same shape as the origin maps + margin
+        idx = maps.shape[1]//2 # Center of the spsf
+        N = origin_size_axe + margin*2 # Size of the window
+        if N%2:
+            stepidx = N//2
+        else:
+            stepidx = int(N/2) - 1
+        start = min(max(idx-stepidx, 0), maps.shape[1]-N)
+        #spsf = spsf[:, (100-0):(351+0), (100-0):(351+0)]
+        maps = maps[:, start:start+N, start:start+N]
 
     """
     Set Cube coordinate.
@@ -63,13 +86,23 @@ def get_simulation_data(spatial_subsampling=4):
     if maps.shape[2] > spsf.shape[2]:
         diff = maps.shape[2] - spsf.shape[2]
         if  diff%2:
-            maps = maps[:,slice(diff//2+1, maps.shape[2]-diff//2,None),:]
+            maps = maps[:, :, slice(diff//2+1,maps.shape[2]-diff//2,None)]
         else:
-            maps = maps[:,slice(diff//2, maps.shape[2]-diff//2,None),:]
+            maps = maps[:, :, slice(diff//2, maps.shape[2]-diff//2,None)]
 
+    # If maps is not the size of the psf (can't be bigger)
+    if maps.shape[1] != spsf.shape[1]:
+        if maps.shape[1] >= spsf.shape[1]:
+            print("1")
+            maps_shape = (maps.shape[0], spsf.shape[1], spsf.shape[2])
+        else:
+            print("2")
+            maps
+            maps_shape = (maps.shape[0], maps.shape[1], maps.shape[2])
+    else:
+        print("3")
+        maps_shape = (maps.shape[0], maps.shape[1], maps.shape[2])
 
-    margin=0
-    maps_shape = (maps.shape[0], maps.shape[1]+margin*2, maps.shape[2]+margin*2)
     step_Angle = Angle(step, u.arcsec)
     origin_alpha_axis = np.arange(maps_shape[1]) * step_Angle.degree
     origin_beta_axis = np.arange(maps_shape[2]) * step_Angle.degree
