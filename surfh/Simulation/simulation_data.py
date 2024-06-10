@@ -45,6 +45,29 @@ def get_simulation_data(spatial_subsampling=4):
     """
     Set Cube coordinate.
     """
+    
+    tpl_ss = 3
+    impulse_response = np.ones((1, tpl_ss)) / tpl_ss
+    tpl = conv2(tpl, impulse_response, "same")[:, ::tpl_ss]
+    wavel_axis = wavel_axis[::tpl_ss]
+
+    
+    spsf = np.load('/home/nmonnier/Data/JWST/Orion_bar/All_bands_psf/psfs_pixscale0.025_fov11.25_date_300123.npy')#[sim_slice]
+    if maps.shape[1] > spsf.shape[1]:
+        diff = maps.shape[1] - spsf.shape[1]
+        if  diff%2:
+            maps = maps[:,slice(diff//2+1, maps.shape[1]-diff//2,None),:]
+        else:
+            maps = maps[:,slice(diff//2, maps.shape[1]-diff//2,None),:]
+
+    if maps.shape[2] > spsf.shape[2]:
+        diff = maps.shape[2] - spsf.shape[2]
+        if  diff%2:
+            maps = maps[:,slice(diff//2+1, maps.shape[2]-diff//2,None),:]
+        else:
+            maps = maps[:,slice(diff//2, maps.shape[2]-diff//2,None),:]
+
+
     margin=0
     maps_shape = (maps.shape[0], maps.shape[1]+margin*2, maps.shape[2]+margin*2)
     step_Angle = Angle(step, u.arcsec)
@@ -53,13 +76,6 @@ def get_simulation_data(spatial_subsampling=4):
     origin_alpha_axis -= np.mean(origin_alpha_axis)
     origin_beta_axis -= np.mean(origin_beta_axis)
 
-    tpl_ss = 3
-    impulse_response = np.ones((1, tpl_ss)) / tpl_ss
-    tpl = conv2(tpl, impulse_response, "same")[:, ::tpl_ss]
-    wavel_axis = wavel_axis[::tpl_ss]
-
-    
-    spsf = np.load('/home/nmonnier/Data/JWST/Orion_bar/All_bands_psf/psfs_pixscale0.025_fov11.25_date_300123.npy')#[sim_slice]
     # sim_slice = slice(945, 1256, None) # Slice corresponding to chan 2A
 
     # wavel_axis = wavel_axis[sim_slice]
