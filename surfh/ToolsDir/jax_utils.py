@@ -1,6 +1,7 @@
 import numpy as np
 from jax import jit
 import jax.numpy as jnp
+import jax.lax
 
 from functools import partial
 
@@ -51,6 +52,9 @@ def lmm_cube2maps_idft_mult(a, b, tpl, im_shape):
     return lmm_cube2maps(d, tpl)
 
 
+@partial(jit, static_argnums=2)
+def conv(local_cube, _otf_sr, local_im_shape):
+    return idft(dft(local_cube) * _otf_sr, local_im_shape)
 
 
 
@@ -75,6 +79,7 @@ def wblur_subSampling(arr, wpsf):
             axis=1,
         ), axis=2)
 
+
 @jit
 def wblur_t(arr, wpsf):
     return jnp.sum(
@@ -97,6 +102,14 @@ def wblur_t_overSampling(arr, wpsf):
 
 
 ### Others 
+
+@jit
+def weight_slice(slice, weight, local_shape, start1, stop1, start2, stop2):
+    out = jnp.zeros(local_shape)
+    
+    return
+
+
 @jit
 def fov_weight_jax(
     fov,

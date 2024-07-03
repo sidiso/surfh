@@ -79,26 +79,29 @@ def get_IFU(filename):
         band = 2 
 
     spec_blur = instru.SpectralBlur(res[(channel-1)*3 + band])
-    targ_ra  = hdr['TARG_RA']
-    targ_dec = hdr['TARG_DEC']
+    
 
     hdr = hdul[1].header
+    targ_ra  = hdr['RA_V1']
+    targ_dec = hdr['DEC_V1']
     wavel = (np.arange(hdr['NAXIS3']) +hdr['CRPIX3'] - 1) * hdr['CDELT3'] + hdr['CRVAL3']
 
     if (str(channel) + chr(65 + band)) not in pce:
-        #pce[str(channel) + chr(65 + band)] = np.random.rand(wavel.size)/10 + 0.5
-        value_pce = np.ones_like(np.load(PCE_PATH + Path(filename).stem + '.pce.npy')) # As PCE is corrected in the pipeline (?), set to 1
-        pce[str(channel) + chr(65 + band)] = value_pce
+        pce[str(channel) + chr(65 + band)] = np.random.rand(wavel.size)/10 + 0.5
+        #value_pce = np.ones_like(np.load(PCE_PATH + Path(filename).stem + '.pce.npy')) # As PCE is corrected in the pipeline (?), set to 1
+        #pce[str(channel) + chr(65 + band)] = value_pce
         
 
     hdul.close()
     return instru.IFU(
-                        instru.FOV(alpha_width, beta_width, origin=instru.Coord(targ_ra, targ_dec), angle=rotation),
-                        pix_size,
+                        # ToChange
+                        # instru.FOV(alpha_width, beta_width, origin=instru.Coord(targ_ra, targ_dec), angle=rotation),
+                        instru.FOV(alpha_width, beta_width, origin=instru.Coord(0,0), angle=rotation),
+                        pix_size*3600,
                         slices,
                         spec_blur,
                         pce[str(channel) + chr(65 + band)],
                         wavel,
                         str(channel) + chr(65 + band),
-                    )
+                    ), targ_ra, targ_dec
  

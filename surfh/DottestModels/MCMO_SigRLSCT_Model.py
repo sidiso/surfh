@@ -5,13 +5,13 @@ import matplotlib.pyplot as plt
 
 import scipy as sp
 from scipy import misc
-from surfh.Models import slicer
+from surfh.Models import slicer_new as slicer
 from surfh.ToolsDir import jax_utils, python_utils, cython_utils, utils, nearest_neighbor_interpolation
 from astropy import units as u
 from astropy.coordinates import Angle
 from numpy.random import standard_normal as randn 
 
-from surfh.Models import instru, slicer
+from surfh.Models import instru
 from surfh.DottestModels import MCMO_SigRLSCT_Channel_Model
 from math import ceil
 
@@ -342,7 +342,7 @@ class spectroSigRLSCT_NN(LinOp):
         self.list_slicer = []
         self.list_wslice = [instr.wslice(wavelength_axis, 0.1) for instr in self.instrs]
         for chan_idx, chan in enumerate(self.instrs):
-            local_alpha_axis, local_beta_axis = chan.fov.local_coords(step_degree, 0, 0)#5* step_degree, 5* step_degree)
+            local_alpha_axis, local_beta_axis = chan.fov.local_coords(step_degree, 5* step_degree, 5* step_degree)
             self.list_local_alpha_axis.append(local_alpha_axis)
             self.list_local_beta_axis.append(local_beta_axis)  
             self.list_slicer.append(slicer.Slicer(chan, 
@@ -351,10 +351,11 @@ class spectroSigRLSCT_NN(LinOp):
                                     beta_axis = self.beta_axis, 
                                     local_alpha_axis = local_alpha_axis, 
                                     local_beta_axis = local_beta_axis))
-
+            
         self.pointings = pointings.pix(self.step_degree)  
        
-       
+        print(self.step_degree*3600)
+        print(chan.det_pix_size)
         # Super resolution factor (in alpha dim) for all channels
         self.srfs = instru.get_srf(
             [chan.det_pix_size for chan in instrs],
@@ -521,7 +522,7 @@ class spectroSigRLSCT_NN(LinOp):
         blurred_cube = jax_utils.idft(jax_utils.dft(cube) * self.sotf, (self.ishape[1], self.ishape[2]))
         out = np.zeros(self.oshape)
         for ch_idx, chan in enumerate(self.channels):
-            out[self._idx[ch_idx] : self._idx[ch_idx + 1]] = chan.forward(cube)
+            out[self._idx[ch_idx] : self._idx[ch_idx + 1]] = chan.forward(blurred_cube)
         return out
    
 
@@ -533,7 +534,7 @@ class spectroSigRLSCT_NN(LinOp):
             global_cube[self.list_wslice[ch_idx]] += chan.adjoint(inarray[self._idx[ch_idx] : self._idx[ch_idx + 1]],)
 
         blurred_t_cube = jax_utils.idft(jax_utils.dft_mult(global_cube, self.sotf.conj()), (self.ishape[1], self.ishape[2]))
-        maps = jax_utils.lmm_cube2maps(global_cube, self.templates).reshape(self.ishape)
+        maps = jax_utils.lmm_cube2maps(blurred_t_cube, self.templates).reshape(self.ishape)
         return maps
     
     def cubeTomaps(self, cube):
@@ -593,7 +594,19 @@ class spectroSigRLSCT_NN(LinOp):
                 self.nmask[chan_idx, p_idx] = nmask
 
 
-    def sliceToCube(self, chan):
+    def make_small_mask(self):
+        ones_mask = np.ones(self.ishape)
+        cube = jax_utils.lmm_maps2cube(ones_mask, self.templates).reshape(self.cube_shape)
+        # C
+        out = np.zeros(self.oshape)
+        out[self._idx[0] : self._idx[0 + 1]] = self.channels[0].forward(cube)
+
         global_cube = np.zeros(self.cube_shape)
-        print(global_cube.shape)
+
+        global_cube[self.list_wslice[0]] += self.channels[0].adjoint(out[self._idx[0] : self._idx[0 + 1]],)
+
+        maps = jax_utils.lmm_cube2maps(global_cube, self.templates).reshape(self.ishape)
+        return maps
+
+
         

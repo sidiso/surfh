@@ -76,7 +76,8 @@ class Slicer():
         out = np.zeros(local_shape)
         slices = self.get_slit_slices(slit_idx)
         weights = self.get_slit_weights(slit_idx, slices)
-        out[:, slices[0], slices[1]] = slit * weights
+        tmp = slit * weights
+        out[:, slices[0], slices[1]] = tmp
         return out
 
 

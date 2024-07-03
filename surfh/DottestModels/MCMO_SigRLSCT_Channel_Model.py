@@ -5,13 +5,13 @@ import matplotlib.pyplot as plt
 
 import scipy as sp
 from scipy import misc
-from surfh.Models import slicer
+from surfh.Models import slicer_new as slicer
 from surfh.ToolsDir import jax_utils, python_utils, cython_utils, utils, nearest_neighbor_interpolation
 from astropy import units as u
 from astropy.coordinates import Angle
 from numpy.random import standard_normal as randn 
 
-from surfh.Models import instru, slicer
+from surfh.Models import instru
 from math import ceil
 
 
@@ -43,7 +43,7 @@ class Channel():
         self.instr = instr.pix(self.step_degree)
         self.pointings = pointings.pix(self.step_degree)
 
-        local_alpha_axis, local_beta_axis = self.instr.fov.local_coords(step_degree, 0, 0)
+        local_alpha_axis, local_beta_axis = self.instr.fov.local_coords(step_degree, 5* step_degree, 5* step_degree)
         self.local_alpha_axis = local_alpha_axis
         self.local_beta_axis = local_beta_axis
         
@@ -85,6 +85,22 @@ class Channel():
                 instr=self.instr,
                 wslice=self.wslice
                 )
+        
+        self.wpsf_dirac = self._wpsf_dirac(length=self.slicer.npix_slit_beta_width,
+                step=self.beta_step,
+                wavel_axis=self.global_wavelength_axis,
+                instr=self.instr,
+                wslice=self.wslice
+                )
+
+        self.local_cube_shape = (len(self.global_wavelength_axis), len(self.local_alpha_axis), len(self.local_beta_axis))
+
+        decal = np.zeros(self.local_cube_shape[1:])
+        dsi = int((self.srf-1)/2)
+        dsj = 0 # int((self.n_pix_beta_slit -1) /2)
+        decal[-dsi, -dsj] = np.sqrt(self.local_cube_shape[1]*self.local_cube_shape[2])
+        self.decalf = jax_utils.dft(decal)
+        
 
         # self.nmask = np.zeros((len(self.pointings), self.imshape[0], self.imshape[1]))
         # self.precompute_mask()
@@ -117,6 +133,18 @@ class Channel():
                         wavel_axis[wslice],
                         arcsec2micron=instr.wavel_step / instr.det_pix_size,
                         type='mrs',
+                    )  
+        return wpsf
+
+    def _wpsf_dirac(self, length: int, step: float, wavel_axis: np.ndarray, instr: instru.IFU, wslice) -> array:
+        """Return spectral PSF"""
+        # ∈ [0, β_s]
+        beta_in_slit = np.arange(0, length) * step
+        wpsf = instr.spectral_psf(
+                        beta_in_slit - np.mean(beta_in_slit),  # ∈ [-β_s / 2, β_s / 2]
+                        wavel_axis[wslice],
+                        arcsec2micron=instr.wavel_step / instr.det_pix_size,
+                        type='dirac',
                     )  
         return wpsf
 
@@ -182,6 +210,7 @@ class Channel():
         for p_idx, pointing in enumerate(self.pointings):
             # gridded = self.NN_gridding(blurred_cube[self.wslice], self.list_gridding_indexes[p_idx]) 
             gridded = self.gridding(blurred_cube[self.wslice], pointing) 
+            plt.imshow()
             sum_cube = jax_utils.idft(
                 jax_utils.dft_mult(gridded, self._otf_sr),
                 self.local_im_shape,
@@ -220,7 +249,7 @@ class Channel():
                                                                         self.local_im_shape[1]))
                 local_cube += tmp
 
-            sum_t_cube = jax_utils.idft(jax_utils.dft(local_cube) * self._otf_sr.conj(), 
+            sum_t_cube = jax_utils.idft(jax_utils.dft(local_cube) * self._otf_sr.conj()*self.decalf.conj(), 
                                         self.local_im_shape)
 
             # degridded = self.NN_gridding_t(np.array(sum_t_cube, dtype=np.float64), self.list_gridding_t_indexes[p_idx])
@@ -245,17 +274,56 @@ class Channel():
                     axis=2,
                 )
             blurred_t_sliced = np.zeros(self.slicer.get_slit_shape_t())
-            blurred_t_sliced[:,: self.oshape[3] * self.srf : self.srf,:] = jax_utils.wblur_t(oversampled_sliced, self.wpsf.conj())
+            blurred_t_sliced[:,: self.oshape[3] * self.srf : self.srf,:] = jax_utils.wblur_t(oversampled_sliced, self.wpsf_dirac.conj())
             tmp = self.slicer.slicing_t(blurred_t_sliced, slit_idx, (self.wslice.stop-self.wslice.start,
                                                                     self.local_im_shape[0],
                                                                     self.local_im_shape[1]))
             local_cube += tmp
 
-        sum_t_cube = jax_utils.idft(jax_utils.dft(local_cube) * self._otf_sr.conj(), 
+        sum_t_cube = jax_utils.idft(jax_utils.dft(local_cube) * self._otf_sr.conj()*self.decalf.conj(), 
                                     self.local_im_shape)
+
+        sum_t_cube = np.array(sum_t_cube, dtype=np.float64)
+        sum_t_cube[:,0,:] = 0
 
         degridded = self.gridding_t(np.array(sum_t_cube, dtype=np.float64), self.pointings[0])
         inter_cube += degridded
+        return inter_cube
+
+    def realData_cubeToSlice(self, cube):
+        slices = np.zeros(self.oshape[1:]) # Remove pointing dimension
+        gridded = self.gridding(cube, instru.Coord(0, 0))
+        for slit_idx in range(self.instr.n_slit):
+            sliced = self.slicer.slicing(gridded, slit_idx)[:, : self.oshape[3] * self.srf : self.srf,:]
+            slices[slit_idx, :, :] = sliced.sum(axis=2) # Only sum on the Beta axis
+        return slices   
+
+    def realData_sliceToCube(self, slices, cube_dim):
+        blurred = np.zeros(cube_dim)
+        gridded = np.zeros((cube_dim[0] , self.local_im_shape[0], self.local_im_shape[1]))
+        for slit_idx in range(self.instr.n_slit):
+            slices_slice = self.slicer.get_slit_slices(slit_idx)
+            slice_alpha, slice_beta = slices_slice
+            sliced = np.zeros((cube_dim[0], slice_alpha.stop - slice_alpha.start, slice_beta.stop - slice_beta.start))
+            tmp = np.repeat(
+                            np.expand_dims(
+                                slices[slit_idx],
+                                axis=2,
+                                ),
+                                self.slicer.npix_slit_beta_width,
+                                axis=2,
+                            )/self.slicer.npix_slit_beta_width
+            tmp2 = tmp
+            sliced[:, : cube_dim[0] * self.srf : self.srf] = tmp2
+            tmp3 = self.slicer.slicing_t(sliced, slit_idx, (cube_dim[0],
+                                                                        self.local_im_shape[0],
+                                                                        self.local_im_shape[1]))
+            gridded += tmp3
+
+        sum_t_cube = jax_utils.idft(jax_utils.dft(np.array(gridded, dtype=np.float64)) * self._otf_sr.conj(), 
+                                        self.local_im_shape)  
+        blurred += self.gridding_t(sum_t_cube, instru.Coord(0, 0))
+        return blurred
 
 
     def precompute_mask(self):

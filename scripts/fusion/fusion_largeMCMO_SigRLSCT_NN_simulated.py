@@ -124,7 +124,7 @@ P3 = main_pointing + instru.Coord((ch2a.det_pix_size/3600)/4, -ch2a.slit_beta_wi
 P4 = main_pointing + instru.Coord(-(ch2a.det_pix_size/3600)/4, -ch2a.slit_beta_width/4)
 pointings = instru.CoordList([P1, P2, P3, P4]).pix(step_Angle.degree)
 
-spectroModel = MCMO_SigRLSCT_Model.spectroSigRLSCT_NN(sotf, 
+spectroModel = MCMO_SigRLSCT_Model.spectroSigRLSCT(sotf, 
                                               templates, 
                                               origin_alpha_axis, 
                                               origin_beta_axis, 
@@ -134,25 +134,34 @@ spectroModel = MCMO_SigRLSCT_Model.spectroSigRLSCT_NN(sotf,
                                               pointings)
 print("FW")
 y = spectroModel.forward(maps)
-print("ADJ")
+# print("ADJ")
 adj = spectroModel.adjoint(y)
 real_cube = spectroModel.mapsToCube(maps)
 
-# np.save('reference_NN_MCMO_SigRLSCT_Simulated_fw.npy', y)
-# np.save('reference_NN_MCMO_SigRLSCT_Simulated_ad.npy', adj)
+
+y2 = spectroModel.forward(adj)
+# print("ADJ")
+adj2 = spectroModel.adjoint(y2)
+utils.plot_maps(adj)
+utils.plot_maps(adj2)
+plt.show()
+
+
+# # np.save('reference_NN_MCMO_SigRLSCT_Simulated_fw.npy', y)
+# # np.save('reference_NN_MCMO_SigRLSCT_Simulated_ad.npy', adj)
 # utils.plot_maps(adj)
 # plt.show()
-y_ref = np.load('reference_NN_MCMO_SigRLSCT_Simulated_fw.npy')
-adj_ref = np.load('reference_NN_MCMO_SigRLSCT_Simulated_ad.npy')
+# y_ref = np.load('reference_NN_MCMO_SigRLSCT_Simulated_fw.npy')
+# adj_ref = np.load('reference_NN_MCMO_SigRLSCT_Simulated_ad.npy')
 
-print(np.allclose(y, y_ref))
-print(np.allclose(adj, adj_ref))
+# print(np.allclose(y, y_ref))
+# print(np.allclose(adj, adj_ref))
 # """
 # Reconstruction method
 # """
-# hyperParameter = 1e7
+# hyperParameter = 1e6
 # method = "lcg"
-# niter = 10
+# niter = 5
 # value_init = 0
 
 # quadCrit_fusion = fusion_CT.QuadCriterion_MRS(mu_spectro=1, 
@@ -191,7 +200,7 @@ print(np.allclose(adj, adj_ref))
 # # np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
 
 
-# plt.show()
+plt.show()
 
 
 
