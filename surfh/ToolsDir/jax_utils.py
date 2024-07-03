@@ -1,8 +1,30 @@
 import numpy as np
 from jax import jit
 import jax.numpy as jnp
+import jax.lax
 
 from functools import partial
+
+
+
+@jit
+def lmm_maps2cube(maps, tpls):
+    cube = jnp.sum(
+            jnp.expand_dims(maps, 1) * tpls[..., jnp.newaxis, jnp.newaxis], axis=0
+        )
+    return cube
+
+@jit
+def lmm_cube2maps(cube, tpls):
+    maps = jnp.concatenate(
+            [
+                jnp.sum(cube * tpl[..., jnp.newaxis, jnp.newaxis], axis=0)[jnp.newaxis, ...]
+                for tpl in tpls
+            ],
+            axis=0,
+            )
+    return maps
+
 
 
 @jit # TODO is it useful here?
@@ -30,29 +52,25 @@ def lmm_cube2maps_idft_mult(a, b, tpl, im_shape):
     return lmm_cube2maps(d, tpl)
 
 
-@jit
-def lmm_maps2cube(maps, tpls):
-    cube = jnp.sum(
-            jnp.expand_dims(maps, 1) * tpls[..., jnp.newaxis, jnp.newaxis], axis=0
-        )
-    return cube
+@partial(jit, static_argnums=2)
+def conv(local_cube, _otf_sr, local_im_shape):
+    return idft(dft(local_cube) * _otf_sr, local_im_shape)
 
-@jit
-def lmm_cube2maps(cube, tpls):
-    maps = jnp.concatenate(
-            [
-                jnp.sum(cube * tpl[..., jnp.newaxis, jnp.newaxis], axis=0)[jnp.newaxis, ...]
-                for tpl in tpls
-            ],
-            axis=0,
-            )
-    return maps
 
 
 #### wblur
-
 @jit
 def wblur(arr, wpsf):
+    return jnp.sum(
+            # in [1, λ, α, β]
+            jnp.expand_dims(arr, axis=0)
+            # wpsf in [λ', λ, 1, β]
+            * jnp.expand_dims(wpsf, axis=2),
+            axis=1,
+        )
+
+@jit
+def wblur_subSampling(arr, wpsf):
     return jnp.sum(jnp.sum(
             # in [1, λ, α, β]
             jnp.expand_dims(arr, axis=0)
@@ -60,6 +78,7 @@ def wblur(arr, wpsf):
             * jnp.expand_dims(wpsf, axis=2),
             axis=1,
         ), axis=2)
+
 
 @jit
 def wblur_t(arr, wpsf):
@@ -71,8 +90,26 @@ def wblur_t(arr, wpsf):
         axis=0,
     )
 
+@jit
+def wblur_t_overSampling(arr, wpsf):
+    return jnp.sum(
+        # in [λ', 1, α, β]
+        jnp.expand_dims(arr, axis=1)
+        # wpsf in [λ', λ, 1, β]
+        * jnp.expand_dims(wpsf, axis=2),
+        axis=0,
+    )
+
 
 ### Others 
+
+@jit
+def weight_slice(slice, weight, local_shape, start1, stop1, start2, stop2):
+    out = jnp.zeros(local_shape)
+    
+    return
+
+
 @jit
 def fov_weight_jax(
     fov,

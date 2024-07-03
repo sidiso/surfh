@@ -120,10 +120,11 @@ data = np.load('/home/nmonnier/Data/JWST/Orion_bar/Single_numpy_slices/' + filen
 data[np.where(np.isnan(data))] = 0
 
 print("Build Cube")
-y_cube = spectroModel.sliceToCube(data)
+# y_cube = spectroModel.sliceToCube(data)
 
 
-
+datamodel = spectroModel.old_forward(maps)
+nmaps = spectroModel.old_adjoint(datamodel)
 
 
 # mask = utils.make_mask_FoV(test)

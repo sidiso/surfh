@@ -129,7 +129,7 @@ class Spectro(LinOp):
         for idx, chan in enumerate(self.channels):
             if self.verbose:
                 logger.info(f"Channel {chan.name}")
-            APPL.runJob("Forward_id:%d"%idx, chan.forward_multiproc, 
+            APPL.runJob("Forward_id:%d"%idx, chan.forward_multiproc_jax, 
                         args=(blurred_f,), 
                         serial=self.serial)
             
