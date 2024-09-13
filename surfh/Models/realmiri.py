@@ -41,6 +41,9 @@ Return Instrumental IFU regarding metadata of the fits file.
 def get_IFU(filename):
     hdul = fits.open(filename)
     hdr = hdul[0].header
+    targ_ra  = hdr['TARG_RA']
+    targ_dec = hdr['TARG_DEC']
+
 
     rotation_ref = hdul[1].header['PA_V3']
 
@@ -82,8 +85,9 @@ def get_IFU(filename):
     
 
     hdr = hdul[1].header
-    targ_ra  = hdr['RA_V1']
-    targ_dec = hdr['DEC_V1']
+    # targ_ra  = hdr['RA_V1'] 
+    # targ_dec = hdr['DEC_V1']
+
     wavel = (np.arange(hdr['NAXIS3']) +hdr['CRPIX3'] - 1) * hdr['CDELT3'] + hdr['CRVAL3']
 
     if (str(channel) + chr(65 + band)) not in pce:
@@ -95,8 +99,8 @@ def get_IFU(filename):
     hdul.close()
     return instru.IFU(
                         # ToChange
-                        # instru.FOV(alpha_width, beta_width, origin=instru.Coord(targ_ra, targ_dec), angle=rotation),
-                        instru.FOV(alpha_width, beta_width, origin=instru.Coord(0,0), angle=rotation),
+                        instru.FOV(alpha_width, beta_width, origin=instru.Coord(targ_ra, targ_dec), angle=rotation),
+                        # instru.FOV(alpha_width, beta_width, origin=instru.Coord(0,0), angle=rotation),
                         pix_size*3600,
                         slices,
                         spec_blur,
