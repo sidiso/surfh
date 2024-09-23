@@ -20,18 +20,6 @@ from surfh.ToolsDir import fits_toolbox
 
 console = Console()
 
-def get_fits_target_coordinates(filepath):
-    """
-    Extract target coordinates from FITS header.
-    """
-    with fits.open(filepath) as hdul:
-        hdr = hdul[1].header
-        targ_ra = hdr['RA_V1']
-        targ_dec = hdr['DEC_V1']
-
-    return targ_ra, targ_dec
-
-
 def load_simulation_data():
     """
     Load simulation data and the wavelength information.
@@ -81,9 +69,9 @@ def setup_channel_model(origin_alpha_axis, origin_beta_axis, targ_ra, targ_dec, 
 
 def main():
 
-    fits_path = '/home/nmonnier/Data/JWST/Orion_bar/Stage_2/ch1a_ch2a_0211f_00001_mirifushort_cal.fits'
-    save_corrected_dir = '/home/nmonnier/Data/JWST/Orion_bar/Stage_2/Corrected/'
-    mode = [0,1] # 0=1st chan; 1=2nd chan; 2=both chan
+    fits_path = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Raw_slices/ch1a_ch2a_02101_00001_mirifushort_cal.fits'
+    save_corrected_dir = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Corrected_slices/'
+    mode = [1] # 0=1st chan; 1=2nd chan; 2=both chan
 
     first_chan, second_chan, dithering_number = extract_name_information(os.path.basename(fits_path))
 
@@ -94,16 +82,18 @@ def main():
             selected_chan = second_chan
         else:
             raise NameError(f"Error in seleced mode : {mod}")
-        
+                
         # Load simulation data
         origin_alpha_axis, origin_beta_axis, wavelength_cube = load_simulation_data()
 
         # Extract target coordinates from FITS file
-        targ_ra, targ_dec = get_fits_target_coordinates(fits_path)
+        targ_ra, targ_dec = fits_toolbox.get_fits_target_coordinates(fits_path)
 
         # Setup channel model
         ifu, targ_ra, targ_dec = realmiri.get_IFU(fits_path, channel=selected_chan)
         model_channel = setup_channel_model(origin_alpha_axis, origin_beta_axis, targ_ra, targ_dec, ifu, wavelength_cube)
+
+        print(f'Oshape Channel is {model_channel.oshape}')
 
         # Process FITS data and generate labeled image
         jwst_model = datamodels.open(fits_path)
@@ -133,11 +123,22 @@ def main():
 
         console.log("[bold blue]--- Process completed successfully! ---[/bold blue]")
 
+        # Sort slices in the right order
+        if 'ch1' in selected_chan:
+            sorted_data = np.zeros_like(corrected_slices)
+
+            new_order = [0,11,1,12,2,13,3,14,4,15,5,16,6,17,7,18,8,19,9,20,10]
+            for i in range(corrected_slices.shape[0]):
+                sorted_data[new_order[i]] = corrected_slices[i]
+            # slices_vizualisation.visualize_corrected_slices(data_shape, data)
+            sorted_data = np.roll(sorted_data, 10, 0)
+
 
 
         filename = save_corrected_dir + selected_chan + '_' + dithering_number + '_corrected.fits'
-        corrected_slice_fits = corrected_slices.transpose(1, 0, 2).reshape(corrected_slices.shape[1], corrected_slices.shape[2]*corrected_slices.shape[0])
-        fits_toolbox.corrected_slices_to_fits(corrected_slice_fits, ifu.fov.angle, targ_ra, targ_dec, filename)
+        corrected_slice_fits = sorted_data.transpose(1, 0, 2).reshape(sorted_data.shape[1], sorted_data.shape[2]*sorted_data.shape[0])
+
+        fits_toolbox.corrected_slices_to_fits(corrected_slice_fits, ifu.fov.angle, targ_ra, targ_dec, filename, selected_chan)
 
         slices_vizualisation.visualize_corrected_slices(corrected_slices.shape, corrected_slices)
 
