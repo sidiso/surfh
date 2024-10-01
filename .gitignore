@@ -94,4 +94,10 @@ ENV/
 # Rope project settings
 .ropeproject
 
+# Vscode
+.vscode/
+
+# scannerwork
+.scannerwork/
+
 poetry.lock
