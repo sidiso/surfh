@@ -608,6 +608,8 @@ class IFU:
     wavel_axis: array
     name: str = "_"
 
+    
+
     def __post_init__(self):
         self.slit_shift = [
             Coord(0, -self.fov.beta_width / 2 + self.slit_beta_width / 2)

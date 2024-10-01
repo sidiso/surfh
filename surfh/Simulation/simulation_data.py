@@ -127,6 +127,13 @@ def get_simulation_data(spatial_subsampling=4, margin=0, path_cube_orion='./cube
     # spsf = spsf[:, start:start+N, start:start+N]
     # sotf = udft.ir2fr(spsf, maps_shape[1:])
 
-    return origin_beta_axis, origin_beta_axis, wavel_axis, spsf, maps, tpl
+    return origin_alpha_axis, origin_beta_axis, wavel_axis, spsf, maps, tpl
 
 
+
+def load_simulation_data(simulation_dir_path='/home/nmonnier/Projects/JWST/MRS/surfh/cube_orion/'):
+    """
+    Load simulation data and the wavelength information.
+    """
+    origin_alpha_axis, origin_beta_axis, wavelength_cube, spsf, maps, templates = get_simulation_data(4, 0, simulation_dir_path)
+    return origin_alpha_axis, origin_beta_axis, wavelength_cube
