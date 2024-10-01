@@ -69,9 +69,9 @@ def setup_channel_model(origin_alpha_axis, origin_beta_axis, targ_ra, targ_dec, 
 
 def main():
 
-    fits_path = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Raw_slices/ch1a_ch2a_02101_00001_mirifushort_cal.fits'
+    fits_path = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Raw_slices/ch1b_ch2b_0210j_00004_mirifushort_cal.fits'
     save_corrected_dir = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Corrected_slices/'
-    mode = [1] # 0=1st chan; 1=2nd chan; 2=both chan
+    mode = [0,1] # 0=1st chan; 1=2nd chan; 2=both chan
 
     first_chan, second_chan, dithering_number = extract_name_information(os.path.basename(fits_path))
 
@@ -133,14 +133,24 @@ def main():
             # slices_vizualisation.visualize_corrected_slices(data_shape, data)
             sorted_data = np.roll(sorted_data, 10, 0)
 
+        elif 'ch2' in selected_chan:
+            sorted_data = np.zeros_like(corrected_slices)
+
+            new_order = [8,0,9,1,10,2,11,3,12,4,13,5,14,6,15,7,16]
+            for i in range(corrected_slices.shape[0]):
+                sorted_data[new_order[i]] = corrected_slices[i]
+            # slices_vizualisation.visualize_corrected_slices(data_shape, data)
+            sorted_data = np.roll(sorted_data, 9, 0)
+        else:
+            raise NameError(f'Error The name of the selected chan is wrong : {selected_chan}')
 
 
         filename = save_corrected_dir + selected_chan + '_' + dithering_number + '_corrected.fits'
         corrected_slice_fits = sorted_data.transpose(1, 0, 2).reshape(sorted_data.shape[1], sorted_data.shape[2]*sorted_data.shape[0])
-
+        
         fits_toolbox.corrected_slices_to_fits(corrected_slice_fits, ifu.fov.angle, targ_ra, targ_dec, filename, selected_chan)
 
-        slices_vizualisation.visualize_corrected_slices(corrected_slices.shape, corrected_slices)
+        # slices_vizualisation.visualize_corrected_slices(corrected_slices.shape, corrected_slices)
 
 if __name__ == "__main__":
     main()
