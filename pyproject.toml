@@ -37,6 +37,7 @@ jax = "^0.4.32"
 jaxlib = "^0.4.32"
 numba = "^0.60.0"
 asdf = "^3.4.0"
+scikit-learn = "^1.5.2"
 
 [tool.poetry.dev-dependencies]
 ipython = "^8.0.1"
