@@ -62,7 +62,7 @@ class spectroSigRLSCT(LinOp):
         self.list_slicer = []
         self.list_wslice = [instr.wslice(wavelength_axis, 0.1) for instr in self.instrs]
         for chan_idx, chan in enumerate(self.instrs):
-            local_alpha_axis, local_beta_axis = chan.fov.local_coords(step_degree, 0, 0)#5* step_degree, 5* step_degree)
+            local_alpha_axis, local_beta_axis = chan.fov.local_coords(step_degree, 5* step_degree, 5* step_degree)
             self.list_local_alpha_axis.append(local_alpha_axis)
             self.list_local_beta_axis.append(local_beta_axis)  
             self.list_slicer.append(slicer.Slicer(chan, 
@@ -80,7 +80,6 @@ class spectroSigRLSCT(LinOp):
             [chan.det_pix_size for chan in instrs],
             self.step_degree*3600, # Conversion in arcsec
         )
-        print(f'Super Resolution factor is set to {self.srfs}')
 
         self.list_wslice = [instr.wslice(wavelength_axis, 0.1) for instr in self.instrs]
 
@@ -352,25 +351,21 @@ class spectroSigRLSCT_NN(LinOp):
                                     local_alpha_axis = local_alpha_axis, 
                                     local_beta_axis = local_beta_axis))
             
-        self.pointings = pointings.pix(self.step_degree)  
+        self.pointings = pointings
        
-        print(self.step_degree*3600)
-        print(chan.det_pix_size)
         # Super resolution factor (in alpha dim) for all channels
         self.srfs = instru.get_srf(
             [chan.det_pix_size for chan in instrs],
             self.step_degree*3600, # Conversion in arcsec
         )
-        print(f'Super Resolution factor is set to {self.srfs}')
 
         self.list_wslice = [instr.wslice(wavelength_axis, 0.1) for instr in self.instrs]
 
-        
         # Templates (4, Nx, Ny)
         ishape = (self.templates.shape[0], len(alpha_axis), len(beta_axis))
         
         # 4D array [Nslit, L, alpha_slit, beta_slit]
-        self.instrs_oshape = [(len(pointings), instrs[idx].n_slit, 
+        self.instrs_oshape = [(len(pointings[0]), instrs[idx].n_slit, 
                           len(instrs[idx].wavel_axis), 
                           ceil(self.list_slicer[idx].npix_slit_alpha_width / self.srfs[idx])) 
                           for idx in range(len(instrs))]
@@ -389,8 +384,6 @@ class spectroSigRLSCT_NN(LinOp):
         self.imshape = (len(alpha_axis), len(beta_axis))
 
         super().__init__(ishape=ishape, oshape=oshape)
-        # self.ishape = tuple(ishape)
-        # self.oshape = tuple(oshape)
 
         # # Convolution kernel used to cumulate or dupplicate oversampled pixels during slitting operator L
         self.list_otf_sr = [python_utils.udft.ir2fr(
@@ -398,15 +391,6 @@ class spectroSigRLSCT_NN(LinOp):
                                             )[np.newaxis, ...] 
                                             for idx, _ in enumerate(self.instrs)]
         
-        # self.nmask = np.zeros((len(self.instrs), len(self.pointings), self.imshape[0], self.imshape[1]))
-        # self.precompute_mask()
-
-        # self.list_gridding_indexes = []
-        # self.precompute_griding_indexes()
-
-        # self.list_gridding_t_indexes = []
-        # self.precompute_griding_t_indexes()
-
         self.channels = [
             MCMO_SigRLSCT_Channel_Model.Channel(
                 instr,
@@ -414,12 +398,11 @@ class spectroSigRLSCT_NN(LinOp):
                 beta_axis,
                 wavelength_axis,
                 srf,
-                pointings,
+                pointings[it],
                 step_degree
             )
-            for srf, instr in zip(self.srfs, instrs)
+            for it, (srf, instr) in enumerate(zip(self.srfs, instrs))
         ]
-
 
     
     @property
@@ -441,79 +424,6 @@ class spectroSigRLSCT_NN(LinOp):
                         type='mrs',
                     )  
         return wpsf
-
-    def precompute_griding_indexes(self):
-        for ch_idx, chan in enumerate(self.instrs):
-            for p_idx, pointing in enumerate(self.pointings):
-                dummy_cube = np.ones(self.list_instr_cube_shape[ch_idx*len(self.pointings) + p_idx])
-                local_alpha_coord, local_beta_coord = (self.instrs[ch_idx].fov + pointing).local2global(
-                                                                self.list_local_alpha_axis[ch_idx], self.list_local_beta_axis[ch_idx]
-                                                                )
-
-                test_cube_alpha_axis = np.tile(self.alpha_axis, len(self.alpha_axis))
-                test_cube_beta_axis= np.repeat(self.beta_axis, len(self.beta_axis)) 
-                # S
-                wavel_idx = np.arange(self.list_wslice[ch_idx].stop - self.list_wslice[ch_idx].start)
-
-                indexes = nearest_neighbor_interpolation.griddata((test_cube_alpha_axis.ravel(), test_cube_beta_axis.ravel()), 
-                                                                dummy_cube[0].ravel(), 
-                                                                (local_alpha_coord, local_beta_coord))
-                
-                wavel_indexes = np.tile(indexes, 
-                                        (len(wavel_idx),1)).reshape(len(wavel_idx), len(indexes)) + ((wavel_idx[...,np.newaxis])*dummy_cube[0].size )
- 
-                self.list_gridding_indexes.append(wavel_indexes)
-
-    
-    def precompute_griding_t_indexes(self):
-        for ch_idx, chan in enumerate(self.instrs):
-            for p_idx, pointing in enumerate(self.pointings):
-                dummy_cube = np.ones((self.list_wslice[ch_idx].stop-self.list_wslice[ch_idx].start,  
-                                       len(self.list_local_alpha_axis[ch_idx]), 
-                                       len(self.list_local_beta_axis[ch_idx])))
-                
-
-                local_alpha_coord, local_beta_coord = (self.instrs[ch_idx].fov + pointing).local2global(
-                                                                self.list_local_alpha_axis[ch_idx], self.list_local_beta_axis[ch_idx]
-                                                                )
-
-                test_cube_alpha_axis = np.tile(self.alpha_axis, len(self.alpha_axis))
-                test_cube_beta_axis= np.repeat(self.beta_axis, len(self.beta_axis))  
-
-                wavel_idx = np.arange(dummy_cube.shape[0])
-
-                indexes_t = nearest_neighbor_interpolation.griddata((local_alpha_coord.ravel(), local_beta_coord.ravel()),
-                                                                    dummy_cube[0].ravel(), 
-                                                                    (test_cube_alpha_axis.reshape(self.imshape[0],self.imshape[1]), test_cube_beta_axis.reshape(self.imshape[0], self.imshape[1])))
-                
-                
-                wavel_indexes_t = np.tile(indexes_t, 
-                                        (len(wavel_idx),1)).reshape(len(wavel_idx), len(indexes_t)) + ((wavel_idx[...,np.newaxis])*local_alpha_coord.shape[0]* local_alpha_coord.shape[1] )
-                self.list_gridding_t_indexes.append(wavel_indexes_t)
-
-        
-    
-
-
-    def NN_gridding(self, blurred_cube: array, pointing: instru.Coord, chan_idx: int, p_idx: int) -> array:
-        local_alpha_coord, local_beta_coord = (self.instrs[chan_idx].fov + pointing).local2global(
-                                                        self.list_local_alpha_axis[chan_idx], self.list_local_beta_axis[chan_idx]
-                                                        )
-        # S
-        wavel_idx = np.arange(self.list_wslice[chan_idx].stop - self.list_wslice[chan_idx].start)
-        wavel_indexes = self.list_gridding_indexes[chan_idx*len(self.pointings) + p_idx]
-        gridded = blurred_cube.ravel()[wavel_indexes].reshape(len(wavel_idx), local_alpha_coord.shape[0], local_alpha_coord.shape[1])
-
-        return gridded
-    
-
-
-    def NN_gridding_t(self, local_cube: array, pointing: instru.Coord, chan_idx: int, p_idx: int) -> array:
-
-        wavel_indexes_t = self.list_gridding_t_indexes[chan_idx*len(self.pointings) + p_idx]
-        degridded = local_cube.ravel()[wavel_indexes_t].reshape(local_cube.shape[0], len(self.alpha_axis), len(self.beta_axis))
-
-        return degridded
 
     def forward(self, maps):
         # T
@@ -542,6 +452,21 @@ class spectroSigRLSCT_NN(LinOp):
     
     def mapsToCube(self, maps):
         return jax_utils.lmm_maps2cube(maps, self.templates)
+
+
+    def project_FOV(self):
+        plt.figure()
+        for ch_idx, chan in enumerate(self.channels):
+            chan.project_FOV()
+            alpha = [np.min(self.alpha_axis), np.max(self.alpha_axis), np.min(self.alpha_axis),np.max(self.alpha_axis)]
+            beta = [np.min(self.beta_axis), np.min(self.beta_axis), np.max(self.beta_axis),np.max(self.beta_axis)]
+            print(alpha, beta)
+            plt.plot(alpha, beta, 'o', label='Reference')
+
+            plt.legend()
+        plt.show()
+        return
+
 
 
     def precompute_mask(self):

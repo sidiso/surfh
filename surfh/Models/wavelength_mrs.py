@@ -23,23 +23,24 @@ def mrs_wavel_axis(filename):
     
 
 def get_mrs_wavelength(chan_name):
-    if chan_name == '1a':
+    if chan_name == '1a' or chan_name == 'ch1a':
         return mrs_wavel_axis('ChannelCube_ch_1_short_s3d_02101_00001.fits')
-    elif chan_name == '1b':
+    elif chan_name == '1b' or chan_name == 'ch1b':
         return mrs_wavel_axis('ChannelCube_ch_1_medium_s3d_0210j_00001.fits')
-    elif chan_name == '1c':
+    elif chan_name == '1c' or chan_name == 'ch1c':
         return mrs_wavel_axis('ChannelCube_ch_1_long_s3d_02111_00001.fits')
-    elif chan_name == '2a':
+    elif chan_name == '2a' or chan_name == 'ch2a':
         return mrs_wavel_axis('ChannelCube_ch_2_short_s3d_02101_00001.fits')
-    elif chan_name == '2b':
+    elif chan_name == '2b' or chan_name == 'ch2b':
         return mrs_wavel_axis('ChannelCube_ch_2_medium_s3d_0210j_00001.fits')
-    elif chan_name == '2c':
+    elif chan_name == '2c' or chan_name == 'ch2c':
         return mrs_wavel_axis('ChannelCube_ch_2_long_s3d_02111_00001.fits')
-    elif chan_name == '3a':
+    elif chan_name == '3a' or chan_name == 'ch3a':
         return mrs_wavel_axis('ChannelCube_ch_3_short_s3d_02101_00001.fits')
-    elif chan_name == '3b':
+    elif chan_name == '3b' or chan_name == 'ch3b':
         return mrs_wavel_axis('ChannelCube_ch_3_medium_s3d_0210j_00001.fits')
-    elif chan_name == '3c':
+    elif chan_name == '3c' or chan_name == 'ch3c':
         return mrs_wavel_axis('ChannelCube_ch_3_long_s3d_02111_00001.fits')
     else:
-        print("ERROR Reading wavelength")
+        raise ValueError(f"Error Reading wavelength, {chan_name} is not a correct input.")
+        print("")

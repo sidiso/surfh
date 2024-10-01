@@ -9,17 +9,17 @@ import udft
 
 
 
-def get_simulation_data(spatial_subsampling=4, margin=0):
+def get_simulation_data(spatial_subsampling=4, margin=0, path_cube_orion='./cube_orion/'):
     def orion():
         """Rerturn maps, templates, spatial step and wavelength"""
-        maps = fits.open("./cube_orion/abundances_orion.fits")[0].data
+        maps = fits.open(path_cube_orion + "abundances_orion.fits")[0].data
 
         h2_map = maps[0]
         if_map = maps[1]
         df_map = maps[2]
         mc_map = maps[3]
 
-        spectrums = fits.open("./cube_orion/spectra_mir_orion.fits")[1].data
+        spectrums = fits.open(path_cube_orion + "spectra_mir_orion.fits")[1].data
         wavel_axis = spectrums.wavelength
 
         h2_spectrum = spectrums["spectrum_h2"][: len(wavel_axis)]
@@ -127,6 +127,13 @@ def get_simulation_data(spatial_subsampling=4, margin=0):
     # spsf = spsf[:, start:start+N, start:start+N]
     # sotf = udft.ir2fr(spsf, maps_shape[1:])
 
-    return origin_beta_axis, origin_beta_axis, wavel_axis, spsf, maps, tpl
+    return origin_alpha_axis, origin_beta_axis, wavel_axis, spsf, maps, tpl
 
 
+
+def load_simulation_data(simulation_dir_path='/home/nmonnier/Projects/JWST/MRS/surfh/cube_orion/'):
+    """
+    Load simulation data and the wavelength information.
+    """
+    origin_alpha_axis, origin_beta_axis, wavelength_cube, spsf, maps, templates = get_simulation_data(4, 0, simulation_dir_path)
+    return origin_alpha_axis, origin_beta_axis, wavelength_cube
