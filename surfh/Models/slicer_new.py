@@ -133,6 +133,13 @@ class Slicer():
                 slices = (slices[0], slice(slices[1].start, slices[1].stop - 1))
             else:
                 slices = (slices[0], slice(slices[1].start + 1, slices[1].stop))
+
+
+        # TODO Fix here 
+        if (slices[0].stop - slices[0].start) > self.npix_slit_alpha_width:
+            slices = (slice(slices[0].start, slices[0].stop - 1), slices[1])
+        elif (slices[0].stop - slices[0].start) < self.npix_slit_alpha_width:
+            slices = (slice(slices[0].start - 2, slices[0].stop), slices[1])
         return slices
 
 
