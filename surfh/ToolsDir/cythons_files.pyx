@@ -345,15 +345,20 @@ def c_sliceToCube_t(const double[:,:,:] arr, const double[:,:,:]dirac,
         double[:,:,:] c_res = np.zeros((sizeLambda, sizeAlpha, sizeBeta))
         int l, a, b, ll = 0
         double tmp = 0.
+        double cum = 0.
 
-    with nogil, parallel(num_threads=num_threads):
+    with nogil, parallel(num_threads=1):
         for l in prange(sizeLambda):
             for a in range(sizeAlpha):
                 for b in range(sizeBeta):
-                    tmp = 0 
+                    tmp = 0.
+                    cum = 0.
                     for ll in range(sizeLambdaPrime):
                         tmp = tmp + arr[ll,a,b]* dirac[ll,l,b]
-                    c_res[l,a,b] = tmp 
+                        cum = cum + dirac[ll,l,b]
+                    if cum != 0.:
+                        c_res[l,a,b] = tmp/cum
+                        
 
     # for a in range(sizeAlpha):
     #     for b in range(sizeBeta):

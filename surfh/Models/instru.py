@@ -281,7 +281,7 @@ class FOV:
     angle: float = 0
 
     def local_coords(
-        self, step: float, alpha_margin: float = 0, beta_margin: float = 0
+        self, step: float, alpha_margin: float = 0, beta_margin: float = 0,
     ) -> Tuple[array, array]:
         """Returns regular Cartesian coordinates inside the FOV in self referential"""
 
@@ -447,6 +447,7 @@ class LocalFOV(FOV):
 
         alpha_step = alpha_axis[1] - alpha_axis[0]
         beta_step = beta_axis[1] - beta_axis[0]
+
         return (
             slice(
                 np.flatnonzero(self.alpha_start < alpha_axis + alpha_step / 2)[0],
@@ -456,11 +457,11 @@ class LocalFOV(FOV):
                 np.flatnonzero(self.beta_start < beta_axis + beta_step / 2)[0],
                 np.flatnonzero(beta_axis - beta_step / 2 < self.beta_end)[-1] + 1,
             ),
-        )
+        )   
 
     def n_alpha(self, step):
         """number of alpha in local referential"""
-        return int(ceil(self.alpha_width / 2 / step)) - int(
+        return int(ceil((self.alpha_width / 2) / step)) - int(
             floor(-self.alpha_width / 2 / step)
         )
 
@@ -606,6 +607,8 @@ class IFU:
     pce: array
     wavel_axis: array
     name: str = "_"
+
+    
 
     def __post_init__(self):
         self.slit_shift = [

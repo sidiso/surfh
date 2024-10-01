@@ -18,7 +18,7 @@ from surfh.Models import smallmiri as miri
 from surfh.ToolsDir import utils
 
 from surfh.ToolsDir import cython_2D_interpolation
-from surfh.Models import models
+from surfh.Models import spectro
 
 
 def orion():
@@ -101,7 +101,7 @@ main_pointing = instru.Coord(0, 0)
 pointings = instru.CoordList(c + main_pointing for c in ch1_dither).pix(step)
 # pointings = instru.CoordList([ifu.Coord(5 * step, 5 * step)])
 
-spectro = models.Spectro(
+spectro = spectro.Spectro(
     [miri.ch1a],
     alpha_axis,
     beta_axis,
@@ -213,7 +213,8 @@ for idx, chan in enumerate(spectro.channels):
                     ),
                     sliced.shape[2],
                     axis=2,
-                )
+                ),
+                slit_idx
             )
             gridded += chan.slicing_t(sliced, slit_idx)
 

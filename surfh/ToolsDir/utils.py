@@ -20,12 +20,22 @@ from math import ceil
 from typing import List, Tuple
 
 import numpy as np
+from numpy import ndarray as array
 import udft
 import scipy as sp
 
 import matplotlib.pyplot as plt
 
+def rotmatrix(degree: float) -> array:
+    """Return a 2x2 rotation matrix
 
+    Parameters
+    ----------
+    degree: float
+       The rotation angle to apply in degree.
+    """
+    theta = np.radians(degree)
+    return np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
 
 def gaussian_psf(wavel_axis, step, D=6.5):
     x_axis = np.linspace(-30, 30, 40).reshape((1, -1))
@@ -95,3 +105,29 @@ def apply_mask_FoV(mask, cube):
     masked = mask[np.newaxis,...] * cube
     #masked[np.where(masked == 0)] = np.NaN
     return masked
+
+
+def plot_maps(estimated_maps):
+    nrow = estimated_maps.shape[0] // 2
+    ncols = estimated_maps.shape[0] // 2
+    fig, axes = plt.subplots(nrows=nrow, ncols=nrow, sharex = True, sharey = True)
+
+    for i in range(nrow):
+        for j in range(ncols):
+            m = axes[i,j].imshow(estimated_maps[i*ncols+j])
+            fig.colorbar(m, ax=axes[i,j])
+
+def plot_3_cube(true_cube, y_cube, res_cube, slice=100):
+    fig, axes = plt.subplots(nrows=1, ncols=3, sharex = True, sharey = True)
+    m = axes[0].imshow(true_cube[slice])
+    fig.colorbar(m, ax=axes[0])
+    axes[0].title.set_text(f"True Cube slice n°{slice}")
+
+    n = axes[1].imshow(y_cube[slice])
+    fig.colorbar(n, ax=axes[1])
+    axes[1].title.set_text(f"Data Cube slice n°{slice}")
+
+    o = axes[2].imshow(res_cube[slice])
+    fig.colorbar(o, ax=axes[2])
+    axes[2].title.set_text(f"Recons Cube slice n°{slice}")
+

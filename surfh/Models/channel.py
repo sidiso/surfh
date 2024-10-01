@@ -30,10 +30,12 @@ from surfh.Models import instru
 
 from surfh.Others import shared_dict
 from surfh.Others.AsyncProcessPoolLight import APPL
-from surfh.ToolsDir import cython_2D_interpolation, matrix_op
+from surfh.ToolsDir import cython_2D_interpolation, matrix_op, jax_utils
+from surfh.Models import slicer
 
 import matplotlib.pyplot as plt
-import jax
+
+import jax.numpy as jnp
 
 InputShape = namedtuple("InputShape", ["wavel", "alpha", "beta"])
 
@@ -170,6 +172,13 @@ class Channel(LinOp):
 
         _metadata["fw_data"] = np.zeros(oshape)
         _metadata["ad_data"] = np.zeros(ishape, dtype=np.complex128)
+
+        self.slicer = slicer.Slicer(self.instr, 
+                                    self.wavel_axis, 
+                                    self.alpha_axis, 
+                                    self.beta_axis, 
+                                    self.local_alpha_axis, 
+                                    self.local_beta_axis)
  
         super().__init__(ishape, oshape, self.instr.name)
 
@@ -211,119 +220,34 @@ class Channel(LinOp):
         """ """
         wavel_axis = shared_dict.attach(self._metadata_path)["wavel_axis"]
         return wavel_axis
-
-    def slit_local_fov(self, slit_idx) -> instru.LocalFOV:
-        """The FOV of slit `slit_idx` in local ref"""
-        slit_fov = self.instr.slit_fov[slit_idx]
-        return slit_fov.local + self.instr.slit_shift[slit_idx]
-
-    def slit_slices(self, slit_idx: int) -> Tuple[slice, slice]:
-        """The slices of slit `slit_idx` in local axis"""
+    
+    @property
+    def local_alpha_axis(self) -> array:
         local_alpha_axis = shared_dict.attach(self._metadata_path)["local_alpha_axis"]
+        return local_alpha_axis
+    
+    @property
+    def local_beta_axis(self) -> array:
         local_beta_axis = shared_dict.attach(self._metadata_path)["local_beta_axis"]
-        slices = self.slit_local_fov(slit_idx).to_slices(
-            local_alpha_axis, local_beta_axis
-        )
-        # If slice to long, remove one pixel at the beginning or the end
-        if (slices[1].stop - slices[1].start) > self.npix_slit:
-            if abs(
-                local_beta_axis[slices[1].stop]
-                - self.slit_local_fov(slit_idx).beta_end
-            ) > abs(
-                local_beta_axis[slices[1].start]
-                - self.slit_local_fov(slit_idx).beta_start
-            ):
-                slices = (slices[0], slice(slices[1].start, slices[1].stop - 1))
-            else:
-                slices = (slices[0], slice(slices[1].start + 1, slices[1].stop))
-        return slices
-
-    def slit_shape(self, slit_idx: int) -> Tuple[int, int, int]:
-        """The shape of slit `slit_idx` in local axis"""
-        slices = self.slit_slices(slit_idx)
-        return (
-            self.wslice.stop - self.wslice.start,
-            slices[0].stop - slices[0].start,
-            slices[1].stop - slices[1].start,
-        )
-
-    def slit_weights(self, slit_idx: int) -> array:
-        """The weights of slit `slit_idx` in local axis"""
-        local_alpha_axis = shared_dict.attach(self._metadata_path)["local_alpha_axis"]
-        local_beta_axis = shared_dict.attach(self._metadata_path)["local_beta_axis"]
-        slices = self.slit_slices(slit_idx)
-
-        weights = matrix_op.fov_weight(
-            self.slit_local_fov(slit_idx),
-            slices,
-            local_alpha_axis,
-            local_beta_axis,
-        )
-
-        # If previous do not share a pixel
-        if slit_idx > 0:
-            if self.slit_slices(slit_idx - 1)[1].stop - 1 != slices[1].start:
-                weights[:, 0] = 1
-
-        # If next do not share a pixel
-        if slit_idx < self.npix_slit - 1:
-            if slices[1].stop - 1 != self.slit_slices(slit_idx + 1)[1].start:
-                weights[:, -1] = 1
-
-        return weights[np.newaxis, ...]
-
-    def slicing(
-        self,
-        gridded: array,
-        slit_idx: int,
-    ) -> array:
-        """Return a weighted slice of gridded. `slit_idx` start at 0."""
-        slices = self.slit_slices(slit_idx)
-        weights = self.slit_weights(slit_idx)
-        return gridded[:, slices[0], slices[1]] * weights
-
-    def slicing_cube2Fente(
-        self,
-        gridded: array,
-        slit_idx: int,
-    ) -> array:
-        """Return a weighted slice of gridded. `slit_idx` start at 0."""
-        slices = self.slit_slices(slit_idx)
-        weights = self.slit_weights(slit_idx)
-        return gridded[:, slices[0], slices[1]] * weights
-
-
-    def slicing_t(
-        self,
-        gridded: array,
-        slit_idx: int,
-    ) -> array:
-        """Return a weighted slice of gridded. `slit_idx` start at 0."""
-        out = np.zeros(self.local_shape)
-        slices = self.slit_slices(slit_idx)
-        weights = self.slit_weights(slit_idx)
-        out[:, slices[0], slices[1]] = gridded * weights
-        return out
-
-    def slicing_Fente2Cube_t(
-        self,
-        gridded: array,
-        slit_idx: int,
-    ) -> array:
-        """Return a weighted slice of gridded. `slit_idx` start at 0."""
-        out = np.zeros(self.local_shape)
-        slices = self.slit_slices(slit_idx)
-        weights = self.slit_weights(slit_idx)
-        out[:, slices[0], slices[1]] = gridded* weights
-        return out
+        return local_beta_axis
+    
+    @property
+    def alpha_axis(self) -> array:
+        alpha_axis = shared_dict.attach(self._metadata_path)["alpha_axis"]
+        return alpha_axis
+    
+    @property
+    def beta_axis(self) -> array:
+        beta_axis = shared_dict.attach(self._metadata_path)["beta_axis"]
+        return beta_axis
         
     def gridding(self, inarray: array, pointing: instru.Coord) -> array:
         """Returns interpolation of inarray in local referential"""
         # α and β inside the FOV shifted to pointing, in the global ref.
-        local_alpha_axis = shared_dict.attach(self._metadata_path)["local_alpha_axis"]
-        local_beta_axis = shared_dict.attach(self._metadata_path)["local_beta_axis"]
-        alpha_axis = shared_dict.attach(self._metadata_path)["alpha_axis"]
-        beta_axis = shared_dict.attach(self._metadata_path)["beta_axis"]
+        local_alpha_axis = self.local_alpha_axis
+        local_beta_axis  = self.local_beta_axis 
+        alpha_axis       = self.alpha_axis
+        beta_axis        = self.beta_axis
 
         alpha_coord, beta_coord = (self.instr.fov + pointing).local2global(
             local_alpha_axis, local_beta_axis
@@ -341,14 +265,6 @@ class Channel(LinOp):
                 beta_coord.ravel()
             ]
         ).T          
-
-        # for i, p in enumerate(local_coords.T):
-        #     if not np.logical_and(np.all(alpha_coord[i] <= p),
-        #                             np.all(p <= beta_coord[i])):
-        #         raise ValueError("One of the requested xi is out of bounds "
-        #                             "in dimension %d" % i)
-        # out_of_bounds = None
-
         return cython_2D_interpolation.interpn( (alpha_axis, beta_axis), 
                                               inarray, 
                                               local_coords, 
@@ -358,10 +274,10 @@ class Channel(LinOp):
     def gridding_t(self, inarray: array, pointing: instru.Coord) -> array:
         """Returns interpolation of inarray in global referential"""
         # α and β inside the FOV shifted to pointing, in the global ref.
-        local_alpha_axis = shared_dict.attach(self._metadata_path)["local_alpha_axis"]
-        local_beta_axis = shared_dict.attach(self._metadata_path)["local_beta_axis"]
-        alpha_axis = shared_dict.attach(self._metadata_path)["alpha_axis"]
-        beta_axis = shared_dict.attach(self._metadata_path)["beta_axis"]
+        local_alpha_axis = self.local_alpha_axis
+        local_beta_axis  = self.local_beta_axis 
+        alpha_axis       = self.alpha_axis
+        beta_axis        = self.beta_axis
 
         alpha_coord, beta_coord = (self.instr.fov + pointing).global2local(
             alpha_axis, beta_axis
@@ -466,15 +382,14 @@ class Channel(LinOp):
                 sliced = self.slicing(gridded, slit_idx)[
                     :, : self.oshape[3] * self.srf : self.srf
                 ]
-                
+
                 out[p_idx, slit_idx, :, :] = self.instr.pce[
                     ..., np.newaxis
                 ]* self.wblur(sliced).sum(axis=2)
                
-    
-    def forward_multiproc(self, inarray_f):
-        """inarray is supposed in global coordinate, spatially blurred and in Fourier space.
 
+    def forward_multiproc_jax(self, inarray_f):
+        """inarray is supposed in global coordinate, spatially blurred and in Fourier space.
         Output is an array of shape (pointing, slit, wavelength, alpha)."""
         # [pointing, slit, λ', α]
         out = shared_dict.attach(self._metadata_path)["fw_data"]
@@ -483,44 +398,16 @@ class Channel(LinOp):
             gridded = self.gridding(blurred, pointing)
             for slit_idx in range(self.instr.n_slit):
                 # Slicing, weighting and α subsampling for SR
-                sliced = self.slicing(gridded, slit_idx)[
+
+                sliced = self.slicer.slicing(gridded, slit_idx)[
                     :, : self.oshape[3] * self.srf : self.srf
                 ]
+
                 out[p_idx, slit_idx, :, :] = self.instr.pce[
                     ..., np.newaxis
-                ]* self.wblur(sliced, slit_idx).sum(axis=2)
-
-    def cubeToSlice(self, cube):
-        """cube is supposed in global coordinate in Fourier space for a specific Channel and band.
-        slices is an array of shape (pointing, slit, wavelength, alpha).
-        Reshape input cube into slices without spatial and spectral blurring 
-        done in Forward operator.
-        """
-        # [pointing, slit, λ', α]
-        slices = np.zeros(self.oshape)
-        blurred = idft(cube[self.wslice, ...], self.imshape) # Replace sblur
-
-        for p_idx, pointing in enumerate(self.pointings):
-            gridded = self.gridding(blurred, pointing)
-            for slit_idx in range(self.instr.n_slit):
-                # Slicing, weighting and α subsampling for SR
-                sliced = self.slicing_cube2Fente(gridded, slit_idx)[
-                    :, : self.oshape[3] * self.srf : self.srf
-                ]
-                slices[p_idx, slit_idx, :, :] = self.wdirac_blur(sliced, slit_idx).sum(axis=2) #TODO Change: That
-        return slices      
-
-    def realData_cubeToSlice(self, cube):
-        slices = np.zeros(self.oshape[1:]) # Remove pointing dimension
-        gridded = self.gridding(cube, instru.Coord(0, 0))
-        for slit_idx in range(self.instr.n_slit):
-            sliced = self.slicing_cube2Fente(gridded, slit_idx)[
-                    :, : self.oshape[3] * self.srf : self.srf
-                ]
-            slices[slit_idx, :, :] = sliced.sum(axis=2) # Only sum on the Beta axis
-        return slices      
-
-          
+                ]*jax_utils.wblur(sliced, self._wpsf(sliced.shape[2], self.beta_step, slit_idx))
+                
+                
 
     def adjoint(self, measures):
         out = shared_dict.attach(self._metadata_path)["ad_data"]
@@ -549,9 +436,9 @@ class Channel(LinOp):
         out[self.wslice, ...] += self.fourier_duplicate_t(blurred)
 
 
-    
-    def adjoint_multiproc(self, measures):
-        out = shared_dict.attach(self._metadata_path)["ad_data"]
+    def adjoint_multiproc_jax(self, measures):
+        # out = shared_dict.attach(self._metadata_path)["ad_data"]
+        out = np.zeros(self.ishape, dtype=np.complex128)
         blurred = np.zeros(self.cshape)
         for p_idx, pointing in enumerate(self.pointings):
             gridded = np.zeros(self.local_shape)
@@ -566,22 +453,56 @@ class Channel(LinOp):
                         sliced.shape[2],
                         axis=2,
                     )
-
-                tmp2 = self.wblur_t(tmp, slit_idx)
-                sliced[:, : self.oshape[3] * self.srf : self.srf] = tmp2
                 
-                gridded += self.slicing_t(sliced, slit_idx)
-           
+                sliced[:, : self.oshape[3] * self.srf : self.srf] = jax_utils.wblur_t(tmp, 
+                                                                                      self._wpsf(tmp.shape[2], 
+                                                                                                 self.beta_step, 
+                                                                                                 slit_idx)
+                                                                                      ) 
+                
+                slices = self.slicer.get_slit_slices(slit_idx)
+                weights = self.slicer.get_slit_weights(slit_idx, slices)
+                gridded[:, slices[0], slices[1]] += sliced * weights
+                
             _otf_sr = udft.ir2fr(np.ones((self.srf, 1)), self.local_shape[1:])[np.newaxis, ...]
-
             tmp3 = dft(gridded) * _otf_sr.conj() 
             tmp4 = idft(tmp3, self.local_shape[1:])
-
             blurred += self.gridding_t(np.array(tmp4).astype(np.float64), pointing)
-            # blurred += self.gridding_t(gridded, pointing)
 
-        # out[self.wslice, ...] += self.fourier_duplicate_t(blurred)
-        out[self.wslice, ...] += dft(blurred)
+        out[self.wslice, ...] += np.array(dft(blurred))
+        return out
+
+
+
+    def cubeToSlice(self, cube):
+        """cube is supposed in global coordinate in Fourier space for a specific Channel and band.
+        slices is an array of shape (pointing, slit, wavelength, alpha).
+        Reshape input cube into slices without spatial and spectral blurring 
+        done in Forward operator.
+        """
+        # [pointing, slit, λ', α]
+        slices = np.zeros(self.oshape)
+        blurred = idft(cube[self.wslice, ...], self.imshape) # Replace sblur
+
+        for p_idx, pointing in enumerate(self.pointings):
+            gridded = self.gridding(blurred, pointing)
+            for slit_idx in range(self.instr.n_slit):
+                # Slicing, weighting and α subsampling for SR
+                sliced = self.slicer.slicing(gridded, slit_idx)[
+                    :, : self.oshape[3] * self.srf : self.srf
+                ]
+                slices[p_idx, slit_idx, :, :] = self.wdirac_blur(sliced, slit_idx).sum(axis=2) #TODO Change: That
+        return slices      
+
+    def realData_cubeToSlice(self, cube):
+        slices = np.zeros(self.oshape[1:]) # Remove pointing dimension
+        gridded = self.gridding(cube, instru.Coord(0, 0))
+        for slit_idx in range(self.instr.n_slit):
+            sliced = self.slicer.slicing_t(gridded, slit_idx)[
+                    :, : self.oshape[3] * self.srf : self.srf
+                ]
+            slices[slit_idx, :, :] = sliced.sum(axis=2) # Only sum on the Beta axis
+        return slices      
 
 
     def sliceToCube(self, measures):
@@ -615,6 +536,10 @@ class Channel(LinOp):
 
 
                 gridded += out_slice#self.slicing_Fente2Cube_t(sliced, slit_idx)
+
+
+
+                plt.show()
 
             _otf_sr = udft.ir2fr(np.ones((self.srf, 1)), self.local_shape[1:])[np.newaxis, ...]
             tmp3 = dft(gridded) * _otf_sr.conj()

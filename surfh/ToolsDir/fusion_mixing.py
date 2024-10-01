@@ -170,7 +170,7 @@ class QuadCriterion_MRS:
 
         def print_last_grad_norm_and_crit(res):
             self.it = self.it + 1
-            if self.it%1000 == 0:
+            if self.it%100 == 0:
                 perf_crit_with_reshape(res)
 
 

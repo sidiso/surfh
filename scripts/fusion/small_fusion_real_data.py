@@ -18,6 +18,9 @@ from surfh.ToolsDir import utils
 from surfh.Models import realmiri
 
 from surfh.ToolsDir import fusion_spectro
+from surfh.ToolsDir import fusion_mixing
+
+
 
 from pathlib import Path
 import click
@@ -27,10 +30,11 @@ import aljabr
 
 from surfh.Models import spectro
 from surfh.Models import spectrolmm
+from surfh.Models import mixing
 
 @click.command()
 @click.option('--data_dir', default='/home/nmonnier/Data/JWST/Orion_bar/', type=click.STRING, help='Path to data directory')
-@click.option('--res_dir', default='/home/nmonnier/Data/JWST/Orion_bar/fusion_result/', type=click.STRING, help='Path to result directory')
+@click.option('--res_dir', default='/home/nmonnier/Data/JWST/Orion_bar/fusion_result/small/', type=click.STRING, help='Path to result directory')
 @click.option('--hyper', default=0.1, type=click.FLOAT, help='Hyperparameter')
 @click.option('--sim_data', default=True, type=click.BOOL, help='Use simulated or real data')
 @click.option('--niter', default=5, type=click.INT, help='Number of iteration for lcg')
@@ -39,9 +43,14 @@ from surfh.Models import spectrolmm
 @click.option('--method', default='lcg', type=click.STRING)
 @click.option('--margin', default=0, type=click.INT)
 @click.option('--value_init', default=100, type=click.FLOAT)
-def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose, method, margin, value_init):
+@click.option('--norm', default=True, type=click.BOOL)
+def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose, method, margin, value_init, norm):
 
-
+    print("#################################################")
+    print("#################################################")
+    print("######## SMALL FUSION TESTING ! #################")
+    print("#################################################")
+    print("#################################################")
 
     if multi_chan is True:
         print("Multi channels/bands fusion")
@@ -55,24 +64,30 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
         psf_directory       = data_dir + 'All_bands_psf/'
         mask_directory      = data_dir + 'Single_mask/'
 
-    mu = str(hyper)
-    mu = mu.split('.')
-    if len(mu[0]) == 1:
-        mu[0] = '00'+ mu[0]
-    elif len(mu[0]) == 2:
-        mu[0] = '0'+ mu[0]
+    if norm :
+        init_directory = '/home/nmonnier/Data/JWST/Orion_bar/Mixing_results/TST_small/Norm/'
+    else:
+        init_directory = '/home/nmonnier/Data/JWST/Orion_bar/Mixing_results/TST_small/NotNorm/'
 
-    if len(mu[1]) == 1:
-        mu[1] = mu[1] + '00'
-    elif len(mu[1]) == 2:
-        mu[1] = mu[1] + '0'
-    mu = mu[0] + mu[1] 
+
+    mu = str(hyper)
+    # mu = mu.split('.')
+    # if len(mu[0]) == 1:
+    #     mu[0] = '00'+ mu[0]
+    # elif len(mu[0]) == 2:
+    #     mu[0] = '0'+ mu[0]
+
+    # if len(mu[1]) == 1:
+    #     mu[1] = mu[1] + '00'
+    # elif len(mu[1]) == 2:
+    #     mu[1] = mu[1] + '0'
+    # mu = mu[0] + mu[1] 
 
     val = str(value_init)
     val = val.split('.')
     if len(val[0]) == 1:
         val[0] = '00'+ val[0]
-    elif len(mu[0]) == 2:
+    elif len(val[0]) == 2:
         val[0] = '0'+ val[0]
 
     if len(val[1]) == 1:
@@ -83,7 +98,7 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
 
 
     date = str(datetime.date.today())+ '-' + str(datetime.datetime.now().hour) + '-' + str(datetime.datetime.now().minute)
-    result_directory = res_dir + 'Fusion_SD_' + str(sim_data) + '_MC_' + str(multi_chan) + f'_{method}_' + '_Mu_' + mu + '_Init_' + val + '_Nit_' + str(niter) + '_' + date
+    result_directory = res_dir + 'Fusion_SD_' + str(sim_data) + '_MC_' + str(multi_chan) + f'_{method}_' + '_Norm_' + str(norm) +'_Mu_' + mu + '_Init_' + val + '_Nit_' + str(niter) + '_' + date
     Path(result_directory).mkdir(parents=True, exist_ok=True)    
     print(f"Result dir is {result_directory}")
 
@@ -135,17 +150,23 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
     impulse_response = np.ones((1, tpl_ss)) / tpl_ss
     tpl = conv2(tpl, impulse_response, "same")[:, ::tpl_ss]
     wavel_axis = wavel_axis[::tpl_ss]
+
+    if norm :
+        # Each template is normalized by its median
+        tpl = np.array([template/np.median(template) for template in tpl])
+
+
+    wavel_axis = wavel_axis[919:1279]
+    tpl = tpl[:,919:1279]
+
     #spsf = utils.gaussian_psf(wavel_axis, step_Angle.degree)
     spsf = np.load(psf_directory + 'psfs_pixscale0.025_fov11.25_date_300123.npy')
     spsf = spsf[:, (100-margin):(351+margin), (100-margin):(351+margin)]
-    print("SHAPE PSF ARE ", spsf.shape)
+    spsf = spsf[919:1279,:,:]
 
     if "sotf" not in globals():
         print("Compute SPSF")
         sotf = udft.ir2fr(spsf, maps_shape[1:])
-    if "sim_cube" not in globals():
-        print("Compute sim cube")
-        sim_cube = np.sum(np.expand_dims(maps, 1) * tpl[..., np.newaxis, np.newaxis], axis=0)
 
 
     """
@@ -173,7 +194,11 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
     origin_alpha_axis += list_channels[0].fov.origin.alpha
     origin_beta_axis += list_channels[0].fov.origin.beta
 
-    spectro = spectrolmm.SpectroLMM(
+    """ 
+    Création modèle instrument
+    """
+
+    spectroModel = spectrolmm.SpectroLMM(
         list_channels, # List of channels and bands 
         origin_alpha_axis, # Alpha Coordinates of the cube
         origin_beta_axis, # Beta Coordinates of the cube
@@ -196,32 +221,68 @@ def launch_fusion(data_dir, res_dir, hyper, sim_data, niter, multi_chan, verbose
         print("Real data selection")
         y_data = list_data[0].ravel()
     
-    quadCrit = fusion_spectro.QuadCriterion_MRS(mu_spectro=1, 
+
+    """
+    Calcul Initialisation
+    """
+    print("\n-----------------------------------")
+    print("Initilisation starting")
+    print("-----------------------------------")
+    filename = 'ChannelCube_ch_2_short_s3d_0210f_00001'
+    data = np.load('/home/nmonnier/Data/JWST/Orion_bar/Single_numpy_slices/' + filename +'.npy')
+    data[np.where(np.isnan(data))] = 0
+    y_cube = spectroModel.sliceToCube(data)
+
+    selection_arr = np.where(y_cube < 1e-5)
+    fast_selection_arr = np.array(np.where(y_cube > 1e-5)).T
+
+    # Création modèle de mélange pour calcul l'init
+    STModel = mixing.MixingST(templates=tpl,
+                            alpha_axis=origin_alpha_axis,
+                            beta_axis=origin_beta_axis,   
+                            wavel_axis=wavel_axis,
+                            selection_arr=selection_arr,
+                            fast_selection_arr=fast_selection_arr)
+
+    # 
+    quadCrit_mixing = fusion_mixing.QuadCriterion_MRS(mu_spectro=1,
+                                                    y_spectro=y_cube,
+                                                    model_mixing=STModel,
+                                                    mu_reg=1e4,
+                                                    printing=True,
+                                                    gradient="separated")
+
+    res_init = quadCrit_mixing.run_method('lcg', 5000, value_init=0.5, calc_crit = False)
+
+
+
+    value_init = res_init.x
+    np.save(result_directory + '/init.npy', res_init.x)
+
+    """
+    Mis en place de l'algorithme de fusion 
+    """
+    print("\n-----------------------------------")
+    print("Data fusion starting")
+    print("-----------------------------------")
+    quadCrit_fusion = fusion_spectro.QuadCriterion_MRS(mu_spectro=1, 
                                         y_spectro=np.copy(y_data), 
-                                        model_spectro=spectro, 
+                                        model_spectro=spectroModel, 
                                         mu_reg=hyper, 
                                         printing=True, 
                                         gradient="separated")
     
-    value_init = np.load('/home/nmonnier/Data/JWST/Orion_bar/Mixing_results/TST/init.npy')
-    res = quadCrit.run_method(method, niter, perf_crit = 1, calc_crit=True, value_init=value_init)
-    x_cube = spectro.get_cube(res.x)
+    res_fusion = quadCrit_fusion.run_method(method, niter, perf_crit = 1, calc_crit=True, value_init=value_init)
+    x_cube = spectroModel.get_cube(res_fusion.x)
 
     """
     Save results
     """
-    np.save(result_directory + '/res_x.npy', res.x)
-    np.save(result_directory + '/res_grad_norm.npy', res.grad_norm)
-    np.save(result_directory + '/res_time.npy', res.time) 
-    np.save(result_directory + '/res_crit_val.npy', quadCrit.L_crit_val)
+    np.save(result_directory + '/res_x.npy', res_fusion.x)
+    np.save(result_directory + '/res_grad_norm.npy', res_fusion.grad_norm)
+    np.save(result_directory + '/res_time.npy', res_fusion.time) 
+    np.save(result_directory + '/res_crit_val.npy', quadCrit_fusion.L_crit_val)
     np.save(result_directory + '/res_cube.npy', x_cube)
-
-
+    
 if __name__ == '__main__':
     launch_fusion()
-
-
-# TODO 0210f -> ch1-short
-#      0210f -> ch2-short
-#      0210f -> ch3-short
-#      0210f -> ch4-short

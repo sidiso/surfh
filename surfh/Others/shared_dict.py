@@ -328,5 +328,5 @@ def testSharedDict ():
     other_view = SharedDict("foo", reset=False)
     print(other_view)
 
-SharedDict.clearAllSD()
+#SharedDict.clearAllSD()
 SharedDict.setBaseName("mrs."+str(os.getpid()))
