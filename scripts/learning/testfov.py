@@ -22,7 +22,7 @@ plt.plot(f.origin.alpha, f.origin.beta, "o")
 plt.plot(
     list(map(op.attrgetter("alpha"), f.vertices)) + [f.vertices[0].alpha],
     list(map(op.attrgetter("beta"), f.vertices)) + [f.vertices[0].beta],
-    "-o",
+    "-x",
 )
 
 

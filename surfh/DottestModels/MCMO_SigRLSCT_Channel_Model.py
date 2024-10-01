@@ -13,7 +13,7 @@ from numpy.random import standard_normal as randn
 
 from surfh.Models import instru
 from math import ceil
-
+import operator as op
 
 from typing import List, Tuple
 from numpy import ndarray as array
@@ -43,13 +43,15 @@ class Channel():
         self.instr = instr.pix(self.step_degree)
         self.pointings = pointings.pix(self.step_degree)
 
-        local_alpha_axis, local_beta_axis = self.instr.fov.local_coords(step_degree, 5* step_degree, 5* step_degree)
+        local_alpha_axis, local_beta_axis = self.instr.fov.local_coords(step_degree, 
+                                                                        alpha_margin=5* step_degree, 
+                                                                        beta_margin=5* step_degree)
         self.local_alpha_axis = local_alpha_axis
         self.local_beta_axis = local_beta_axis
         
 
         self.slicer = slicer.Slicer(self.instr, 
-                                    wavelength_axis = self.global_wavelength_axis[self.wslice], 
+                                    wavelength_axis = self.global_wavelength_axis, #[self.wslice], 
                                     alpha_axis = self.alpha_axis, 
                                     beta_axis = self.beta_axis, 
                                     local_alpha_axis = local_alpha_axis, 
@@ -172,10 +174,11 @@ class Channel():
 
 
     def gridding_t(self, local_cube: array, pointing: instru.Coord) -> array:
+
         alpha_coord, beta_coord = (self.instr.fov + pointing).global2local(
                 self.alpha_axis, self.beta_axis
                 )
-        
+
         optimized_global_coords = np.vstack(
                 [
                     alpha_coord.ravel(),
@@ -210,7 +213,6 @@ class Channel():
         for p_idx, pointing in enumerate(self.pointings):
             # gridded = self.NN_gridding(blurred_cube[self.wslice], self.list_gridding_indexes[p_idx]) 
             gridded = self.gridding(blurred_cube[self.wslice], pointing) 
-            plt.imshow()
             sum_cube = jax_utils.idft(
                 jax_utils.dft_mult(gridded, self._otf_sr),
                 self.local_im_shape,
@@ -259,7 +261,7 @@ class Channel():
         return inter_cube
 
     def sliceToCube(self, data):
-        inter_cube = np.zeros((self.wslice.stop-self.wslice.start, len(self.alpha_axis), len(self.beta_axis)))
+        inter_cube = np.zeros((len(self.global_wavelength_axis), len(self.alpha_axis), len(self.beta_axis)))
         local_cube = np.zeros((self.wslice.stop-self.wslice.start,
                                 self.local_im_shape[0],
                                 self.local_im_shape[1]))
@@ -274,7 +276,8 @@ class Channel():
                     axis=2,
                 )
             blurred_t_sliced = np.zeros(self.slicer.get_slit_shape_t())
-            blurred_t_sliced[:,: self.oshape[3] * self.srf : self.srf,:] = jax_utils.wblur_t(oversampled_sliced, self.wpsf_dirac.conj())
+
+            blurred_t_sliced[:,: self.oshape[3] * self.srf : self.srf,:] = jax_utils.wblur_t(oversampled_sliced.astype(np.float32), self.wpsf_dirac[:,:,:].conj())
             tmp = self.slicer.slicing_t(blurred_t_sliced, slit_idx, (self.wslice.stop-self.wslice.start,
                                                                     self.local_im_shape[0],
                                                                     self.local_im_shape[1]))
@@ -282,12 +285,16 @@ class Channel():
 
         sum_t_cube = jax_utils.idft(jax_utils.dft(local_cube) * self._otf_sr.conj()*self.decalf.conj(), 
                                     self.local_im_shape)
+        # plt.figure()
+        # plt.imshow(sum_t_cube[150])
+        # plt.show()
+
 
         sum_t_cube = np.array(sum_t_cube, dtype=np.float64)
-        sum_t_cube[:,0,:] = 0
+        #sum_t_cube[:,0,:] = 0
 
         degridded = self.gridding_t(np.array(sum_t_cube, dtype=np.float64), self.pointings[0])
-        inter_cube += degridded
+        inter_cube[self.wslice, ...] += degridded
         return inter_cube
 
     def realData_cubeToSlice(self, cube):
@@ -324,6 +331,20 @@ class Channel():
                                         self.local_im_shape)  
         blurred += self.gridding_t(sum_t_cube, instru.Coord(0, 0))
         return blurred
+
+
+
+    def project_FOV(self):
+        for p_idx, pointing in enumerate(self.pointings):
+            f = self.instr.fov + pointing
+            plt.plot(
+                list(map(op.attrgetter("alpha"), f.vertices)) + [f.vertices[0].alpha],
+                list(map(op.attrgetter("beta"), f.vertices)) + [f.vertices[0].beta],
+                "-x",
+                label=p_idx
+            )
+
+
 
 
     def precompute_mask(self):

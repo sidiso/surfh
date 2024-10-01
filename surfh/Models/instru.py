@@ -81,8 +81,6 @@ def get_srf(det_pix_size_list: List[float], step: float) -> List[int]:
     A list of SRF int.
 
     """
-    print("step = ", step)
-    print(det_pix_size_list)
     return [int(det_pix_size // step) for det_pix_size in det_pix_size_list]
 
 
@@ -609,6 +607,8 @@ class IFU:
     pce: array
     wavel_axis: array
     name: str = "_"
+
+    
 
     def __post_init__(self):
         self.slit_shift = [
