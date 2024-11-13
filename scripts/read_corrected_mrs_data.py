@@ -49,7 +49,7 @@ def setup_channel_model(origin_alpha_axis, origin_beta_axis, targ_ra, targ_dec, 
 def main():
 
     data_corrected_path = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Corrected_slices/ch2b_00001_corrected.fits'
-    data_corrected_path = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Filtered_slices/ch1a_00001_corrected_filtered.fits'
+    data_corrected_path = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Filtered_slices/ch1c_00001_corrected_filtered.fits'
     chan_band, dithering_number = extract_name_information(os.path.basename(data_corrected_path))
     print(chan_band)
 
@@ -63,6 +63,7 @@ def main():
     ifu, targ_ra, targ_dec = realmiri.get_IFU_from_corrected_data(data_corrected_path, channel=chan_band)
     model_channel = setup_channel_model(origin_alpha_axis, origin_beta_axis, targ_ra, targ_dec, ifu, wavelength_cube)
     print(f'Oshape Channel is {model_channel.oshape}')
+    print(f"Wavelength min = {np.min(ifu.wavel_axis)}, Wavelength max = {np.max(ifu.wavel_axis)}")
     # Read data from fits
     corrected_data = fits_toolbox.get_data_from_fits(data_corrected_path)
 

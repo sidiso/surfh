@@ -66,11 +66,12 @@ print("origin alpha axis is ", origin_alpha_axis)
 step = 0.025 # arcsec
 step_Angle = Angle(step, u.arcsec)
 
-# imshape = (351, 351)
-# origin_alpha_axis = np.arange(imshape[0]) * step_Angle.degree
-# origin_beta_axis = np.arange(imshape[1]) * step_Angle.degree
-# origin_alpha_axis -= np.mean(origin_alpha_axis)
-# origin_beta_axis -= np.mean(origin_beta_axis)
+N = 301
+imshape = (N, N)
+origin_alpha_axis = np.arange(imshape[0]) * step_Angle.degree
+origin_beta_axis = np.arange(imshape[1]) * step_Angle.degree
+origin_alpha_axis -= np.mean(origin_alpha_axis)
+origin_beta_axis -= np.mean(origin_beta_axis)
 
 
 
@@ -86,21 +87,9 @@ wavel_axis = wavel_axis[idx_cube_wavelength]
 print(f"Instr wavelength = {choosen_wavelentgh} - Closest wavelength = {wavel_axis}")
 
 
-spsf = spsf[idx_cube_wavelength,:,:]
-# Select PSF to be the same shape as maps
-idx = spsf.shape[1]//2 # Center of the spsf
-N = maps.shape[1] # Size of the window
-if N%2:
-    stepidx = N//2
-else:
-    stepidx = int(N/2) - 1
-start = min(max(idx-stepidx, 0), spsf.shape[1]-N)
-#spsf = spsf[:, (100-0):(351+0), (100-0):(351+0)]
-spsf = spsf[start:start+N, start:start+N]
-
-spsf = np.load('/home/nmonnier/Data/JWST/Orion_bar/PSF/psf_1C.npy')
+spsf = np.load('/home/nmonnier/Data/JWST/Orion_bar/Fusion/PSF/psf_1C_301pix_rotNeut.npy')
 spsf = spsf/np.sum(spsf)
-sotf = udft.ir2fr(spsf, maps.shape[1:])
+sotf = udft.ir2fr(spsf, imshape)
 
 
 print(f'sum psf = {np.sum(spsf)}')
@@ -167,20 +156,20 @@ use_data = data[:,:,100,:].ravel()
 
 use_data = spectroModel.real_data_janskySR_to_jansky(use_data)
 print(data[:,:,100,:].shape)
-# adj_mean, adj = spectroModel.data_to_img(use_data)
-# plt.figure()
-# plt.imshow(np.rot90(np.fliplr(adj),1))
-# plt.figure()
-# plt.imshow(np.flipud(np.rot90(np.fliplr(adj_mean),1)))
-# plt.show()
+adj_mean, adj = spectroModel.data_to_img(use_data)
+plt.figure()
+plt.imshow(np.rot90(np.fliplr(adj),1))
+plt.figure()
+plt.imshow(np.rot90(np.fliplr(adj_mean),-1))
+plt.show()
 # print(dottest(spectroModel, num=10, echo=True))
 
 """
 Reconstruction method
 """
-hyperParameter = 75
+hyperParameter = 500
 method = "lcg"
-niter = 50
+niter = 200
 value_init = 0
 
 quadCrit_fusion = criterion_2D.QuadCriterion_MRS_2D(mu_spectro=1, 
@@ -201,7 +190,17 @@ print(spectroModel.npix_slit_alpha_width)
 print(spectroModel.npix_slit_alpha_width/spectroModel.slices_shape[-1])
 
 
+
 adj_mean, adj = spectroModel.data_to_img(np.copy(use_data))
+# plt.figure()
+# plt.title("Test proj 0")
+# plt.imshow(adj_mean)
+# binary_map = np.zeros_like(adj_mean)
+# binary_map = adj > 0.5
+# np.save('/home/nmonnier/Data/JWST/Orion_bar/Fusion/Masks/binary_mask_1C.npy', binary_map)
+# plt.figure()
+# plt.title("Binary")
+# plt.imshow(binary_map)
 plt.figure()
 plt.title("Projected data")
 plt.imshow(np.rot90(np.fliplr(adj_mean), -1))
