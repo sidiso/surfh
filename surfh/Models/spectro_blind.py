@@ -409,6 +409,8 @@ class MRSBlurred(LinOp):
         """
         reshaped_data = data.reshape(self.slices_shape)
         for slit in range(self.slices_shape[1]):
-            reshaped_data[:,slit,:] = reshaped_data[:,slit,:]*(self.npix_slit_beta_width)*self.srf
+            slices = self.get_slit_slices(slit_idx=slit)
+            weights = self.get_slit_weights(slit_idx=slit, slices=slices)   
+            reshaped_data[:,slit,:] = reshaped_data[:,slit,:]*(np.sum(weights[0,0,:]))*self.srf
 
         return reshaped_data.ravel()

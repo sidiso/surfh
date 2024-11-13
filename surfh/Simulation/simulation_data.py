@@ -9,7 +9,10 @@ import udft
 
 
 
-def get_simulation_data(spatial_subsampling=4, margin=0, path_cube_orion='./cube_orion/'):
+def get_simulation_data(spatial_subsampling=4, 
+                        margin=0, 
+                        path_cube_orion='/home/nmonnier/Projects/JWST/MRS/surfh/cube_orion/',
+                        path_spsf='/home/nmonnier/Data/JWST/Orion_bar/All_bands_psf/psfs_pixscale0.025_fov11.25_date_300123.npy'):
     def orion():
         """Rerturn maps, templates, spatial step and wavelength"""
         maps = fits.open(path_cube_orion + "abundances_orion.fits")[0].data
@@ -75,7 +78,7 @@ def get_simulation_data(spatial_subsampling=4, margin=0, path_cube_orion='./cube
     wavel_axis = wavel_axis[::tpl_ss]
 
     
-    spsf = np.load('/home/nmonnier/Data/JWST/Orion_bar/All_bands_psf/psfs_pixscale0.025_fov11.25_date_300123.npy')#[sim_slice]
+    spsf = np.load(path_spsf)#[sim_slice]
     if maps.shape[1] > spsf.shape[1]:
         diff = maps.shape[1] - spsf.shape[1]
         if  diff%2:

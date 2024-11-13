@@ -139,8 +139,8 @@ def get_IFU_from_corrected_data(filename, channel=None, wavel_from_file=False):
     """
     hdul = fits.open(filename)
     hdr = hdul[0].header
-    targ_ra  = hdul[1].header['RA_V1']
-    targ_dec = hdul[1].header['DEC_V1']
+    targ_ra  = hdul[0].header['TARG_RA']
+    targ_dec = hdul[0].header['TARG_DEC']
 
 
     rotation_ref = hdr['PA_V3']

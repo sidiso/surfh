@@ -14,7 +14,6 @@ from surfh.Simulation import simulation_data
 from surfh.Models import wavelength_mrs, realmiri, instru
 from surfh.DottestModels import MCMO_SigRLSCT_Channel_Model
 from surfh.Preprocessing import distorsion_correction
-from surfh.Vizualisation import slices_vizualisation
 from surfh.ToolsDir import fits_toolbox
 
 
@@ -69,7 +68,7 @@ def setup_channel_model(origin_alpha_axis, origin_beta_axis, targ_ra, targ_dec, 
 
 def main():
 
-    fits_path = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Raw_slices/ch1b_ch2b_0210j_00004_mirifushort_cal.fits'
+    fits_path = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Raw_slices/ch1c_ch2c_02111_00004_mirifushort_cal.fits'
     save_corrected_dir = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Corrected_slices/'
     mode = [0,1] # 0=1st chan; 1=2nd chan; 2=both chan
 
