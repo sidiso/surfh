@@ -214,7 +214,7 @@ class Channel():
             # gridded = self.NN_gridding(blurred_cube[self.wslice], self.list_gridding_indexes[p_idx]) 
             gridded = self.gridding(blurred_cube[self.wslice], pointing) 
             sum_cube = jax_utils.idft(
-                jax_utils.dft_mult(gridded, self._otf_sr),
+                jax_utils.dft_mult(gridded, self._otf_sr*self.decalf),
                 self.local_im_shape,
             )
             for slit_idx in range(self.instr.n_slit):
@@ -254,9 +254,8 @@ class Channel():
             sum_t_cube = jax_utils.idft(jax_utils.dft(local_cube) * self._otf_sr.conj()*self.decalf.conj(), 
                                         self.local_im_shape)
 
-            # degridded = self.NN_gridding_t(np.array(sum_t_cube, dtype=np.float64), self.list_gridding_t_indexes[p_idx])
             degridded = self.gridding_t(np.array(sum_t_cube, dtype=np.float64), pointing)
-            inter_cube += degridded#*self.nmask[p_idx]
+            inter_cube += degridded
 
         return inter_cube
 
@@ -344,6 +343,44 @@ class Channel():
                 label=p_idx
             )
 
+
+    def test_vizual_projection(self, data):
+        inter_cube = np.zeros((len(self.global_wavelength_axis), len(self.alpha_axis), len(self.beta_axis)))
+        for p_idx, pointing in enumerate(self.pointings):
+            local_cube = np.zeros((self.wslice.stop-self.wslice.start,
+                                    self.local_im_shape[0],
+                                    self.local_im_shape[1]))
+            for slit_idx in range(self.instr.n_slit):
+                oversampled_sliced = np.repeat(
+                        np.expand_dims(
+                            np.reshape(data, 
+                                        self.oshape)[p_idx, slit_idx],
+                            axis=2,
+                        ),
+                        self.slicer.npix_slit_beta_width,
+                        axis=2,
+                    )
+                blurred_t_sliced = np.zeros(self.slicer.get_slit_shape_t())
+
+                blurred_t_sliced[:,: self.oshape[3] * self.srf : self.srf,:] = jax_utils.wblur_t(oversampled_sliced.astype(np.float32), self.wpsf_dirac[:,:,:].conj())
+                tmp = self.slicer.slicing_t(blurred_t_sliced, slit_idx, (self.wslice.stop-self.wslice.start,
+                                                                        self.local_im_shape[0],
+                                                                        self.local_im_shape[1]))
+                local_cube += tmp
+
+            sum_t_cube = jax_utils.idft(jax_utils.dft(local_cube) * self._otf_sr.conj()*self.decalf.conj(), 
+                                        self.local_im_shape)
+            # plt.figure()
+            # plt.imshow(sum_t_cube[150])
+            # plt.show()
+
+
+            sum_t_cube = np.array(sum_t_cube, dtype=np.float64)
+            #sum_t_cube[:,0,:] = 0
+
+            degridded = self.gridding_t(np.array(sum_t_cube, dtype=np.float64), pointing)
+            inter_cube[self.wslice, ...] += degridded
+        return inter_cube
 
 
 

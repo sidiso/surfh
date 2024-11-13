@@ -79,7 +79,7 @@ class QuadCriterion_MRS:
         self.y_spectro = y_spectro
         self.model_spectro = model_spectro
 
-        n_spec = model_spectro.templates.shape[0]
+        n_spec = model_spectro.ishape[0]
         self.n_spec = n_spec
         self.it = 1
 
