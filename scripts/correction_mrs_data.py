@@ -8,6 +8,8 @@ from astropy.io import fits
 from astropy import units as u
 from astropy.coordinates import Angle
 
+import matplotlib.pyplot as plt
+
 from jwst import datamodels
 
 from surfh.Simulation import simulation_data
@@ -15,20 +17,40 @@ from surfh.Models import wavelength_mrs, realmiri, instru
 from surfh.DottestModels import MCMO_SigRLSCT_Channel_Model
 from surfh.Preprocessing import distorsion_correction
 from surfh.ToolsDir import fits_toolbox
-
+from surfh.Vizualisation import slices_vizualisation
 
 console = Console()
 
-def load_simulation_data():
+def load_simulation_data(npix=451):
     """
     Load simulation data and the wavelength information.
     """
-    console.log("[bold cyan]Loading simulation data...[/bold cyan]")
-    origin_alpha_axis, origin_beta_axis, wavelength_cube, spsf, maps, templates = simulation_data.get_simulation_data(4, 0, '/home/nmonnier/Projects/JWST/MRS/surfh/cube_orion/')
-    console.log("[bold cyan]Loading wavelength data...[/bold cyan]")
+    def orion():
+        """Rerturn maps, templates, spatial step and wavelength"""
+        path_cube_orion='/home/nmonnier/Projects/JWST/MRS/surfh/cube_orion/'
+        spectrums = fits.open(path_cube_orion + "spectra_mir_orion.fits")[1].data
+        wavel_axis = spectrums.wavelength
+
+        return (
+            0.025,
+            wavel_axis,
+        )
     
+    step, wavel_axis = orion()
+    step_Angle = Angle(step, u.arcsec)
+    tpl_ss = 3
+    wavel_axis = wavel_axis[::tpl_ss]
+
+
+    console.log("[bold cyan]Loading wavelength data...[/bold cyan]")
+    origin_alpha_axis = np.arange(npix) * step_Angle.degree
+    origin_beta_axis = np.arange(npix) * step_Angle.degree
+    origin_alpha_axis -= np.mean(origin_alpha_axis)
+    origin_beta_axis -= np.mean(origin_beta_axis)
+
+
     console.log("[green]Simulation data and wavelength loaded successfully![/green]")
-    return origin_alpha_axis, origin_beta_axis, wavelength_cube
+    return origin_alpha_axis, origin_beta_axis, wavel_axis
 
 def extract_name_information(fits_path):
     splitted_filename = fits_path.split('_')
@@ -68,9 +90,9 @@ def setup_channel_model(origin_alpha_axis, origin_beta_axis, targ_ra, targ_dec, 
 
 def main():
 
-    fits_path = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Raw_slices/ch1c_ch2c_02111_00004_mirifushort_cal.fits'
+    fits_path = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Raw_slices/ch1a_ch2a_02101_00004_mirifushort_cal.fits'
     save_corrected_dir = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Corrected_slices/'
-    mode = [0,1] # 0=1st chan; 1=2nd chan; 2=both chan
+    mode = [1] # 0=1st chan; 1=2nd chan; 2=both chan
 
     first_chan, second_chan, dithering_number = extract_name_information(os.path.basename(fits_path))
 
@@ -81,7 +103,10 @@ def main():
             selected_chan = second_chan
         else:
             raise NameError(f"Error in seleced mode : {mod}")
-                
+
+        console.log(f"[bold blue]--- Chan selected is {selected_chan}! ---[/bold blue]")
+
+
         # Load simulation data
         origin_alpha_axis, origin_beta_axis, wavelength_cube = load_simulation_data()
 
@@ -140,16 +165,31 @@ def main():
                 sorted_data[new_order[i]] = corrected_slices[i]
             # slices_vizualisation.visualize_corrected_slices(data_shape, data)
             sorted_data = np.roll(sorted_data, 9, 0)
+        elif 'ch3' in selected_chan:
+            sorted_data = np.zeros_like(corrected_slices)
+
+            new_order = [0,8,1,9,2,10,3,11,4,12,5,13,6,14,7,15]
+            for i in range(corrected_slices.shape[0]):
+                sorted_data[new_order[i]] = corrected_slices[i]
+
+        elif 'ch4' in selected_chan:
+            sorted_data = corrected_slices
         else:
             raise NameError(f'Error The name of the selected chan is wrong : {selected_chan}')
 
+        print(corrected_slices.shape)
+        cube = model_channel.realData_sliceToCube(sorted_data, (sorted_data.shape[1], 451,451))
+        plt.imshow(cube[100])
+        plt.colorbar()
+        plt.show()
+        raise RuntimeError
 
         filename = save_corrected_dir + selected_chan + '_' + dithering_number + '_corrected.fits'
         corrected_slice_fits = sorted_data.transpose(1, 0, 2).reshape(sorted_data.shape[1], sorted_data.shape[2]*sorted_data.shape[0])
         
         fits_toolbox.corrected_slices_to_fits(corrected_slice_fits, ifu.fov.angle, targ_ra, targ_dec, filename, selected_chan)
 
-        # slices_vizualisation.visualize_corrected_slices(corrected_slices.shape, corrected_slices)
+        slices_vizualisation.visualize_corrected_slices(corrected_slices.shape, corrected_slices)
 
 if __name__ == "__main__":
     main()
