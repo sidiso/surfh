@@ -97,6 +97,9 @@ class Channel():
 
         self.local_cube_shape = (len(self.global_wavelength_axis), len(self.local_alpha_axis), len(self.local_beta_axis))
 
+        self.slices_shape = (len(pointings), instr.n_slit, ceil(self.slicer.npix_slit_alpha_width / self.srf))
+
+
         decal = np.zeros(self.local_cube_shape[1:])
         dsi = int((self.srf-1)/2)
         dsj = 0 # int((self.n_pix_beta_slit -1) /2)
@@ -430,48 +433,3 @@ class Channel():
                             
             self.nmask[p_idx] = nmask
 
-    def precompute_griding_indexes(self):
-        for p_idx, pointing in enumerate(self.pointings):
-            dummy_cube = np.ones(self.instr_cube_shape)
-            local_alpha_coord, local_beta_coord = (self.instr.fov + pointing).local2global(
-                                                            self.local_alpha_axis, self.local_beta_axis
-                                                            )
-
-            test_cube_alpha_axis = np.tile(self.alpha_axis, len(self.alpha_axis))
-            test_cube_beta_axis= np.repeat(self.beta_axis, len(self.beta_axis)) 
-            # S
-            wavel_idx = np.arange(self.wslice.stop - self.wslice.start)
-
-            indexes = nearest_neighbor_interpolation.griddata((test_cube_alpha_axis.ravel(), test_cube_beta_axis.ravel()), 
-                                                            dummy_cube[0].ravel(), 
-                                                            (local_alpha_coord, local_beta_coord))
-            
-            wavel_indexes = np.tile(indexes, 
-                                    (len(wavel_idx),1)).reshape(len(wavel_idx), len(indexes)) + ((wavel_idx[...,np.newaxis])*dummy_cube[0].size )
-
-            self.list_gridding_indexes.append(wavel_indexes)
-
-    def precompute_griding_t_indexes(self):
-        for p_idx, pointing in enumerate(self.pointings):
-            dummy_cube = np.ones((self.wslice.stop-self.wslice.start,  
-                                    len(self.local_alpha_axis), 
-                                    len(self.local_beta_axis)))
-            
-
-            local_alpha_coord, local_beta_coord = (self.instr.fov + pointing).local2global(
-                                                            self.local_alpha_axis, self.local_beta_axis
-                                                            )
-
-            test_cube_alpha_axis = np.tile(self.alpha_axis, len(self.alpha_axis))
-            test_cube_beta_axis= np.repeat(self.beta_axis, len(self.beta_axis))  
-
-            wavel_idx = np.arange(dummy_cube.shape[0])
-
-            indexes_t = nearest_neighbor_interpolation.griddata((local_alpha_coord.ravel(), local_beta_coord.ravel()),
-                                                                dummy_cube[0].ravel(), 
-                                                                (test_cube_alpha_axis.reshape(self.imshape[0],self.imshape[1]), test_cube_beta_axis.reshape(self.imshape[0], self.imshape[1])))
-            
-            
-            wavel_indexes_t = np.tile(indexes_t, 
-                                    (len(wavel_idx),1)).reshape(len(wavel_idx), len(indexes_t)) + ((wavel_idx[...,np.newaxis])*local_alpha_coord.shape[0]* local_alpha_coord.shape[1] )
-            self.list_gridding_t_indexes.append(wavel_indexes_t)
