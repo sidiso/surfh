@@ -19,7 +19,8 @@ class Slicer():
                  alpha_axis: array,
                  beta_axis: array,
                  local_alpha_axis: array,
-                 local_beta_axis: array):
+                 local_beta_axis: array,
+                 srf: int):
         
         self.instr = instr
         self.wavelength_axis = wavelength_axis
@@ -27,6 +28,8 @@ class Slicer():
         self.beta_axis = beta_axis
         self.local_alpha_axis = local_alpha_axis
         self.local_beta_axis = local_beta_axis
+        self.srf = srf
+        self.slices_shape = (self.instr.n_slit, ceil(self.npix_slit_alpha_width / self.srf))
 
 
     @property
@@ -57,8 +60,6 @@ class Slicer():
         return int(ceil(self.slit_alpha_width / 2 / step)) - int(
             floor(-self.slit_alpha_width / 2 / step)
         )
-
-    
 
     def slicing(self, gridded_cube: array, slit_idx: int) -> array:
         """Return a weighted slice of gridded. `slit_idx` start at 0."""
@@ -134,12 +135,13 @@ class Slicer():
             else:
                 slices = (slices[0], slice(slices[1].start + 1, slices[1].stop))
 
+        if self.slices_shape[1]%2 == 0 and self.slices_shape[1] < 28:
+            # TODO Fix here 
+            if (slices[0].stop - slices[0].start) > self.npix_slit_alpha_width:
+                slices = (slice(slices[0].start, slices[0].stop - 1), slices[1])
+            elif (slices[0].stop - slices[0].start) < self.npix_slit_alpha_width:
+                slices = (slice(slices[0].start - 2, slices[0].stop), slices[1])
 
-        # TODO Fix here 
-        if (slices[0].stop - slices[0].start) > self.npix_slit_alpha_width:
-            slices = (slice(slices[0].start, slices[0].stop - 1), slices[1])
-        elif (slices[0].stop - slices[0].start) < self.npix_slit_alpha_width:
-            slices = (slice(slices[0].start - 2, slices[0].stop), slices[1])
         return slices
 
 
@@ -159,7 +161,8 @@ class Slicer():
                 weights[:, 0] = 1
 
         # If next do not share a pixel
-        if slit_idx < self.npix_slit_beta_width - 1:
+        if slit_idx < self.slices_shape[0] - 1:
+            print(f'slit_idx < self.npix_slit_beta_width - 1 = {slit_idx} < {self.slices_shape[0] - 1}')
             if slices[1].stop - 1 != self.get_slit_slices(slit_idx + 1)[1].start:
                 weights[:, -1] = 1
 

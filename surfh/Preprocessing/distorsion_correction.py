@@ -138,7 +138,8 @@ def mrs_slices_distrorsion_correction(model_channel, sorted_labeled_image, detec
         
         pixel_set = np.where(sorted_labeled_image == slit)
         alpha, beta, lam = detector2world(pixel_set[1], pixel_set[0])
-
+        print(f"Max wavel  lam = {np.max(lam)}; instr = {np.max(chan_wavelength)}")
+        print(f"Min wavel  lam = {np.min(lam)}; instr = {np.min(chan_wavelength)}")
         if mode == 0:
           if np.any(lam > np.max(chan_wavelength) +1):
               console.log(f"[yellow]Skipping slit due to wavelength limits.[/yellow]")
@@ -168,7 +169,7 @@ def mrs_slices_distrorsion_correction(model_channel, sorted_labeled_image, detec
         lambda_res = (np.max(surfh_lambda_coordinates) - np.min(surfh_lambda_coordinates)) / lambda_mesh.shape[0]
 
         # Create meshgrid and perform interpolation
-        console.log(f"[cyan]Performing interpolation for slit {i}...[/cyan]")
+        console.log(f"[cyan]Performing interpolation for slit {i} / {len(np.unique(sorted_labeled_image))}...[/cyan]")
         corrected_slices[i] = perform_shepard_interpolation(alpha_valid, lambda_valid, intensity_valid, alpha_mesh, lambda_mesh, 2, 2.0, 2, alpha_res, lambda_res)
         i += 1
 

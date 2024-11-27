@@ -36,7 +36,12 @@ def get_mrs_wavelength(chan_name, fits_path='/home/nmonnier/Data/JWST/Orion_bar/
         return global_variables.wavelength_3b
     elif chan_name == '3c' or chan_name == 'ch3c':
         return global_variables.wavelength_3c
-
+    elif chan_name == '4a' or chan_name == 'ch4a':
+        return global_variables.wavelength_4a
+    elif chan_name == '4b' or chan_name == 'ch4b':
+        return global_variables.wavelength_4b
+    elif chan_name == '4c' or chan_name == 'ch4c':
+        return global_variables.wavelength_4c
     else:
         raise ValueError(f"Error Reading wavelength, {chan_name} is not a correct input.")
         

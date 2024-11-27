@@ -55,7 +55,8 @@ class Channel():
                                     alpha_axis = self.alpha_axis, 
                                     beta_axis = self.beta_axis, 
                                     local_alpha_axis = local_alpha_axis, 
-                                    local_beta_axis = local_beta_axis)
+                                    local_beta_axis = local_beta_axis,
+                                    srf = self.srf)
         
         self.ishape = (len(self.global_wavelength_axis), len(alpha_axis), len(beta_axis))
 

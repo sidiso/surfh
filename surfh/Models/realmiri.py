@@ -26,17 +26,20 @@ res = []
 res.append(np.mean([3320, 3710]))
 res.append(np.mean([3190, 3750]))
 res.append(np.mean([3100, 3610]))
+
 res.append(np.mean([2990, 3110]))
 res.append(np.mean([2750, 3170]))
 res.append(np.mean([2860, 3300]))
+
 res.append(np.mean([2530, 2880]))
 res.append(np.mean([1790, 2640]))
 res.append(np.mean([1980, 2790]))
+
 res.append(np.mean([1460, 1930]))
 res.append(np.mean([1680, 1760]))
 res.append(np.mean([1630, 1330]))
 
-def get_IFU(filename, channel=None, wavel_from_file=False):
+def get_IFU(filename, chan_name=None, wavel_from_file=False):
     """
     Return Instrumental IFU regarding metadata of the fits file.
     """
@@ -47,6 +50,8 @@ def get_IFU(filename, channel=None, wavel_from_file=False):
 
 
     rotation_ref = hdul[1].header['PA_V3']
+
+    channel = chan_name
 
     if channel is None: # We can force a specific channel if mandatory
         channel = int(hdr['CHANNEL'])
@@ -91,15 +96,17 @@ def get_IFU(filename, channel=None, wavel_from_file=False):
         rotation = 8.3 + rotation_ref
         chan_str += '4'
 
-    if hdr['BAND'] == 'SHORT':
+    if 'a' in chan_name:
         band = 0
         chan_str += 'a'
-    elif hdr['BAND'] == 'MEDIUM':
+    elif 'b' in chan_name:
         band = 1
         chan_str += 'b'
-    else:
+    elif 'c' in chan_name:
         band = 2 
         chan_str += 'c'
+    else:
+        raise NameError(f"Wrong channel name : {channel}. No band specified.")
 
     spec_blur = instru.SpectralBlur(res[(channel-1)*3 + band])
     
