@@ -62,6 +62,13 @@ class spectroSigRLSCT(LinOp):
         else:
             self.lmm = True
 
+
+        # Super resolution factor (in alpha dim) for all channels
+        self.srfs = instru.get_srf(
+            [chan.det_pix_size for chan in instrs],
+            self.step_degree*3600, # Conversion in arcsec
+        )
+
         self.list_local_alpha_axis = []
         self.list_local_beta_axis = []
         self.list_slicer = []
@@ -75,15 +82,11 @@ class spectroSigRLSCT(LinOp):
                                     alpha_axis = self.alpha_axis, 
                                     beta_axis = self.beta_axis, 
                                     local_alpha_axis = local_alpha_axis, 
-                                    local_beta_axis = local_beta_axis))
+                                    local_beta_axis = local_beta_axis,
+                                    srf=self.srfs[chan_idx]))
             
         self.pointings = pointings
        
-        # Super resolution factor (in alpha dim) for all channels
-        self.srfs = instru.get_srf(
-            [chan.det_pix_size for chan in instrs],
-            self.step_degree*3600, # Conversion in arcsec
-        )
 
         # Templates (4, Nx, Ny)
         if self.lmm:
