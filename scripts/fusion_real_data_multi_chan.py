@@ -5,6 +5,9 @@ from astropy.io import fits
 import pathlib
 import matplotlib.pyplot as plt
 
+from rich import print
+from rich.progress import track
+from rich.console import Console
 
 from astropy import units as u
 from astropy.coordinates import Angle
@@ -16,6 +19,8 @@ from surfh.Simulation import fusion_CT
 from aljabr import LinOp, dottest
 from scipy import ndimage
 
+console = Console()
+
 
 def load_data(list_chan):
     save_filter_corrected_dir = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Filtered_slices/'        
@@ -26,7 +31,6 @@ def load_data(list_chan):
     data_dict["rotation"] = {}
     # Init main dict
     for chan in list_chan:
-        print(chan)
         data_dict['data'][chan] = list()
         data_dict["target"][chan] = list()
         data_dict["rotation"][chan] = 0.
@@ -39,7 +43,7 @@ def load_data(list_chan):
     datashape['2b'] = (17, 1124, 24)
     datashape['2c'] = (17, 1300, 24)
     datashape['3a'] = (16, 769, 25)
-    datashape['3b'] = (16, 893, 25)
+    datashape['3b'] = (16, 892, 25)
     datashape['3c'] = (16, 1028, 25)
     datashape['4a'] = (12, 542, 28)
     datashape['4b'] = (12, 632, 28)
@@ -93,20 +97,21 @@ sotf = udft.ir2fr(spsf, imshape)
 templates = np.load(template_dir_path + 'nmf_orion_1ABC_2ABC_3ABC_4ABC_4_templates_SS4.npy')
 if len(templates.shape) == 1:
       templates = templates[np.newaxis,...]
-print(templates.shape, wavel_axis.shape)
 
 
 # data, list_target_b, list_target_c, rotation_ref_b, rotation_ref_c = crappy_load_data()
 
 list_chan = ['1a', '1b', '1c' , '2a' , '2b' , '2c', '3a', '3b', '3c', '4a', '4b', '4c']
+console.log("[bold cyan]Loading data...[/bold cyan]")
 data_dict = load_data(list_chan)
+console.log("[green]Data loaded successfully![/green]")
+
+
 
 data = list()
 for chan in list_chan:
     data.append(np.array(data_dict['data'][chan]).ravel())
-    print(np.array(data_dict['data'][chan]).shape)
 ndata = np.concatenate(data)
-print(ndata.shape)
 
 grating_resolution_1a = np.mean([3320, 3710])
 spec_blur_1a = instru.SpectralBlur(grating_resolution_1a)
@@ -267,11 +272,6 @@ ch4c = instru.IFU(
 )
 
 main_pointing = instru.Coord(0,0)
-# P1 = main_pointing + instru.Coord(list_target_a[0][0], list_target_a[0][1])
-# P2 = main_pointing + instru.Coord(list_target_a[1][0], list_target_a[1][1])
-# P3 = main_pointing + instru.Coord(list_target_a[2][0], list_target_a[2][1])
-# P4 = main_pointing + instru.Coord(list_target_a[3][0], list_target_a[3][1])
-# pointings_ch1a = instru.CoordList([P1, P2, P3, P4]).pix(step_Angle.degree)
 
 pointings = list()
 for chan in list_chan:
