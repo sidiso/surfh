@@ -42,12 +42,12 @@ def load_data(list_chan):
     datashape['2a'] = (17, 970, 24)
     datashape['2b'] = (17, 1124, 24)
     datashape['2c'] = (17, 1300, 24)
-    datashape['3a'] = (16, 769, 25)
-    datashape['3b'] = (16, 892, 25)
-    datashape['3c'] = (16, 1028, 25)
-    datashape['4a'] = (12, 542, 28)
-    datashape['4b'] = (12, 632, 28)
-    datashape['4c'] = (12, 717, 28)
+    datashape['3a'] = (16, 769, 24)
+    datashape['3b'] = (16, 892, 24)
+    datashape['3c'] = (16, 1028, 24)
+    datashape['4a'] = (12, 542, 27)
+    datashape['4b'] = (12, 632, 27)
+    datashape['4c'] = (12, 717, 27)
     
     for file in sorted(os.listdir(save_filter_corrected_dir)):
         for chan in list_chan:
@@ -88,13 +88,11 @@ origin_alpha_axis -= np.mean(origin_alpha_axis)
 origin_beta_axis -= np.mean(origin_beta_axis)
 
 wavel_axis = np.load(template_dir_path + 'wavel_axis_orion_1ABC_2ABC_3ABC_4ABC_4_templates_SS4.npy')
-
+templates = np.load(template_dir_path + 'nmf_orion_1ABC_2ABC_3ABC_4ABC_4_templates_SS4.npy')
 spsf = np.load(psf_dir_path + 'psfs_pixscale0.025_npix_501_fov12.525_chan_1ABC_2ABC_3ABC_4ABC_SS4.npy')
 sotf = udft.ir2fr(spsf, imshape)
 
 
-
-templates = np.load(template_dir_path + 'nmf_orion_1ABC_2ABC_3ABC_4ABC_4_templates_SS4.npy')
 if len(templates.shape) == 1:
       templates = templates[np.newaxis,...]
 
@@ -117,7 +115,7 @@ grating_resolution_1a = np.mean([3320, 3710])
 spec_blur_1a = instru.SpectralBlur(grating_resolution_1a)
 # Def Channel spec.
 ch1a = instru.IFU(
-    fov=instru.FOV(3.2/3600, 3.7/3600, origin=instru.Coord(0, 0), angle=8.4 - data_dict["rotation"]['1a']),
+    fov=instru.FOV(3.2/3600, 3.7/3600, origin=instru.Coord(0, 0), angle= - data_dict["rotation"]['1a']),
     det_pix_size=0.196,
     n_slit=21,
     w_blur=spec_blur_1a,
@@ -130,7 +128,7 @@ grating_resolution_1b = np.mean([3190, 3750])
 spec_blur_1b = instru.SpectralBlur(grating_resolution_1b)
 # Def Channel spec.
 ch1b = instru.IFU(
-    fov=instru.FOV(3.2/3600, 3.7/3600, origin=instru.Coord(0, 0), angle=8.4 - data_dict["rotation"]['1b']),
+    fov=instru.FOV(3.2/3600, 3.7/3600, origin=instru.Coord(0, 0), angle= - data_dict["rotation"]['1b']),
     det_pix_size=0.196,
     n_slit=21,
     w_blur=spec_blur_1b,
@@ -143,7 +141,7 @@ grating_resolution_1c = np.mean([3100, 3610])
 spec_blur_1c = instru.SpectralBlur(grating_resolution_1c)
 # Def Channel spec.
 ch1c = instru.IFU(
-    fov=instru.FOV(3.2/3600, 3.7/3600, origin=instru.Coord(0, 0), angle=8.4 - data_dict["rotation"]['1c']),
+    fov=instru.FOV(3.2/3600, 3.7/3600, origin=instru.Coord(0, 0), angle= - data_dict["rotation"]['1c']),
     det_pix_size=0.196,
     n_slit=21,
     w_blur=spec_blur_1c,
@@ -156,7 +154,7 @@ grating_resolution_2a = np.mean([2990, 3110])
 spec_blur_2a = instru.SpectralBlur(grating_resolution_2a)
 # Def Channel spec.
 ch2a = instru.IFU(
-    fov=instru.FOV(4.0/3600, 4.8/3600, origin=instru.Coord(0, 0), angle=8.2 - data_dict["rotation"]['2a']),
+    fov=instru.FOV(4.0/3600, 4.8/3600, origin=instru.Coord(0, 0), angle= - data_dict["rotation"]['2a']),
     det_pix_size=0.196,
     n_slit=17,
     w_blur=spec_blur_2a,
@@ -170,7 +168,7 @@ grating_resolution_2b = np.mean([2750, 3170])
 spec_blur_2b = instru.SpectralBlur(grating_resolution_2b)
 # Def Channel spec.
 ch2b = instru.IFU(
-    fov=instru.FOV(4.0/3600, 4.8/3600, origin=instru.Coord(0, 0), angle=8.2 - data_dict["rotation"]['2b']),
+    fov=instru.FOV(4.0/3600, 4.8/3600, origin=instru.Coord(0, 0), angle= - data_dict["rotation"]['2b']),
     det_pix_size=0.196,
     n_slit=17,
     w_blur=spec_blur_2b,
@@ -183,7 +181,7 @@ grating_resolution_2c = np.mean([2860, 3300])
 spec_blur_2c = instru.SpectralBlur(grating_resolution_2c)
 # Def Channel spec.
 ch2c = instru.IFU(
-    fov=instru.FOV(4.0/3600, 4.8/3600, origin=instru.Coord(0, 0), angle=8.2 - data_dict["rotation"]['2c']),
+    fov=instru.FOV(4.0/3600, 4.8/3600, origin=instru.Coord(0, 0), angle= - data_dict["rotation"]['2c']),
     det_pix_size=0.196,
     n_slit=17,
     w_blur=spec_blur_2c,
@@ -196,7 +194,7 @@ grating_resolution_3a = np.mean([2530, 2880])
 spec_blur_3a = instru.SpectralBlur(grating_resolution_3a)
 # Def Channel spec.
 ch3a = instru.IFU(
-    fov=instru.FOV(5.2/3600, 6.2/3600, origin=instru.Coord(0, 0), angle=7.5 - data_dict["rotation"]['3a']),
+    fov=instru.FOV(5.2/3600, 6.2/3600, origin=instru.Coord(0, 0), angle=- data_dict["rotation"]['3a']),
     det_pix_size=0.245,
     n_slit=16,
     w_blur=spec_blur_3a,
@@ -210,7 +208,7 @@ grating_resolution_3b = np.mean([1790, 2640])
 spec_blur_3b = instru.SpectralBlur(grating_resolution_3b)
 # Def Channel spec.
 ch3b = instru.IFU(
-    fov=instru.FOV(5.2/3600, 6.2/3600, origin=instru.Coord(0, 0), angle=7.5 - data_dict["rotation"]['3b']),
+    fov=instru.FOV(5.2/3600, 6.2/3600, origin=instru.Coord(0, 0), angle= - data_dict["rotation"]['3b']),
     det_pix_size=0.245,
     n_slit=16,
     w_blur=spec_blur_3b,
@@ -223,7 +221,7 @@ grating_resolution_3c = np.mean([1980, 2790])
 spec_blur_3c = instru.SpectralBlur(grating_resolution_3c)
 # Def Channel spec.
 ch3c = instru.IFU(
-    fov=instru.FOV(5.2/3600, 6.2/3600, origin=instru.Coord(0, 0), angle=7.5 - data_dict["rotation"]['3c']),
+    fov=instru.FOV(5.2/3600, 6.2/3600, origin=instru.Coord(0, 0), angle= - data_dict["rotation"]['3c']),
     det_pix_size=0.245,
     n_slit=16,
     w_blur=spec_blur_3c,
@@ -236,7 +234,7 @@ grating_resolution_4a = np.mean([1460, 1930])
 spec_blur_4a = instru.SpectralBlur(grating_resolution_4a)
 # Def Channel spec.
 ch4a = instru.IFU(
-    fov=instru.FOV(6.6/3600, 7.7/3600, origin=instru.Coord(0, 0), angle=8.3 - data_dict["rotation"]['4a']),
+    fov=instru.FOV(6.6/3600, 7.7/3600, origin=instru.Coord(0, 0), angle= - data_dict["rotation"]['4a']),
     det_pix_size=0.273,
     n_slit=12,
     w_blur=spec_blur_4a,
@@ -249,7 +247,7 @@ grating_resolution_4b = np.mean([1680, 1760])
 spec_blur_4b = instru.SpectralBlur(grating_resolution_4b)
 # Def Channel spec.
 ch4b = instru.IFU(
-    fov=instru.FOV(6.6/3600, 7.7/3600, origin=instru.Coord(0, 0), angle=8.3 - data_dict["rotation"]['4b']),
+    fov=instru.FOV(6.6/3600, 7.7/3600, origin=instru.Coord(0, 0), angle= - data_dict["rotation"]['4b']),
     det_pix_size=0.273,
     n_slit=12,
     w_blur=spec_blur_4b,
@@ -262,7 +260,7 @@ grating_resolution_4c = np.mean([1630, 1330])
 spec_blur_4c = instru.SpectralBlur(grating_resolution_4c)
 # Def Channel spec.
 ch4c = instru.IFU(
-    fov=instru.FOV(6.6/3600, 7.7/3600, origin=instru.Coord(0, 0), angle=8.3 - data_dict["rotation"]['4c']),
+    fov=instru.FOV(6.6/3600, 7.7/3600, origin=instru.Coord(0, 0), angle= - data_dict["rotation"]['4c']),
     det_pix_size=0.273,
     n_slit=12,
     w_blur=spec_blur_4c,
@@ -291,7 +289,7 @@ spectroModel = MCMO_SigRLSCT_Model.spectroSigRLSCT(sotf=sotf,
                                                     alpha_axis=alpha_axis, 
                                                     beta_axis=beta_axis, 
                                                     wavelength_axis=wavel_axis, 
-                                                    instrs=[ch1a, ch1b, ch1c, ch2a, ch2b, ch2c],#, ch3a, ch3b, ch3c], 
+                                                    instrs=[ch1a, ch1b, ch1c, ch2a, ch2b, ch2c, ch3a, ch3b, ch3c, ch4a, ch4b, ch4c], 
                                                     step_degree=step_Angle.degree, 
                                                     pointings=pointings)
 
@@ -310,21 +308,34 @@ use_data = spectroModel.real_data_janskySR_to_jansky(ndata)
 # # slices_vizualisation.visualize_corrected_slices(data_shape, corrected_slices)
 
 
-weighted_img, img = spectroModel.plot_slice(ndata, 8, 100)
-weighted_img[weighted_img<10] = np.nan
-img[img<10] = np.nan
-print(data_dict["rotation"]['1a'], data_dict["rotation"]['1b'], data_dict["rotation"]['1c'], data_dict["rotation"]['2a'], data_dict["rotation"]['2b'], data_dict["rotation"]['2c'])
-# plt.figure()
-# plt.imshow(np.rot90(np.fliplr(img), -1))
-# plt.colorbar()
-plt.figure()
-plt.imshow(weighted_img)
-# plt.imshow(np.rot90(np.fliplr(weighted_img), -1))
-plt.colorbar()
-# plt.clim(vmin=2000)
-plt.show()
+# weighted_img, img = spectroModel.plot_slice(ndata, 9, 100)
+# weighted_img[weighted_img<10] = np.nan
+# img[img<10] = np.nan
+# print("Rotation 1a = ", data_dict["rotation"]['1a'])
+# print("Rotation 1b = ", data_dict["rotation"]['1b'])
+# print("Rotation 1c = ", data_dict["rotation"]['1c'])
+# print("Rotation 2a = ", data_dict["rotation"]['2a'])
+# print("Rotation 2b = ", data_dict["rotation"]['2b'])
+# print("Rotation 2c = ", data_dict["rotation"]['2c'])
+# print("Rotation 3a = ", data_dict["rotation"]['3a'])
+# print("Rotation 3b = ", data_dict["rotation"]['3b'])
+# print("Rotation 3c = ", data_dict["rotation"]['3c'])
+# print("Rotation 4a = ", data_dict["rotation"]['4a'])
+# print("Rotation 4b = ", data_dict["rotation"]['4b'])
+# print("Rotation 4c = ", data_dict["rotation"]['4c'])
 
-raise RuntimeError("!!!")
+
+# # plt.figure()
+# # plt.imshow(np.rot90(np.fliplr(img), -1))
+# # plt.colorbar()
+# plt.figure()
+# plt.imshow(weighted_img)
+# # plt.imshow(np.rot90(np.fliplr(weighted_img), -1))
+# plt.colorbar()
+# # plt.clim(vmin=2000)
+# plt.show()
+
+# raise RuntimeError("!!!")
 
 
 # print(dottest(spectroModel, num=10, echo=True))
@@ -413,7 +424,7 @@ Reconstruction method
 """
 hyperParameter = 5e9
 method = "lcg"
-niter = 450
+niter = 20
 value_init = 0
 
 # Create result directory

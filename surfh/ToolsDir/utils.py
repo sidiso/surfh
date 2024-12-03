@@ -108,12 +108,14 @@ def apply_mask_FoV(mask, cube):
 
 
 def plot_maps(estimated_maps):
-    nrow = estimated_maps.shape[0] // 2
+    nrow = 2#estimated_maps.shape[0] // 2
     ncols = estimated_maps.shape[0] // 2
-    fig, axes = plt.subplots(nrows=nrow, ncols=nrow, sharex = True, sharey = True)
+    print(nrow)
+    fig, axes = plt.subplots(nrows=nrow, ncols=ncols, sharex = True, sharey = True)
 
     for i in range(nrow):
         for j in range(ncols):
+            print(i,j)
             m = axes[i,j].imshow(estimated_maps[i*ncols+j])
             fig.colorbar(m, ax=axes[i,j])
 

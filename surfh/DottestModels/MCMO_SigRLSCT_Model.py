@@ -235,7 +235,6 @@ class spectroSigRLSCT(LinOp):
     def plot_slice(self, all_data, n_chan, nslice):
 
         # Get shape of specific IFU band
-        ifu_shape = self.channels[n_chan].oshape
         chan = self.channels[n_chan]
         # Get shape of output image
         global_img = np.zeros(self.imshape)

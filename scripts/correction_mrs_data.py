@@ -21,7 +21,7 @@ from surfh.Vizualisation import slices_vizualisation
 
 console = Console()
 
-def load_simulation_data(npix=451):
+def load_simulation_data(npix=501):
     """
     Load simulation data and the wavelength information.
     """
@@ -63,7 +63,6 @@ def setup_channel_model(origin_alpha_axis, origin_beta_axis, targ_ra, targ_dec, 
     """
     step = 0.025
     step_angle = Angle(step, u.arcsec).degree
-    ch1c_pix = ifu.pix(step_angle)
 
     super_resolution_factor = instru.get_srf(
         [ifu.det_pix_size],
@@ -72,7 +71,7 @@ def setup_channel_model(origin_alpha_axis, origin_beta_axis, targ_ra, targ_dec, 
 
     alpha_axis = origin_alpha_axis - np.mean(origin_alpha_axis) + targ_ra
     beta_axis = origin_beta_axis - np.mean(origin_beta_axis) + targ_dec
-    pointings = instru.CoordList([instru.Coord(targ_ra, targ_dec)]).pix(step_angle)
+    pointings = instru.CoordList([instru.Coord(0, 0)]).pix(step_angle)
 
 
     channel = MCMO_SigRLSCT_Channel_Model.Channel(
@@ -93,8 +92,8 @@ def main():
     save_corrected_dir = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Corrected_slices/'
     mode = [1] # 0=1st chan; 1=2nd chan; 2=both chan
     raw_dir = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Raw_slices/'
-    for file in os.listdir(raw_dir):
-        if 'ch3b' in file:
+    for file in sorted(os.listdir(raw_dir)):
+        if 'ch3c_ch4c' in file:
             print("File is ", file)
             first_chan, second_chan, dithering_number = extract_name_information(os.path.basename(raw_dir + file))
 
@@ -110,7 +109,8 @@ def main():
 
 
                 # Load simulation data
-                origin_alpha_axis, origin_beta_axis, wavelength_cube = load_simulation_data()
+                Nx = 501
+                origin_alpha_axis, origin_beta_axis, wavelength_cube = load_simulation_data(npix=Nx)
 
                 # Extract target coordinates from FITS file
                 targ_ra, targ_dec = fits_toolbox.get_fits_target_coordinates(raw_dir + file)
@@ -118,8 +118,6 @@ def main():
                 # Setup channel model
                 ifu, targ_ra, targ_dec = realmiri.get_IFU(raw_dir + file, chan_name=selected_chan)
                 model_channel = setup_channel_model(origin_alpha_axis, origin_beta_axis, targ_ra, targ_dec, ifu, wavelength_cube)
-
-                print(f'Oshape Channel is {model_channel.oshape}')
 
                 # Process FITS data and generate labeled image
                 jwst_model = datamodels.open(raw_dir + file)
@@ -167,6 +165,9 @@ def main():
                         sorted_data[new_order[i]] = corrected_slices[i]
                     # slices_vizualisation.visualize_corrected_slices(data_shape, data)
                     sorted_data = np.roll(sorted_data, 9, 0)
+                    # Correct data so slices are in right order
+                    sorted_data = [sorted_data[:, i*24:(i+1)*24] for i in range(17)]
+
                 elif 'ch3' in selected_chan:
                     sorted_data = np.zeros_like(corrected_slices)
 
@@ -183,16 +184,17 @@ def main():
                 else:
                     raise NameError(f'Error The name of the selected chan is wrong : {selected_chan}')
 
-                # print(corrected_slices.shape)
-                # cube = model_channel.realData_sliceToCube(sorted_data, (sorted_data.shape[1], 451,451))
+
+                # cube = model_channel.realData_sliceToCube(sorted_data, (sorted_data.shape[1],501,501))
                 # plt.imshow(cube[100])
-                # plt.colorbar()
                 # plt.show()
-                # raise RuntimeError
 
                 filename = save_corrected_dir + selected_chan + '_' + dithering_number + '_corrected.fits'
                 corrected_slice_fits = sorted_data.transpose(1, 0, 2).reshape(sorted_data.shape[1], sorted_data.shape[2]*sorted_data.shape[0])
                 
+
+
+
                 fits_toolbox.corrected_slices_to_fits(corrected_slice_fits, ifu.fov.angle, targ_ra, targ_dec, filename, selected_chan)
 
                 # slices_vizualisation.visualize_corrected_slices(corrected_slices.shape, corrected_slices)

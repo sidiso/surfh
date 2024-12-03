@@ -162,7 +162,6 @@ class Slicer():
 
         # If next do not share a pixel
         if slit_idx < self.slices_shape[0] - 1:
-            print(f'slit_idx < self.npix_slit_beta_width - 1 = {slit_idx} < {self.slices_shape[0] - 1}')
             if slices[1].stop - 1 != self.get_slit_slices(slit_idx + 1)[1].start:
                 weights[:, -1] = 1
 

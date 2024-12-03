@@ -301,8 +301,6 @@ class FOV:
         beta_axis = axis(
             -self.beta_width / 2 - beta_margin, self.beta_width + 2 * beta_margin, step
         )
-        print("self.alpha_width = ", self.alpha_width)
-        print("self.beta_width = ", self.beta_width)
         return alpha_axis, beta_axis
 
     def local2global(self, alpha_coords, beta_coords):

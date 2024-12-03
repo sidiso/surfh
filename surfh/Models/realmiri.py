@@ -69,30 +69,30 @@ def get_IFU(filename, chan_name=None, wavel_from_file=False):
     chan_str = ''
     if channel == 1:
         slices = 21
-        pix_size = 0.196/ARCSEC_TO_DEGREE
+        pix_size = 0.196
         alpha_width = 3.2/ARCSEC_TO_DEGREE
         beta_width = 3.7/ARCSEC_TO_DEGREE
         rotation = 8.4 + rotation_ref
         chan_str += '1'
     elif channel == 2:
         slices = 17
-        pix_size = 0.196/ARCSEC_TO_DEGREE
+        pix_size = 0.196
         alpha_width = 4.0/ARCSEC_TO_DEGREE
         beta_width = 4.8/ARCSEC_TO_DEGREE
         rotation = 8.2 + rotation_ref
         chan_str += '2'
     elif channel == 3:
         slices = 16
-        pix_size = 0.245/ARCSEC_TO_DEGREE
-        alpha_width = 5.5/ARCSEC_TO_DEGREE
+        pix_size = 0.245
+        alpha_width = 5.2/ARCSEC_TO_DEGREE
         beta_width = 6.2/ARCSEC_TO_DEGREE
         rotation = 7.5 + rotation_ref
         chan_str += '3'
     else:
         slices = 12
-        pix_size = 0.273/ARCSEC_TO_DEGREE
-        alpha_width = 6.9/ARCSEC_TO_DEGREE
-        beta_width = 7.9/ARCSEC_TO_DEGREE
+        pix_size = 0.273
+        alpha_width = 6.6/ARCSEC_TO_DEGREE
+        beta_width = 7.7/ARCSEC_TO_DEGREE
         rotation = 8.3 + rotation_ref
         chan_str += '4'
 
@@ -129,9 +129,9 @@ def get_IFU(filename, chan_name=None, wavel_from_file=False):
     hdul.close()
     return instru.IFU(
                         # ToChange
-                        instru.FOV(alpha_width, beta_width, origin=instru.Coord(targ_ra, targ_dec), angle=rotation),
+                        instru.FOV(alpha_width, beta_width, origin=instru.Coord(0, 0), angle=rotation),
                         # instru.FOV(alpha_width, beta_width, origin=instru.Coord(0,0), angle=rotation),
-                        pix_size*3600,
+                        pix_size,#*3600,
                         slices,
                         spec_blur,
                         pce[str(channel) + chr(65 + band)],
