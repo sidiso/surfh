@@ -22,8 +22,7 @@ from scipy import ndimage
 console = Console()
 
 
-def load_data(list_chan):
-    save_filter_corrected_dir = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Filtered_slices/'        
+def load_data(list_chan, save_filter_corrected_dir):
 
     data_dict = {}
     data_dict['data'] = {}
@@ -74,9 +73,15 @@ def load_data(list_chan):
 """
 Create Model and simulation
 """
-psf_dir_path = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/PSF/'
-sim_dir_path='/home/nmonnier/Projects/JWST/MRS/surfh/cube_orion/'
-template_dir_path = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Templates/'
+
+
+fusion_dir_path = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/'
+
+psf_dir_path = fusion_dir_path + 'PSF/'
+template_dir_path = fusion_dir_path +'Templates/'
+save_filter_corrected_dir = fusion_dir_path + 'Filtered_slices/'        
+result_path = fusion_dir_path + '/Results/'
+
 step = 0.025 # arcsec
 step_Angle = Angle(step, u.arcsec)
 
@@ -90,18 +95,24 @@ origin_beta_axis -= np.mean(origin_beta_axis)
 wavel_axis = np.load(template_dir_path + 'wavel_axis_orion_1ABC_2ABC_3ABC_4ABC_4_templates_SS4.npy')
 templates = np.load(template_dir_path + 'nmf_orion_1ABC_2ABC_3ABC_4ABC_4_templates_SS4.npy')
 spsf = np.load(psf_dir_path + 'psfs_pixscale0.025_npix_501_fov12.525_chan_1ABC_2ABC_3ABC_4ABC_SS4.npy')
+
 sotf = udft.ir2fr(spsf, imshape)
 
 
+
+
+
+print("tempaltes shape = ", templates.shape)
 if len(templates.shape) == 1:
       templates = templates[np.newaxis,...]
 
+templates = templates/10e3
 
 # data, list_target_b, list_target_c, rotation_ref_b, rotation_ref_c = crappy_load_data()
 
 list_chan = ['1a', '1b', '1c' , '2a' , '2b' , '2c', '3a', '3b', '3c', '4a', '4b', '4c']
 console.log("[bold cyan]Loading data...[/bold cyan]")
-data_dict = load_data(list_chan)
+data_dict = load_data(list_chan, save_filter_corrected_dir)
 console.log("[green]Data loaded successfully![/green]")
 
 
@@ -308,31 +319,35 @@ use_data = spectroModel.real_data_janskySR_to_jansky(ndata)
 # # slices_vizualisation.visualize_corrected_slices(data_shape, corrected_slices)
 
 
-# weighted_img, img = spectroModel.plot_slice(ndata, 9, 100)
-# weighted_img[weighted_img<10] = np.nan
-# img[img<10] = np.nan
-# print("Rotation 1a = ", data_dict["rotation"]['1a'])
-# print("Rotation 1b = ", data_dict["rotation"]['1b'])
-# print("Rotation 1c = ", data_dict["rotation"]['1c'])
-# print("Rotation 2a = ", data_dict["rotation"]['2a'])
-# print("Rotation 2b = ", data_dict["rotation"]['2b'])
-# print("Rotation 2c = ", data_dict["rotation"]['2c'])
-# print("Rotation 3a = ", data_dict["rotation"]['3a'])
-# print("Rotation 3b = ", data_dict["rotation"]['3b'])
-# print("Rotation 3c = ", data_dict["rotation"]['3c'])
-# print("Rotation 4a = ", data_dict["rotation"]['4a'])
-# print("Rotation 4b = ", data_dict["rotation"]['4b'])
-# print("Rotation 4c = ", data_dict["rotation"]['4c'])
+# weighted_img, img = spectroModel.plot_slice(ndata, 8, 100)
+# weighted_img[weighted_img<10] = np.nanc
+# # img[img<10] = np.nan
+# # print("Rotation 1a = ", data_dict["rotation"]['1a'])
+# # print("Rotation 1b = ", data_dict["rotation"]['1b'])
+# # print("Rotation 1c = ", data_dict["rotation"]['1c'])
+# # print("Rotation 2a = ", data_dict["rotation"]['2a'])
+# # print("Rotation 2b = ", data_dict["rotation"]['2b'])
+# # print("Rotation 2c = ", data_dict["rotation"]['2c'])
+# # print("Rotation 3a = ", data_dict["rotation"]['3a'])
+# # print("Rotation 3b = ", data_dict["rotation"]['3b'])
+# # print("Rotation 3c = ", data_dict["rotation"]['3c'])
+# # print("Rotation 4a = ", data_dict["rotation"]['4a'])
+# # print("Rotation 4b = ", data_dict["rotation"]['4b'])
+# # print("Rotation 4c = ", data_dict["rotation"]['4c'])
 
 
-# # plt.figure()
-# # plt.imshow(np.rot90(np.fliplr(img), -1))
-# # plt.colorbar()
+# plt.figure()
+# plt.imshow(np.rot90(np.fliplr(img), -1))
+# plt.colorbar()
 # plt.figure()
 # plt.imshow(weighted_img)
 # # plt.imshow(np.rot90(np.fliplr(weighted_img), -1))
 # plt.colorbar()
 # # plt.clim(vmin=2000)
+# plt.figure()
+# for i in range(templates.shape[0]):
+#     plt.plot(templates[i])
+# cube_vizualisation.plot_cube(spsf, wavel_axis)
 # plt.show()
 
 # raise RuntimeError("!!!")
@@ -422,13 +437,12 @@ from astropy.table import Table
 """
 Reconstruction method
 """
-hyperParameter = 5e9
+hyperParameter = 5e3
 method = "lcg"
-niter = 20
+niter = 50
 value_init = 0
 
 # Create result directory
-result_path = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Results/'
 result_dir = f'{method}_MC_{len(spectroModel.instrs)}_MO_{len(pointings[0])}_Temp_{templates.shape[0]}_nit_{str(niter)}_mu_{str("{:.2e}".format(hyperParameter))}/'
 path = pathlib.Path(result_path+result_dir)
 path.mkdir(parents=True, exist_ok=True)
@@ -448,9 +462,10 @@ y_cube = spectroModel.mapsToCube(res_fusion.x)
 flipped_cube = np.array([np.fliplr(y_cube[i]) for i in range(y_cube.shape[0])])
 
 # Save results
+print(f"Results save in {path}")
 np.save(path / 'res_x.npy', res_fusion.x)
 np.save(path / 'res_cube.npy', y_cube)
 np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
 
 
-cube_vizualisation.plot_cube(np.rot90(flipped_cube, -1, axes=(1,2)), wavel_axis)
+# cube_vizualisation.plot_cube(np.rot90(flipped_cube, -1, axes=(1,2)), wavel_axis)
