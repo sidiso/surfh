@@ -260,6 +260,8 @@ def parse_options(fusion_dir, npix, hyper_parameter, niter, n_templates, scale_d
     ndata = np.concatenate(data)
 
     if scale_data:
+        if verbose:
+            log.info('Data scaling enable')
         ndata = spectroModel.real_data_janskySR_to_jansky(ndata)
 
 
