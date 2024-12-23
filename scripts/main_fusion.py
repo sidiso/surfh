@@ -157,7 +157,7 @@ def create_model(sotf, templates, origin_alpha_axis, origin_beta_axis, wavel_axi
 
 
 # Main function to execute the reconstruction method
-def reconstruction_method(spectroModel, ndata, templates, result_path, hyperParameter, niter, method):
+def reconstruction_method(spectroModel, ndata, templates, result_path, hyperParameter, niter, method, scale_data):
     """
     Perform the reconstruction method and save results.
 
@@ -176,7 +176,7 @@ def reconstruction_method(spectroModel, ndata, templates, result_path, hyperPara
     value_init = 0
 
     # Create result directory
-    result_dir = f'{method}_MC_{len(spectroModel.instrs)}_MO_4_Temp_{templates.shape[0]}_nit_{str(niter)}_mu_{str("{:.2e}".format(hyperParameter))}/'
+    result_dir = f'{method}_MC_{len(spectroModel.instrs)}_MO_4_Temp_{templates.shape[0]}_nit_{str(niter)}_mu_{str("{:.2e}".format(hyperParameter))}_SD_{scale_data}/'
     path = pathlib.Path(result_path + result_dir)
     path.mkdir(parents=True, exist_ok=True)
 
@@ -265,7 +265,7 @@ def parse_options(fusion_dir, npix, hyper_parameter, niter, n_templates, scale_d
 
     if verbose:
         log.info(f'Start {method} algorithm')
-    # reconstruction_method(spectroModel, ndata, templates, paths["result_path"], hyper_parameter, niter, method)
+    reconstruction_method(spectroModel, ndata, templates, paths["result_path"], hyper_parameter, niter, method, scale_data)
 
 
 if __name__ == '__main__':
