@@ -218,9 +218,10 @@ def reconstruction_method(spectroModel, ndata, templates, result_path, hyperPara
 @click.option('-hp', '--hyper_parameter', default=1., type=float, help='Hyperparameter value')
 @click.option('-ni', '--niter', default=5, type=int, help='Number of iteration.')
 @click.option('-nt', '--nTemplates', default=4, type=int, help='Number of Templates.')
+@click.option('-sd', '--scaleData', default=False, type=bool, help='Scale data from Jy  to Jy/str.')
 @click.option('-m', '--method', default='lcg', type=str, help='Method used (default = lcg).')
 @click.option('-v', '--verbose', default=True, type=bool, help='Verbose.')
-def parse_options(fusion_dir, npix, hyper_parameter, niter, nTemplates, method, verbose):
+def parse_options(fusion_dir, npix, hyper_parameter, niter, nTemplates, scaleData, method, verbose):
 
     print(f'Options selected are : ') 
     print(f'\t fusion_dir = {fusion_dir}')
@@ -228,6 +229,7 @@ def parse_options(fusion_dir, npix, hyper_parameter, niter, nTemplates, method, 
     print(f'\t hyper_parameter = {hyper_parameter}')
     print(f'\t niter = {niter}')
     print(f'\t nTemplates = {nTemplates}')
+    print(f'\t scaleData = {scaleData}')
     print(f'\t method = {method}')
 
     if verbose:
@@ -256,6 +258,10 @@ def parse_options(fusion_dir, npix, hyper_parameter, niter, nTemplates, method, 
     for chan in list_chan:
         data.append(np.array(data_dict['data'][chan]).ravel())
     ndata = np.concatenate(data)
+
+    if scaleData:
+        ndata = spectroModel.real_data_janskySR_to_jansky(ndata)
+
 
     if verbose:
         log.info(f'Start {method} algorithm')
