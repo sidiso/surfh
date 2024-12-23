@@ -76,14 +76,23 @@ def initialize_parameters(fusion_dir_path):
 
     return paths, step, step_angle
 
-def load_simulation_data(paths, step, step_angle, Npix):
+def load_simulation_data(paths, step, step_angle, Npix, nTemplates):
     """Load simulation data."""
     imshape = (Npix, Npix)
     origin_alpha_axis = np.arange(imshape[0]) * step_angle - np.mean(np.arange(imshape[0]) * step_angle)
     origin_beta_axis = np.arange(imshape[1]) * step_angle - np.mean(np.arange(imshape[1]) * step_angle)
-
-    wavel_axis = np.load(os.path.join(paths['template_dir'], 'wavel_axis_orion_1ABC_2ABC_3ABC_4ABC_4_templates_SS4.npy'))
-    templates = np.load(os.path.join(paths['template_dir'], 'nmf_orion_1ABC_2ABC_3ABC_4ABC_4_templates_SS4.npy'))
+    
+    if nTemplates == 4:
+        wavel_file = 'wavel_axis_orion_1ABC_2ABC_3ABC_4ABC_4_templates_SS4.npy'
+        templates_file = 'nmf_orion_1ABC_2ABC_3ABC_4ABC_4_templates_SS4.npy'
+    elif nTemplates == 6:
+        wavel_file = 'wavel_axis_orion_1ABC_2ABC_3ABC_4ABC_6_templates_SS4.npy'
+        templates_file = 'nmf_orion_1ABC_2ABC_3ABC_4ABC_6_templates_SS4.npy'
+    else:
+        raise NameError("No corresponding Templates name")
+    
+    wavel_axis = np.load(os.path.join(paths['template_dir'], wavel_file))
+    templates = np.load(os.path.join(paths['template_dir'], templates_file))
     spsf = np.load(os.path.join(paths['psf_dir'], 'psfs_pixscale0.025_npix_501_fov12.525_chan_1ABC_2ABC_3ABC_4ABC_SS4.npy'))
 
     sotf = udft.ir2fr(spsf, imshape)
@@ -208,15 +217,17 @@ def reconstruction_method(spectroModel, ndata, templates, result_path, hyperPara
 @click.option('-np', '--npix', default=501, type=int, help='Number of pixels')
 @click.option('-hp', '--hyper_parameter', default=1., type=float, help='Hyperparameter value')
 @click.option('-ni', '--niter', default=5, type=int, help='Number of iteration.')
+@click.option('-nt', '--nTemplates', default=4, type=int, help='Number of Templates.')
 @click.option('-m', '--method', default='lcg', type=str, help='Method used (default = lcg).')
 @click.option('-v', '--verbose', default=True, type=bool, help='Verbose.')
-def parse_options(fusion_dir, npix, hyper_parameter, niter, method, verbose):
+def parse_options(fusion_dir, npix, hyper_parameter, niter, nTemplates, method, verbose):
 
     print(f'Options selected are : ') 
     print(f'\t fusion_dir = {fusion_dir}')
     print(f'\t npix = {npix}')
     print(f'\t hyper_parameter = {hyper_parameter}')
     print(f'\t niter = {niter}')
+    print(f'\t nTemplates = {nTemplates}')
     print(f'\t method = {method}')
 
     if verbose:
@@ -230,7 +241,7 @@ def parse_options(fusion_dir, npix, hyper_parameter, niter, method, verbose):
 
     if verbose:
         log.info('Load simulation data')
-    origin_alpha_axis, origin_beta_axis, wavel_axis, templates, sotf = load_simulation_data(paths, step, step_angle, npix)
+    origin_alpha_axis, origin_beta_axis, wavel_axis, templates, sotf = load_simulation_data(paths, step, step_angle, npix, nTemplates)
 
     if verbose:
         log.info('Load MRS data')
@@ -248,7 +259,7 @@ def parse_options(fusion_dir, npix, hyper_parameter, niter, method, verbose):
 
     if verbose:
         log.info(f'Start {method} algorithm')
-    # reconstruction_method(spectroModel, ndata, templates, paths["result_path"], hyper_parameter, niter, method)
+    reconstruction_method(spectroModel, ndata, templates, paths["result_path"], hyper_parameter, niter, method)
 
 
 if __name__ == '__main__':
