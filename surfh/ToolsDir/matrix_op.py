@@ -130,27 +130,27 @@ def cubeToSlice(arr: array, dirac: array, num_threads: int) -> array:
                                          dirac.shape[0], num_threads)
     return result_array
 
-def wblur_t(arr: array, wpsf: array, num_threads: int) -> array:
-    """Apply transpose of blurring in λ axis
+# def wblur_t(arr: array, wpsf: array, num_threads: int) -> array:
+#     """Apply transpose of blurring in λ axis
 
-    Parameters
-    ----------
-    arr: array-like
-      Input of shape [λ', α, β].
-    wpsf: array-like
-      Wavelength PSF of shape [λ', λ, β]
+#     Parameters
+#     ----------
+#     arr: array-like
+#       Input of shape [λ', α, β].
+#     wpsf: array-like
+#       Wavelength PSF of shape [λ', λ, β]
 
-    Returns
-    -------
-    out: array-like
-      A wavelength blurred array in [λ, α, β].
-    """
-    # [λ, α, β] = ∑_λ' arr[λ', α, β] wpsf[λ', λ]
-    # Σ_λ'
-    result_array = cythons_files.c_wblur_t(arr, wpsf, wpsf.shape[1], 
-                                           arr.shape[1], arr.shape[2], 
-                                           wpsf.shape[0], num_threads)
-    return result_array
+#     Returns
+#     -------
+#     out: array-like
+#       A wavelength blurred array in [λ, α, β].
+#     """
+#     # [λ, α, β] = ∑_λ' arr[λ', α, β] wpsf[λ', λ]
+#     # Σ_λ'
+#     result_array = cythons_files.c_wblur_t(arr, wpsf, wpsf.shape[1], 
+#                                            arr.shape[1], arr.shape[2], 
+#                                            wpsf.shape[0], num_threads)
+#     return result_array
 
 
 
@@ -213,3 +213,56 @@ def linearMixingModel_cube2maps(cube, NLambda, ishape, tpls):
                 maps[m,i,j] = tmp
                 tmp = 0
     return maps
+
+@njit(parallel=True)
+def wblur_subSampling(arr, wpsf):
+    """
+    Fonction équivalente en Numba pour flou et sous-échantillonnage.
+    Args:
+        arr: Tableau numpy de dimensions [λ, α, β]
+        wpsf: Tableau numpy de dimensions [λ', λ, β]
+    Returns:
+        Tableau de dimensions [λ', α] représentant la somme pondérée.
+    """
+    # Dimensions des tableaux
+    lambda_prime, lambda_dim, beta = wpsf.shape
+    _, alpha, _ = arr.shape
+    
+    # Résultat accumulé
+    result = np.zeros((lambda_prime, alpha), dtype=arr.dtype)
+    
+    # Calcul
+    for l_p in range(lambda_prime):  # Parcourt λ'
+        for a in range(alpha):       # Parcourt α
+            for b in range(beta):    # Parcourt β
+                for l in range(lambda_dim):  # Parcourt λ
+                    result[l_p, a] += arr[l, a, b] * wpsf[l_p, l, b]
+    
+    return result
+
+
+@njit(parallel=True)
+def wblur_t(arr, wpsf):
+    """
+    Fonction équivalente en Numba pour le flou avec transposition.
+    Args:
+        arr: Tableau numpy de dimensions [λ', α, β]
+        wpsf: Tableau numpy de dimensions [λ', λ, β]
+    Returns:
+        Tableau de dimensions [λ, α, β] représentant la somme pondérée.
+    """
+    # Dimensions des tableaux
+    lambda_prime, alpha, beta = arr.shape
+    _, lambda_dim, _ = wpsf.shape
+    
+    # Résultat accumulé
+    result = np.zeros((lambda_dim, alpha, beta), dtype=arr.dtype)
+    
+    # Calcul
+    for l in range(lambda_dim):  # Parcourt λ
+        for a in range(alpha):   # Parcourt α
+            for b in range(beta): # Parcourt β
+                for l_p in range(lambda_prime):  # Parcourt λ'
+                    result[l, a, b] += arr[l_p, a, b] * wpsf[l_p, l, b]
+    
+    return result

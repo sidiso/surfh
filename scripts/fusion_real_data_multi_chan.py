@@ -80,8 +80,8 @@ fusion_dir_path = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/'
 psf_dir_path = fusion_dir_path + 'PSF/'
 template_dir_path = fusion_dir_path +'Templates/'
 save_filter_corrected_dir = fusion_dir_path + 'Filtered_slices/'        
-result_path = fusion_dir_path + '/Results/'
-
+result_path = fusion_dir_path + 'Results/'
+mask_path = fusion_dir_path + 'Masks/'
 step = 0.025 # arcsec
 step_Angle = Angle(step, u.arcsec)
 
@@ -307,6 +307,9 @@ spectroModel = MCMO_SigRLSCT_Model.spectroSigRLSCT(sotf=sotf,
 
 use_data = spectroModel.real_data_janskySR_to_jansky(ndata)
 
+masks = spectroModel.make_mask(ndata)
+
+np.save(mask_path + 'binary_mask_1ABC_2ABC_3ABC_4ABC.npy', np.array(masks))
 # with fits.open('/home/nmonnier/Data/JWST/Orion_bar/Fusion/Filtered_slices/ch2c_00002_corrected_filtered.fits') as hdul:
 #     corrected_slices = hdul[0].data
 #     print("corrected slice shape = ", corrected_slices.shape)
@@ -368,7 +371,7 @@ use_data = spectroModel.real_data_janskySR_to_jansky(ndata)
 from astropy.wcs import WCS
 from astropy.table import Table
 
-# with fits.open('/home/nmonnier/Data/JWST/Orion_bar/Fusion/Raw_slices/ChannelCube_ch1-long_s3d.fits') as hdul:
+# with fits.open('/home/nmonnier/Data/JWST/Orion_bar/Fusion/Raw_slices/ch1a_ch2a_02101_00002_mirifushort_cal.fits') as hdul:
 #       hdr = hdul[1].header
 #       RA = hdr['CRVAL1']
 #       DEC = hdr['CRVAL2']
