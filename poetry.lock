@@ -265,6 +265,32 @@ docs = ["pytest"]
 test = ["hypothesis", "pytest", "pytest-remotedata"]
 
 [[package]]
+name = "astroquery"
+version = "0.4.7"
+description = "Functions and classes to access online astronomical data resources"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "astroquery-0.4.7-py3-none-any.whl", hash = "sha256:dfa8ca46ca0a983f66e9547c774601b331770242f9f6245df5e603f795d75540"},
+    {file = "astroquery-0.4.7.tar.gz", hash = "sha256:047fbacb0a4faec4cdb62675e919c244c1c35e661044fcbb6c9a933331747ec9"},
+]
+
+[package.dependencies]
+astropy = ">=4.2.1"
+beautifulsoup4 = ">=4.8"
+html5lib = ">=0.999"
+keyring = ">=15.0"
+numpy = ">=1.18"
+pyvo = ">=1.1"
+requests = ">=2.19"
+
+[package.extras]
+all = ["astropy-healpix", "boto3", "mocpy (>=0.9)", "regions"]
+docs = ["fsspec[http]", "matplotlib", "scipy", "sphinx-astropy (>=1.5)"]
+test = ["matplotlib", "pytest-astropy", "pytest-dependency", "pytest-rerunfailures"]
+
+[[package]]
 name = "asttokens"
 version = "2.0.5"
 description = "Annotate AST trees with source code positions"
@@ -330,10 +356,26 @@ files = [
 ]
 
 [[package]]
+name = "backports-tarfile"
+version = "1.2.0"
+description = "Backport of CPython tarfile module"
+category = "main"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "backports.tarfile-1.2.0-py3-none-any.whl", hash = "sha256:77e284d754527b01fb1e6fa8a1afe577858ebe4e9dad8919e34c862cb399bc34"},
+    {file = "backports_tarfile-1.2.0.tar.gz", hash = "sha256:d75e02c268746e1b8144c278978b6e98e85de6ad16f8e4b0844a154557eca991"},
+]
+
+[package.extras]
+docs = ["furo", "jaraco.packaging (>=9.3)", "rst.linker (>=1.9)", "sphinx (>=3.5)", "sphinx-lint"]
+testing = ["jaraco.test", "pytest (!=8.0.*)", "pytest (>=6,!=8.1.*)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=2.2)"]
+
+[[package]]
 name = "beautifulsoup4"
 version = "4.11.1"
 description = "Screen-scraping library"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.6.0"
 files = [
@@ -429,7 +471,7 @@ files = [
 name = "certifi"
 version = "2021.10.8"
 description = "Python package for providing Mozilla's CA Bundle."
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 files = [
@@ -441,7 +483,7 @@ files = [
 name = "cffi"
 version = "1.15.0"
 description = "Foreign Function Interface for Python calling C code."
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 files = [
@@ -504,7 +546,7 @@ pycparser = "*"
 name = "charset-normalizer"
 version = "2.0.12"
 description = "The Real First Universal Charset Detector. Open, modern and actively maintained alternative to Chardet."
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.5.0"
 files = [
@@ -556,6 +598,56 @@ files = [
 
 [package.extras]
 test = ["flake8 (==3.7.8)", "hypothesis (==3.55.3)"]
+
+[[package]]
+name = "cryptography"
+version = "43.0.3"
+description = "cryptography is a package which provides cryptographic recipes and primitives to Python developers."
+category = "main"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "cryptography-43.0.3-cp37-abi3-macosx_10_9_universal2.whl", hash = "sha256:bf7a1932ac4176486eab36a19ed4c0492da5d97123f1406cf15e41b05e787d2e"},
+    {file = "cryptography-43.0.3-cp37-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:63efa177ff54aec6e1c0aefaa1a241232dcd37413835a9b674b6e3f0ae2bfd3e"},
+    {file = "cryptography-43.0.3-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7e1ce50266f4f70bf41a2c6dc4358afadae90e2a1e5342d3c08883df1675374f"},
+    {file = "cryptography-43.0.3-cp37-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:443c4a81bb10daed9a8f334365fe52542771f25aedaf889fd323a853ce7377d6"},
+    {file = "cryptography-43.0.3-cp37-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:74f57f24754fe349223792466a709f8e0c093205ff0dca557af51072ff47ab18"},
+    {file = "cryptography-43.0.3-cp37-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:9762ea51a8fc2a88b70cf2995e5675b38d93bf36bd67d91721c309df184f49bd"},
+    {file = "cryptography-43.0.3-cp37-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:81ef806b1fef6b06dcebad789f988d3b37ccaee225695cf3e07648eee0fc6b73"},
+    {file = "cryptography-43.0.3-cp37-abi3-win32.whl", hash = "sha256:cbeb489927bd7af4aa98d4b261af9a5bc025bd87f0e3547e11584be9e9427be2"},
+    {file = "cryptography-43.0.3-cp37-abi3-win_amd64.whl", hash = "sha256:f46304d6f0c6ab8e52770addfa2fc41e6629495548862279641972b6215451cd"},
+    {file = "cryptography-43.0.3-cp39-abi3-macosx_10_9_universal2.whl", hash = "sha256:8ac43ae87929a5982f5948ceda07001ee5e83227fd69cf55b109144938d96984"},
+    {file = "cryptography-43.0.3-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:846da004a5804145a5f441b8530b4bf35afbf7da70f82409f151695b127213d5"},
+    {file = "cryptography-43.0.3-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:0f996e7268af62598f2fc1204afa98a3b5712313a55c4c9d434aef49cadc91d4"},
+    {file = "cryptography-43.0.3-cp39-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:f7b178f11ed3664fd0e995a47ed2b5ff0a12d893e41dd0494f406d1cf555cab7"},
+    {file = "cryptography-43.0.3-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:c2e6fc39c4ab499049df3bdf567f768a723a5e8464816e8f009f121a5a9f4405"},
+    {file = "cryptography-43.0.3-cp39-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:e1be4655c7ef6e1bbe6b5d0403526601323420bcf414598955968c9ef3eb7d16"},
+    {file = "cryptography-43.0.3-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:df6b6c6d742395dd77a23ea3728ab62f98379eff8fb61be2744d4679ab678f73"},
+    {file = "cryptography-43.0.3-cp39-abi3-win32.whl", hash = "sha256:d56e96520b1020449bbace2b78b603442e7e378a9b3bd68de65c782db1507995"},
+    {file = "cryptography-43.0.3-cp39-abi3-win_amd64.whl", hash = "sha256:0c580952eef9bf68c4747774cde7ec1d85a6e61de97281f2dba83c7d2c806362"},
+    {file = "cryptography-43.0.3-pp310-pypy310_pp73-macosx_10_9_x86_64.whl", hash = "sha256:d03b5621a135bffecad2c73e9f4deb1a0f977b9a8ffe6f8e002bf6c9d07b918c"},
+    {file = "cryptography-43.0.3-pp310-pypy310_pp73-manylinux_2_28_aarch64.whl", hash = "sha256:a2a431ee15799d6db9fe80c82b055bae5a752bef645bba795e8e52687c69efe3"},
+    {file = "cryptography-43.0.3-pp310-pypy310_pp73-manylinux_2_28_x86_64.whl", hash = "sha256:281c945d0e28c92ca5e5930664c1cefd85efe80e5c0d2bc58dd63383fda29f83"},
+    {file = "cryptography-43.0.3-pp310-pypy310_pp73-win_amd64.whl", hash = "sha256:f18c716be16bc1fea8e95def49edf46b82fccaa88587a45f8dc0ff6ab5d8e0a7"},
+    {file = "cryptography-43.0.3-pp39-pypy39_pp73-macosx_10_9_x86_64.whl", hash = "sha256:4a02ded6cd4f0a5562a8887df8b3bd14e822a90f97ac5e544c162899bc467664"},
+    {file = "cryptography-43.0.3-pp39-pypy39_pp73-manylinux_2_28_aarch64.whl", hash = "sha256:53a583b6637ab4c4e3591a15bc9db855b8d9dee9a669b550f311480acab6eb08"},
+    {file = "cryptography-43.0.3-pp39-pypy39_pp73-manylinux_2_28_x86_64.whl", hash = "sha256:1ec0bcf7e17c0c5669d881b1cd38c4972fade441b27bda1051665faaa89bdcaa"},
+    {file = "cryptography-43.0.3-pp39-pypy39_pp73-win_amd64.whl", hash = "sha256:2ce6fae5bdad59577b44e4dfed356944fbf1d925269114c28be377692643b4ff"},
+    {file = "cryptography-43.0.3.tar.gz", hash = "sha256:315b9001266a492a6ff443b61238f956b214dbec9910a081ba5b6646a055a805"},
+]
+
+[package.dependencies]
+cffi = {version = ">=1.12", markers = "platform_python_implementation != \"PyPy\""}
+
+[package.extras]
+docs = ["sphinx (>=5.3.0)", "sphinx-rtd-theme (>=1.1.1)"]
+docstest = ["pyenchant (>=1.6.11)", "readme-renderer", "sphinxcontrib-spelling (>=4.0.1)"]
+nox = ["nox"]
+pep8test = ["check-sdist", "click", "mypy", "ruff"]
+sdist = ["build"]
+ssh = ["bcrypt (>=3.1.5)"]
+test = ["certifi", "cryptography-vectors (==43.0.3)", "pretend", "pytest (>=6.2.0)", "pytest-benchmark", "pytest-cov", "pytest-xdist"]
+test-randomorder = ["pytest-randomly"]
 
 [[package]]
 name = "cycler"
@@ -705,6 +797,18 @@ files = [
 graph = ["objgraph (>=1.7.2)"]
 
 [[package]]
+name = "einops"
+version = "0.8.0"
+description = "A new flavour of deep learning operations"
+category = "main"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "einops-0.8.0-py3-none-any.whl", hash = "sha256:9572fb63046264a862693b0a87088af3bdc8c068fde03de63453cbbde245465f"},
+    {file = "einops-0.8.0.tar.gz", hash = "sha256:63486517fed345712a8385c100cb279108d9d47e6ae59099b07657e983deae85"},
+]
+
+[[package]]
 name = "entrypoints"
 version = "0.4"
 description = "Discover and load entry points from installed packages."
@@ -714,6 +818,18 @@ python-versions = ">=3.6"
 files = [
     {file = "entrypoints-0.4-py3-none-any.whl", hash = "sha256:f174b5ff827504fd3cd97cc3f8649f3693f51538c7e4bdf3ef002c8429d42f9f"},
     {file = "entrypoints-0.4.tar.gz", hash = "sha256:b706eddaa9218a19ebcd67b56818f05bb27589b1ca9e8d797b74affad4ccacd4"},
+]
+
+[[package]]
+name = "et-xmlfile"
+version = "2.0.0"
+description = "An implementation of lxml.xmlfile for the standard library"
+category = "main"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "et_xmlfile-2.0.0-py3-none-any.whl", hash = "sha256:7a91720bc756843502c3b7504c77b8fe44217c85c537d85037f0f536151b2caa"},
+    {file = "et_xmlfile-2.0.0.tar.gz", hash = "sha256:dab3f4764309081ce75662649be815c4c9081e88f0837825f90fd28317d4da54"},
 ]
 
 [[package]]
@@ -816,6 +932,28 @@ files = [
 pytoml = "*"
 
 [[package]]
+name = "html5lib"
+version = "1.1"
+description = "HTML parser based on the WHATWG HTML specification"
+category = "main"
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+files = [
+    {file = "html5lib-1.1-py2.py3-none-any.whl", hash = "sha256:0d78f8fde1c230e99fe37986a60526d7049ed4bf8a9fadbad5f00e22e58e041d"},
+    {file = "html5lib-1.1.tar.gz", hash = "sha256:b2e5b40261e20f354d198eae92afc10d750afb487ed5e50f9c4eaf07c184146f"},
+]
+
+[package.dependencies]
+six = ">=1.9"
+webencodings = "*"
+
+[package.extras]
+all = ["chardet (>=2.2)", "genshi", "lxml"]
+chardet = ["chardet (>=2.2)"]
+genshi = ["genshi"]
+lxml = ["lxml"]
+
+[[package]]
 name = "icecream"
 version = "2.1.2"
 description = "Never use print() to debug again; inspect variables, expressions, and program execution with a single, simple function call."
@@ -837,7 +975,7 @@ pygments = ">=2.2.0"
 name = "idna"
 version = "3.3"
 description = "Internationalized Domain Names in Applications (IDNA)"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.5"
 files = [
@@ -1041,6 +1179,67 @@ plugins = ["setuptools"]
 requirements-deprecated-finder = ["pip-api", "pipreqs"]
 
 [[package]]
+name = "jaraco-classes"
+version = "3.4.0"
+description = "Utility functions for Python class constructs"
+category = "main"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "jaraco.classes-3.4.0-py3-none-any.whl", hash = "sha256:f662826b6bed8cace05e7ff873ce0f9283b5c924470fe664fff1c2f00f581790"},
+    {file = "jaraco.classes-3.4.0.tar.gz", hash = "sha256:47a024b51d0239c0dd8c8540c6c7f484be3b8fcf0b2d85c13825780d3b3f3acd"},
+]
+
+[package.dependencies]
+more-itertools = "*"
+
+[package.extras]
+docs = ["furo", "jaraco.packaging (>=9.3)", "jaraco.tidelift (>=1.4)", "rst.linker (>=1.9)", "sphinx (>=3.5)", "sphinx-lint"]
+testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=2.2)", "pytest-mypy", "pytest-ruff (>=0.2.1)"]
+
+[[package]]
+name = "jaraco-context"
+version = "6.0.1"
+description = "Useful decorators and context managers"
+category = "main"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "jaraco.context-6.0.1-py3-none-any.whl", hash = "sha256:f797fc481b490edb305122c9181830a3a5b76d84ef6d1aef2fb9b47ab956f9e4"},
+    {file = "jaraco_context-6.0.1.tar.gz", hash = "sha256:9bae4ea555cf0b14938dc0aee7c9f32ed303aa20a3b73e7dc80111628792d1b3"},
+]
+
+[package.dependencies]
+"backports.tarfile" = {version = "*", markers = "python_version < \"3.12\""}
+
+[package.extras]
+doc = ["furo", "jaraco.packaging (>=9.3)", "jaraco.tidelift (>=1.4)", "rst.linker (>=1.9)", "sphinx (>=3.5)", "sphinx-lint"]
+test = ["portend", "pytest (>=6,!=8.1.*)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=2.2)", "pytest-mypy", "pytest-ruff (>=0.2.1)"]
+
+[[package]]
+name = "jaraco-functools"
+version = "4.1.0"
+description = "Functools like those found in stdlib"
+category = "main"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "jaraco.functools-4.1.0-py3-none-any.whl", hash = "sha256:ad159f13428bc4acbf5541ad6dec511f91573b90fba04df61dafa2a1231cf649"},
+    {file = "jaraco_functools-4.1.0.tar.gz", hash = "sha256:70f7e0e2ae076498e212562325e805204fc092d7b4c17e0e86c959e249701a9d"},
+]
+
+[package.dependencies]
+more-itertools = "*"
+
+[package.extras]
+check = ["pytest-checkdocs (>=2.4)", "pytest-ruff (>=0.2.1)"]
+cover = ["pytest-cov"]
+doc = ["furo", "jaraco.packaging (>=9.3)", "jaraco.tidelift (>=1.4)", "rst.linker (>=1.9)", "sphinx (>=3.5)", "sphinx-lint"]
+enabler = ["pytest-enabler (>=2.2)"]
+test = ["jaraco.classes", "pytest (>=6,!=8.1.*)"]
+type = ["pytest-mypy"]
+
+[[package]]
 name = "jax"
 version = "0.4.32"
 description = "Differentiate, compile, and transform Numpy code."
@@ -1116,6 +1315,22 @@ parso = ">=0.8.0,<0.9.0"
 [package.extras]
 qa = ["flake8 (==3.8.3)", "mypy (==0.782)"]
 testing = ["Django (<3.1)", "colorama", "docopt", "pytest (<7.0.0)"]
+
+[[package]]
+name = "jeepney"
+version = "0.8.0"
+description = "Low-level, pure Python DBus protocol wrapper."
+category = "main"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "jeepney-0.8.0-py3-none-any.whl", hash = "sha256:c0a454ad016ca575060802ee4d590dd912e35c122fa04e70306de3d076cce755"},
+    {file = "jeepney-0.8.0.tar.gz", hash = "sha256:5efe48d255973902f6badc3ce55e2aa6c5c3b3bc642059ef3a91247bcfcc5806"},
+]
+
+[package.extras]
+test = ["async-timeout", "pytest", "pytest-asyncio (>=0.17)", "pytest-trio", "testpath", "trio"]
+trio = ["async_generator", "trio"]
 
 [[package]]
 name = "jinja2"
@@ -1448,6 +1663,36 @@ files = [
 ]
 
 [[package]]
+name = "keyring"
+version = "25.5.0"
+description = "Store and access your passwords safely."
+category = "main"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "keyring-25.5.0-py3-none-any.whl", hash = "sha256:e67f8ac32b04be4714b42fe84ce7dad9c40985b9ca827c592cc303e7c26d9741"},
+    {file = "keyring-25.5.0.tar.gz", hash = "sha256:4c753b3ec91717fe713c4edd522d625889d8973a349b0e582622f49766de58e6"},
+]
+
+[package.dependencies]
+importlib-metadata = {version = ">=4.11.4", markers = "python_version < \"3.12\""}
+"jaraco.classes" = "*"
+"jaraco.context" = "*"
+"jaraco.functools" = "*"
+jeepney = {version = ">=0.4.2", markers = "sys_platform == \"linux\""}
+pywin32-ctypes = {version = ">=0.2.0", markers = "sys_platform == \"win32\""}
+SecretStorage = {version = ">=3.2", markers = "sys_platform == \"linux\""}
+
+[package.extras]
+check = ["pytest-checkdocs (>=2.4)", "pytest-ruff (>=0.2.1)"]
+completion = ["shtab (>=1.1.0)"]
+cover = ["pytest-cov"]
+doc = ["furo", "jaraco.packaging (>=9.3)", "jaraco.tidelift (>=1.4)", "rst.linker (>=1.9)", "sphinx (>=3.5)", "sphinx-lint"]
+enabler = ["pytest-enabler (>=2.2)"]
+test = ["pyfakefs", "pytest (>=6,!=8.1.*)"]
+type = ["pygobject-stubs", "pytest-mypy", "shtab", "types-pywin32"]
+
+[[package]]
 name = "kiwisolver"
 version = "1.4.2"
 description = "A fast implementation of the Cassowary constraint solver"
@@ -1601,7 +1846,7 @@ dev = ["Sphinx (>=4.1.1)", "black (>=19.10b0)", "colorama (>=0.3.4)", "docutils 
 name = "lxml"
 version = "4.8.0"
 description = "Powerful and Pythonic XML processing library combining libxml2/libxslt with the ElementTree API."
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, != 3.4.*"
 files = [
@@ -1853,6 +2098,18 @@ numpy = [
 
 [package.extras]
 dev = ["absl-py", "pyink", "pylint (>=2.6.0)", "pytest", "pytest-xdist"]
+
+[[package]]
+name = "more-itertools"
+version = "10.5.0"
+description = "More routines for operating on iterables, beyond itertools"
+category = "main"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "more-itertools-10.5.0.tar.gz", hash = "sha256:5482bfef7849c25dc3c6dd53a6173ae4795da2a41a80faea6700d9f5846c5da6"},
+    {file = "more_itertools-10.5.0-py3-none-any.whl", hash = "sha256:037b0d3203ce90cca8ab1defbbdac29d5f993fc20131f3664dc8d6acfa872aef"},
+]
 
 [[package]]
 name = "mypy"
@@ -2151,6 +2408,21 @@ files = [
 ]
 
 [[package]]
+name = "openpyxl"
+version = "3.1.5"
+description = "A Python library to read/write Excel 2010 xlsx/xlsm files"
+category = "main"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "openpyxl-3.1.5-py2.py3-none-any.whl", hash = "sha256:5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2"},
+    {file = "openpyxl-3.1.5.tar.gz", hash = "sha256:cf0e3cf56142039133628b5acffe8ef0c12bc902d2aadd3e0fe5878dc08d1050"},
+]
+
+[package.dependencies]
+et-xmlfile = "*"
+
+[[package]]
 name = "opt-einsum"
 version = "3.3.0"
 description = "Optimizing numpys einsum function"
@@ -2279,6 +2551,43 @@ files = [
 ptyprocess = ">=0.5"
 
 [[package]]
+name = "photutils"
+version = "2.0.2"
+description = "An Astropy package for source detection and photometry"
+category = "main"
+optional = false
+python-versions = ">=3.10"
+files = [
+    {file = "photutils-2.0.2-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:f2cb47f72c0661e2f71280899a28daf5bf820e1637618566df86be50b492faf2"},
+    {file = "photutils-2.0.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:0c2ecbf659d2a7e72622486ef006fe95eb77bd23933a342a92f0d0d169680000"},
+    {file = "photutils-2.0.2-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:43df0fc02a5a4f74bc9eeefd5e7bc7de375c84b146cc5a43956583751352eedb"},
+    {file = "photutils-2.0.2-cp310-cp310-win_amd64.whl", hash = "sha256:392c7596120f43e85a3e0a0c740b777ddb5697d1289678e8e222f215ac054055"},
+    {file = "photutils-2.0.2-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:661166db28a8c0e5dfe997fa8c461457bb00627b5e8512fed6e66007104dbda7"},
+    {file = "photutils-2.0.2-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:a07c2090356aac1d66dcb5e8d150ba846a7fd3f76e934844f9d54a3ed430c03a"},
+    {file = "photutils-2.0.2-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:38537e89419a696af7d71ba872a81ff350e041d595d16c72c30f8ad63125cd54"},
+    {file = "photutils-2.0.2-cp311-cp311-win_amd64.whl", hash = "sha256:8c348f661e0171bb6509b78685247df1f7e686157d43376dd8a8ab601899681a"},
+    {file = "photutils-2.0.2-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:cb33e115db2809b1c19cb4d6e1cbebdaf9eaf4c67c25c01a83c550de6ceb425e"},
+    {file = "photutils-2.0.2-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:401120aacdbe58a88fb380127d0da92b69dcddc8ad29a1081a44ec0f2793de50"},
+    {file = "photutils-2.0.2-cp312-cp312-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:03007bd09156b3e478cbe2b5637e596e693afdd0f6eba403259b3734ee81d853"},
+    {file = "photutils-2.0.2-cp312-cp312-win_amd64.whl", hash = "sha256:75c07b2a7b48dda1542c0052a9b8ab19085e716db405ebc15087eb8f8acd0659"},
+    {file = "photutils-2.0.2-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:9c7c3fe140697d13d3680cbad98f6ba77fdda381d0009f544feebc616c72f00b"},
+    {file = "photutils-2.0.2-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:b0c8c506aee771bce673d3fec7629855e2d4207c0ad609c27ae605c2344aa389"},
+    {file = "photutils-2.0.2-cp313-cp313-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:cc77e117879283b34ac5f35a411c1e52ed1be0aa7efc0e0d779861a7813bdea8"},
+    {file = "photutils-2.0.2-cp313-cp313-win_amd64.whl", hash = "sha256:7bd8ce4fae76fd00dab66f3bc50d88cbbe8e3acdfd2b44414361e0fc9f369dbb"},
+    {file = "photutils-2.0.2.tar.gz", hash = "sha256:f07b7d0eadf4b6a761074204915e8ba32f32565d853dd2503c792c4ed481ea52"},
+]
+
+[package.dependencies]
+astropy = ">=5.3"
+numpy = ">=1.24"
+scipy = ">=1.10"
+
+[package.extras]
+all = ["bottleneck", "gwcs (>=0.19)", "matplotlib (>=3.7)", "rasterio", "regions (>=0.9)", "scikit-image (>=0.20)", "shapely", "tqdm"]
+docs = ["photutils[all]", "sphinx", "sphinx-astropy[confv2] (>=1.9.1)", "sphinx-design", "tomli"]
+test = ["pytest-astropy (>=0.11)", "pytest-xdist (>=2.5.0)"]
+
+[[package]]
 name = "pickleshare"
 version = "0.7.5"
 description = "Tiny 'shelve'-like database with concurrency support"
@@ -2373,6 +2682,29 @@ files = [
 [package.extras]
 dev = ["pre-commit", "tox"]
 testing = ["pytest", "pytest-benchmark"]
+
+[[package]]
+name = "poppy"
+version = "1.1.1"
+description = "Physical optics propagation (wavefront diffraction) for optical simulations, particularly of telescopes."
+category = "main"
+optional = false
+python-versions = ">=3.9"
+files = [
+    {file = "poppy-1.1.1-py3-none-any.whl", hash = "sha256:b61a88279acecb6beb639a712a6b7109562d3e66c5a103ce85c35477e3695a91"},
+    {file = "poppy-1.1.1.tar.gz", hash = "sha256:37afe1fc24eb31e6799a3110fa0189afac65d624e4e1d19036e6378483591969"},
+]
+
+[package.dependencies]
+astropy = ">=4.3.0"
+matplotlib = ">=3.2.0"
+numpy = ">=1.20.0"
+scipy = ">=1.5.0"
+
+[package.extras]
+all = ["synphot"]
+docs = ["nbsphinx", "sphinx-astropy", "sphinx-automodapi", "sphinx-issues", "sphinx-rtd-theme", "stsci-rtd-theme", "tomli"]
+test = ["pytest", "pytest-astropy"]
 
 [[package]]
 name = "progressbar2"
@@ -2523,7 +2855,7 @@ files = [
 name = "pycparser"
 version = "2.21"
 description = "C parser in Python"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 files = [
@@ -2654,6 +2986,42 @@ files = [
 ]
 
 [[package]]
+name = "pysiaf"
+version = "0.23.3"
+description = "Handling of Science Instrument Aperture Files (SIAF) for space telescopes"
+category = "main"
+optional = false
+python-versions = ">=3.10"
+files = [
+    {file = "pysiaf-0.23.3-py3-none-any.whl", hash = "sha256:199a6cee2cfcbdb844902053e18e4a4b1f71109a54317e0dbf0672d86caec923"},
+    {file = "pysiaf-0.23.3.tar.gz", hash = "sha256:282f1369e37117e0dfebc62350ec057c7c75fe89800085e2c85cf0256c790b9b"},
+]
+
+[package.dependencies]
+astropy = ">=4.3.1"
+lxml = ">=4.6.4"
+matplotlib = ">=3.4.3"
+numpy = ">=1.21.4"
+openpyxl = ">=3.0.9"
+requests = ">=2.26.0"
+scipy = ">=1.7.2"
+
+[package.extras]
+docs = ["matplotlib", "numpy", "numpydoc (>=1.1.0)", "scipy", "sphinx (>=7.2.5)", "sphinx-automodapi", "sphinx-rtd-theme (>=1.3.0)", "stsci-rtd-theme", "tomli"]
+test = ["pytest"]
+
+[[package]]
+name = "pysptools"
+version = "0.15.0"
+description = "A hyperspectral imaging tools box"
+category = "main"
+optional = false
+python-versions = "*"
+files = [
+    {file = "pysptools-0.15.0.tar.gz", hash = "sha256:923c4e1af97c490d7d9ad86d04fdf8918b63106023493e6a4cf54323e244b05e"},
+]
+
+[[package]]
 name = "pytest"
 version = "8.3.3"
 description = "pytest: simple powerful testing with Python"
@@ -2733,6 +3101,27 @@ files = [
 ]
 
 [[package]]
+name = "pyvo"
+version = "1.6"
+description = "Astropy affiliated package for accessing Virtual Observatory data and services"
+category = "main"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "pyvo-1.6-py3-none-any.whl", hash = "sha256:65740f565ffbe947c2a93aade9be905eaa3b0ab86660bb805e1beb3cc3ff4812"},
+    {file = "pyvo-1.6.tar.gz", hash = "sha256:db6ef423e6008eba1ca68459e7e2a91dbc34cbe1bda2f29f64ba57d8df570caa"},
+]
+
+[package.dependencies]
+astropy = ">=4.1"
+requests = "*"
+
+[package.extras]
+all = ["defusedxml", "pillow"]
+docs = ["sphinx-astropy"]
+test = ["pytest-astropy", "pytest-doctestplus (>=0.13)", "requests-mock"]
+
+[[package]]
 name = "pywavelets"
 version = "1.3.0"
 description = "PyWavelets, wavelet transform module"
@@ -2795,6 +3184,18 @@ files = [
     {file = "pywin32-303-cp38-cp38-win_amd64.whl", hash = "sha256:793bf74fce164bcffd9d57bb13c2c15d56e43c9542a7b9687b4fccf8f8a41aba"},
     {file = "pywin32-303-cp39-cp39-win32.whl", hash = "sha256:7d3271c98434617a11921c5ccf74615794d97b079e22ed7773790822735cc352"},
     {file = "pywin32-303-cp39-cp39-win_amd64.whl", hash = "sha256:79cbb862c11b9af19bcb682891c1b91942ec2ff7de8151e2aea2e175899cda34"},
+]
+
+[[package]]
+name = "pywin32-ctypes"
+version = "0.2.3"
+description = "A (partial) reimplementation of pywin32 using ctypes/cffi"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "pywin32-ctypes-0.2.3.tar.gz", hash = "sha256:d162dc04946d704503b2edc4d55f3dba5c1d539ead017afa00142c38b9885755"},
+    {file = "pywin32_ctypes-0.2.3-py3-none-any.whl", hash = "sha256:8a1513379d709975552d202d942d9837758905c8d01eb82b8bcc30918929e7b8"},
 ]
 
 [[package]]
@@ -2946,7 +3347,7 @@ resolved_reference = "978798e3b05715ec48624a0611c8784013524718"
 name = "requests"
 version = "2.27.1"
 description = "Python HTTP for Humans."
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*"
 files = [
@@ -3082,6 +3483,22 @@ doc = ["jupyterlite-pyodide-kernel", "jupyterlite-sphinx (>=0.13.1)", "jupytext"
 test = ["Cython", "array-api-strict (>=2.0)", "asv", "gmpy2", "hypothesis (>=6.30)", "meson", "mpmath", "ninja", "pooch", "pytest", "pytest-cov", "pytest-timeout", "pytest-xdist", "scikit-umfpack", "threadpoolctl"]
 
 [[package]]
+name = "secretstorage"
+version = "3.3.3"
+description = "Python bindings to FreeDesktop.org Secret Service API"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "SecretStorage-3.3.3-py3-none-any.whl", hash = "sha256:f356e6628222568e3af06f2eba8df495efa13b3b63081dafd4f7d9a7b7bc9f99"},
+    {file = "SecretStorage-3.3.3.tar.gz", hash = "sha256:2403533ef369eca6d2ba81718576c5e0f564d5cca1b58f73a8b23e7d4eeebd77"},
+]
+
+[package.dependencies]
+cryptography = ">=2.0"
+jeepney = ">=0.6"
+
+[[package]]
 name = "see"
 version = "1.4.1"
 description = "dir for humans"
@@ -3171,7 +3588,7 @@ files = [
 name = "soupsieve"
 version = "2.3.2.post1"
 description = "A modern CSS selector implementation for Beautiful Soup."
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.6"
 files = [
@@ -3198,6 +3615,36 @@ pure-eval = "*"
 
 [package.extras]
 tests = ["cython", "littleutils", "pygments", "pytest", "typeguard"]
+
+[[package]]
+name = "synphot"
+version = "1.4.0"
+description = "Synthetic photometry"
+category = "main"
+optional = false
+python-versions = ">=3.10"
+files = [
+    {file = "synphot-1.4.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:b6a3634b94521a24fe2ffdc4aa3eb265d86d1fd782855e0de0325946343747be"},
+    {file = "synphot-1.4.0-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4e52e7725819ed363207d2bd7c570e86506db7d888041003ebdce3aa69f20abc"},
+    {file = "synphot-1.4.0-cp310-cp310-win_amd64.whl", hash = "sha256:24ccd38914dc450f77656ba081f6b1468e5d9d618e6373fce42b83c98202a168"},
+    {file = "synphot-1.4.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:b79c2e5bdf91479ab41296bf71e1f5dd01e851c2cab96a3e6148c7f9755bae0e"},
+    {file = "synphot-1.4.0-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:686d9eb12f6be904477b729a7bbf2ecf8e14d5fe2641e3f6435be1aec9ac75c2"},
+    {file = "synphot-1.4.0-cp311-cp311-win_amd64.whl", hash = "sha256:ba161fb29d22f5bd57b4ad57c9a97faab64e18aa982c12e119b777504050f92e"},
+    {file = "synphot-1.4.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:510d81acd575859c37ba4c5241de71ff2a4c271989a5cdd5e6ddb4497c0e8512"},
+    {file = "synphot-1.4.0-cp312-cp312-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f5997986390de3624c1c0d88d7db90f7e7cb578d8e57af8eb2dbff4b83e88881"},
+    {file = "synphot-1.4.0-cp312-cp312-win_amd64.whl", hash = "sha256:7f6bce3c8a0c79637cbb7af2349e2cbc028c84f5d9b492d91ae224e95fc90634"},
+    {file = "synphot-1.4.0.tar.gz", hash = "sha256:262e1dcfc09d819cf67e55a8cc40f1e0b805f7a278de1270ae6a61d51730683a"},
+]
+
+[package.dependencies]
+astropy = ">=6"
+numpy = ">=1.23"
+scipy = ">=1.9"
+
+[package.extras]
+all = ["dust-extinction", "specutils (>=0.7)"]
+docs = ["matplotlib", "sphinx-astropy"]
+test = ["pytest-astropy"]
 
 [[package]]
 name = "terminado"
@@ -3374,7 +3821,7 @@ fftw = ["pyFFTW (>=0.12.0,<0.13.0)"]
 name = "urllib3"
 version = "1.26.9"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, <4"
 files = [
@@ -3400,10 +3847,37 @@ files = [
 ]
 
 [[package]]
+name = "webbpsf"
+version = "1.4.0"
+description = "Creates simulated point spread functions for the James Webb Space Telescope"
+category = "main"
+optional = false
+python-versions = ">=3.10"
+files = [
+    {file = "webbpsf-1.4.0-py3-none-any.whl", hash = "sha256:ce9da6f8ba38c647828c309c4642e9eb4d57e683490992edf359b4bbb46aede4"},
+    {file = "webbpsf-1.4.0.tar.gz", hash = "sha256:8a501e36e6d0933a4d7b533a7dd5475f7011f5fac221b85f5f7e0e2ce6da0481"},
+]
+
+[package.dependencies]
+astropy = ">=5.1.0"
+astroquery = ">=0.4.6"
+matplotlib = ">=3.2.0"
+numpy = ">=1.21.6"
+photutils = ">=1.10.0"
+poppy = ">=1.0.0"
+pysiaf = ">=0.19.1"
+scipy = ">=1.5.0"
+synphot = ">=1.0.0"
+
+[package.extras]
+docs = ["nbsphinx", "sphinx", "sphinx-astropy", "sphinx-automodapi", "sphinx-issues", "stsci-rtd-theme", "tomli"]
+test = ["pytest", "pytest-astropy"]
+
+[[package]]
 name = "webencodings"
 version = "0.5.1"
 description = "Character encoding aliases for legacy web content"
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 files = [
@@ -3592,4 +4066,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.12"
-content-hash = "aa546d5844408e1de0832b79ee9df4c1ecb05cb496453a5b685e232aba2146d1"
+content-hash = "ce275efdd19000dd5f8475c8e64ca3df58bead7e1b080591a47feba53e77416c"
