@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import scipy as sp
 from scipy import misc
 from surfh.Models import slicer_new as slicer
-from surfh.ToolsDir import jax_utils, python_utils, cython_utils, utils, nearest_neighbor_interpolation
+from surfh.ToolsDir import jax_utils, python_utils, matrix_op ,cython_utils, utils, nearest_neighbor_interpolation
 from astropy import units as u
 from astropy.coordinates import Angle
 from numpy.random import standard_normal as randn 
@@ -188,7 +188,14 @@ class spectroSigRLSCT(LinOp):
         return jax_utils.lmm_cube2maps(cube, self.templates)
     
     def mapsToCube(self, maps):
-        return jax_utils.lmm_maps2cube(maps, self.templates)
+        if True:
+            return matrix_op.linearMixingModel_maps2cube(maps, self.templates.shape[1], maps.shape, self.templates)
+            # return np.sum(
+            #                 np.expand_dims(maps, 1) * self.templates[..., np.newaxis, np.newaxis], axis=0
+            #             )
+
+        else:
+            return jax_utils.lmm_maps2cube(maps, self.templates)
 
 
     def project_FOV(self):
@@ -277,3 +284,55 @@ class spectroSigRLSCT(LinOp):
         
 
         return weighted_mean, global_img
+
+
+    def make_mask(self, all_data):
+        """
+        Make one mask per channel.
+        """
+        nslice = 50
+        masks = list()
+        for i in range(4): # Considering 4 channels
+            ch = i*3
+            chan = self.channels[ch]
+            global_img = np.zeros(self.imshape)
+            cum_grid = np.zeros((len(self.pointings[ch]), self.imshape[0], self.imshape[1]))
+
+            # Select data for specific wavelength
+            chan_data = all_data[self._idx[ch] : self._idx[ch + 1]]
+            data = chan_data.reshape(chan.oshape)[:,:,nslice,:].ravel()
+
+            for p_idx, pointing in enumerate(self.pointings[ch]):
+                local_img = np.zeros(chan.local_im_shape)
+                for slit_idx in range(chan.instr.n_slit):
+                    oversampled_sliced = np.repeat(
+                            np.expand_dims(
+                                np.reshape(data, 
+                                        chan.slices_shape)[p_idx, slit_idx],
+                                axis=1,
+                            ),
+                            chan.slicer.npix_slit_beta_width,
+                            axis=1,
+                        )/(chan.slicer.npix_slit_beta_width * chan.srf)
+                    blurred_t_sliced = np.zeros((1, chan.slicer.get_slit_shape_t()[1], chan.slicer.get_slit_shape_t()[2]))
+                    blurred_t_sliced[0,: chan.slices_shape[2] * chan.srf : chan.srf,:] = oversampled_sliced
+                    local_img += chan.slicer.slicing_t(blurred_t_sliced, slit_idx, (1, chan.local_im_shape[0],chan.local_im_shape[1]))[0]
+                    
+                sum_t_img = jax_utils.idft(jax_utils.dft(local_img) * chan._otf_sr.conj()*chan.decalf.conj(), 
+                                            chan.local_im_shape)
+
+                # sum_t_img = np.array(sum_t_img)
+                # sum_t_img[sum_t_img<1] = 0
+                # sum_t_img[:,5] = sum_t_img[:,6]
+                # sum_t_img[:,153] = sum_t_img[:,152]
+
+                degridded = chan.gridding_t(np.array(sum_t_img, dtype=np.float64), pointing)[0]
+                global_img += degridded
+                cum_grid[p_idx] = degridded
+            valid_counts = np.sum(cum_grid > 100, axis=0)
+            sum_of_values = np.sum(cum_grid, axis=0)
+            weighted_mean = np.divide(sum_of_values, valid_counts, where=valid_counts != 0)
+
+            binary_mask = global_img > 50
+            masks.append(binary_mask)
+        return masks
