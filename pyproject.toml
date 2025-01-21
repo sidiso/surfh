@@ -1,9 +1,9 @@
 [tool.poetry]
 name = "surfh"
-version = "0.1.0"
+version = "1.0.0"
 description = "SUper Resolution and Fusion for Hyperspectral images"
-authors = ["François Orieux <francois.orieux@universite-paris-saclay.fr>", "Ralph Abirizk  <ralph.abirizk@universite-paris-saclay.fr>"]
-maintainers = ["François Orieux <francois.orieux@universite-paris-saclay.fr>"]
+authors = ["François Orieux <francois.orieux@universite-paris-saclay.fr>", "Ralph Abirizk  <ralph.abirizk@universite-paris-saclay.fr>", "Nicolas Monnier <nicolas.monnier@universite-paris-saclay.fr>"]
+maintainers = ["François Orieux <francois.orieux@universite-paris-saclay.fr>", "Nicolas Monnier <nicolas.monnier@universite-paris-saclay.fr>"]
 readme = "README.md"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/sidiso/surfh/"
@@ -38,6 +38,9 @@ jaxlib = "^0.4.32"
 numba = "^0.60.0"
 asdf = "^3.4.0"
 scikit-learn = "^1.5.2"
+einops = "^0.8.0"
+pysptools = "^0.15.0"
+webbpsf = "^1.4.0"
 
 [tool.poetry.dev-dependencies]
 ipython = "^8.0.1"
