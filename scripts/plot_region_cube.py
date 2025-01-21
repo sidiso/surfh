@@ -293,7 +293,7 @@ spectroModel = MCMO_SigRLSCT_Model.spectroSigRLSCT(sotf=None,
                                                     step_degree=step_Angle.degree, 
                                                     pointings=pointings)
 
-maps = np.load(fusion_dir_path + 'Results/lcg_MC_12_MO_4_Temp_6_nit_200_mu_3.00e+02_SD_True/res_x.npy')
+maps = np.load(fusion_dir_path + 'Results/lcg_MC_12_MO_4_Temp_6_nit_200_mu_1.00e+03_SD_True/res_x.npy')
 masks = np.load(fusion_dir_path + 'Masks/binary_mask_1ABC_2ABC_3ABC_4ABC.npy')
 
 ch1_idx = np.argmin(np.abs(wavel_axis - 7.55))
@@ -317,47 +317,147 @@ flipped_cube = np.array([np.fliplr(y_cube[i]) for i in range(y_cube.shape[0])])
 
 hdul = fits.open('/home/nmonnier/Data/JWST/Orion_bar/Fusion/ChannelCube_ch1-2-3-4-shortmediumlong_s3d.fits')
 data_cube = hdul[1].data
-raw_data_cube = hdul[1].data
 hdr = hdul[1].header
 wavel = np.array(hdul[5].data[0])[0,:,0]
 
-cube_vizualisation.plot_maps(maps)
-cube_vizualisation.plot_two_cubes(y_cube, wavel_axis, np.rot90(raw_data_cube, 1, axes=(1,2)), wavel)
-
-
 from astropy.wcs import WCS
-from astropy.table import Table
 
-print(alpha_axis)
-print(beta_axis)
-flipped_cube = np.array([np.rot90(np.fliplr(y_cube[i]), 1) for i in range(y_cube.shape[0])])
+# Open the FITS file and load the full HDU list
+with fits.open('/home/nmonnier/Data/JWST/Orion_bar/Fusion/ChannelCube_ch1-2-3-4-shortmediumlong_s3d.fits') as hdulist:
+    header = hdul[1].header  # Extract the SCI extension header
+    CRPIX1 = header["CRPIX1"]
+    CRPIX2 = header["CRPIX2"]
+    CRVAL1 = header["CRVAL1"]
+    CRVAL2 = header["CRVAL2"]
+    CDELT1 = header["CDELT1"]
+    CDELT2 = header["CDELT2"]
+    PC1_1 = -header["PC1_1"]
+    PC1_2  = header["PC1_2"]
+    PC2_1  = header["PC2_1"]
+    PC2_2  = header["PC2_2"]
+    NAXIS1 = header["NAXIS1"] 
+    NAXIS2 = header["NAXIS2"]
 
-# # Créer l'objet WCS avec les dimensions et les types de coordonnées
-# # Création de l'objet WCS pour définir les métadonnées globales
-# wcs = WCS(naxis=3)
-# wcs.wcs.crpix = [1, 1, 1]  # Point de référence de chaque axe (pixel 1,1,1)
-# wcs.wcs.crval = [alpha_axis[0], beta_axis[0], wavel_axis[0]]  # Valeurs de départ pour chaque axe
-# wcs.wcs.cdelt = [np.diff(alpha_axis).mean(), np.diff(beta_axis).mean(), np.diff(wavel_axis).mean()]  # Résolution moyenne pour chaque axe
-# wcs.wcs.ctype = ["RA---TAN", "DEC--TAN", "WAVE"]  # Types d'axes : longueur d'onde, RA, et DEC
+# Create pixel coordinate grid
+x = np.arange(1, NAXIS1 + 1)  # Pixel x-coordinates
+y = np.arange(1, NAXIS2 + 1)  # Pixel y-coordinates
+X, Y = np.meshgrid(x, y)      # Create grid of pixel coordinates
 
-# flipped_cube[flipped_cube < 100] = np.nan
-# # Créer le PrimaryHDU avec les données et les informations WCS
-# hdu_data = fits.PrimaryHDU(data=flipped_cube, header=wcs.to_header())
+# Compute pixel offsets from reference pixel
+delta_x = X - CRPIX1
+delta_y = Y - CRPIX2
 
-# # Création d'extensions pour sauvegarder les valeurs exactes des axes
-# # Table pour les longueurs d'onde (axe spectral)
-# wavel_table = Table([wavel_axis], names=['WAVELENGTH'])
-# hdu_wavel = fits.BinTableHDU(wavel_table, name='WAVEL_AXIS')
+# Apply the linear transformation
+RA_offset = delta_x * CDELT1 * PC1_1 + delta_y * CDELT1 * PC1_2
+DEC_offset = delta_x * CDELT2 * PC2_1 + delta_y * CDELT2 * PC2_2
 
-# # Table pour les coordonnées spatiales RA (alpha) et DEC (beta)
-# alpha_beta_table = Table([alpha_axis, beta_axis], names=['ALPHA_RA', 'BETA_DEC'])
-# hdu_alpha_beta = fits.BinTableHDU(alpha_beta_table, name='SPATIAL_AXES')
+# Compute RA and DEC
+RA = CRVAL1 + RA_offset
+DEC = CRVAL2 + DEC_offset
 
-# # Sauvegarder dans un fichier FITS
-# hdul = fits.HDUList([hdu_data, hdu_wavel, hdu_alpha_beta])
-# output_filename = "/home/nmonnier/Data/JWST/Orion_bar/Fusion/datacube_with_custom_axes.fits"
-# hdul.writeto(output_filename, overwrite=True)
 
-# print(f"Fichier FITS '{output_filename}' créé avec succès, contenant le datacube et les axes personnalisés.")
+# Fonction pour réduire le vecteur A
+def reduce_vector(A, coords_A, coords_B):
+    reduced_A = []
+    for coord in coords_B:
+        # Trouver l'indice de la coordonnée la plus proche
+        closest_idx = np.argmin(np.abs(coords_A - coord))
+        # Ajouter la valeur correspondante
+        reduced_A.append(A[closest_idx])
+    return np.array(reduced_A)
 
-# cube_vizualisation.plot_cube(np.rot90(flipped_cube, -1, axes=(1,2)), wavel_axis)
+viz_pipeline_cube = reduce_vector(data_cube, wavel, wavel_axis)
+print("viz_pipeline_cube Shape is ", viz_pipeline_cube.shape)
+
+flipped_data_cube = np.array([np.rot90(np.fliplr(viz_pipeline_cube[i]), -1) for i in range(viz_pipeline_cube.shape[0])])
+
+
+
+
+from scipy.interpolate import RegularGridInterpolator
+
+
+""" 
+Verticale Line Fusion
+"""
+ra1, dec1 = 83.835939, -5.416140
+ra2, dec2 = 83.832803, -5.417226
+
+# Create the line
+num_points = 1000  # Number of points to sample along the line
+t = np.linspace(0, 1, num_points)
+ra_line = ra1 + t * (ra2 - ra1)
+dec_line = dec1 + t * (dec2 - dec1)
+
+edge_array = np.zeros((y_cube.shape[0], num_points))
+# Interpolate values from img along the line
+for i in range(y_cube.shape[0]):
+    interpolator = RegularGridInterpolator((beta_axis, alpha_axis), flipped_cube[i], bounds_error=False, fill_value=0)
+    points = np.array([dec_line, ra_line]).T
+    values_on_line = interpolator(points)
+    values_on_line = values_on_line/np.max(values_on_line)
+    edge_array[i] = values_on_line
+print("data cube shape", data_cube.shape)
+
+
+
+flipped_data_cube[np.isnan(flipped_data_cube)] = 0
+edge_array_real_data = np.zeros((flipped_data_cube.shape[0], num_points))
+# Interpolate values from img along the line
+for i in range(flipped_data_cube.shape[0]):
+    interpolator = RegularGridInterpolator((DEC[:,0], RA[0]), flipped_data_cube[i], bounds_error=False, fill_value=0)
+    points = np.array([dec_line, ra_line]).T
+    values_on_line = interpolator(points)
+    values_on_line = values_on_line/np.max(values_on_line)
+    edge_array_real_data[i] = values_on_line
+
+
+
+# Plot the image with the line
+plt.figure(figsize=(10, 10))
+plt.imshow(flipped_cube[1500], extent=[alpha_axis[0], alpha_axis[-1], beta_axis[0], beta_axis[-1]], origin='lower', aspect='auto', cmap='viridis')
+plt.plot(ra_line, dec_line, color='red', linewidth=2, label='Line')
+plt.xlabel('RA')
+plt.ylabel('Dec')
+plt.title('Fusion with Line Overlay')
+plt.legend()
+plt.grid(False)
+
+
+# Plot the image with the line
+plt.figure(figsize=(10, 10))
+plt.imshow(flipped_data_cube[1500], extent=[RA[0,0], RA[0,-1], DEC[0,0], DEC[-1,0]], origin='lower', aspect='auto', cmap='viridis')
+plt.plot(ra_line, dec_line, color='red', linewidth=2, label='Line')
+plt.xlabel('RA')
+plt.ylabel('Dec')
+plt.title('Real data with Line Overlay')
+plt.legend()
+plt.grid(False)
+
+
+
+interpolator = RegularGridInterpolator((beta_axis, alpha_axis), flipped_cube[i], bounds_error=False, fill_value=0)
+points = np.array([dec_line, ra_line]).T
+values_on_line_fusion = interpolator(points)
+values_on_line_fusion = values_on_line_fusion/np.max(values_on_line_fusion)
+# Plot the extracted values
+plt.figure(figsize=(10, 6))
+plt.plot(range(num_points), values_on_line, label='Values along the line')
+plt.xlabel('Position along the line')
+plt.ylabel('Value')
+plt.title('')
+plt.legend()
+plt.grid()
+
+plt.figure()
+plt.imshow(edge_array)
+plt.title('Fusion')
+plt.colorbar()
+
+plt.figure()
+plt.imshow(edge_array_real_data)
+plt.title('Real data')
+plt.colorbar()
+
+
+plt.show()
