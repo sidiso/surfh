@@ -14,7 +14,7 @@ from jwst import datamodels
 
 from surfh.Simulation import simulation_data
 from surfh.Models import wavelength_mrs, realmiri, instru
-from surfh.DottestModels import MCMO_SigRLSCT_Channel_Model
+from surfh.Models import spectroModelChannel
 from surfh.Preprocessing import distorsion_correction
 from surfh.ToolsDir import fits_toolbox
 from surfh.Vizualisation import slices_vizualisation
@@ -74,7 +74,7 @@ def setup_channel_model(origin_alpha_axis, origin_beta_axis, targ_ra, targ_dec, 
     pointings = instru.CoordList([instru.Coord(0, 0)]).pix(step_angle)
 
 
-    channel = MCMO_SigRLSCT_Channel_Model.Channel(
+    channel = spectroModelChannel.Channel(
         ifu,
         alpha_axis,
         beta_axis,
@@ -89,9 +89,10 @@ def setup_channel_model(origin_alpha_axis, origin_beta_axis, targ_ra, targ_dec, 
 
 def main():
 
-    save_corrected_dir = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Corrected_slices/'
+    
+    save_corrected_dir = '/home/nmonnier/Data/JWST/Orion_bar/Observation_2/Fusion/Corrected_slices/'
     mode = [0,1] # 0=1st chan; 1=2nd chan; 2=both chan
-    raw_dir = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Raw_slices/'
+    raw_dir = '/home/nmonnier/Data/JWST/Orion_bar/Observation_2/Fusion/Raw_slices/'
     for file in sorted(os.listdir(raw_dir)):
         print("File is ", file)
         first_chan, second_chan, dithering_number = extract_name_information(os.path.basename(raw_dir + file))
@@ -165,7 +166,7 @@ def main():
                 # slices_vizualisation.visualize_corrected_slices(data_shape, data)
                 sorted_data = np.roll(sorted_data, 9, 0)
                 # Correct data so slices are in right order
-                sorted_data = [sorted_data[:, i*24:(i+1)*24] for i in range(17)]
+                # sorted_data = np.array([sorted_data[:, i*24:(i+1)*24] for i in range(17)])
 
             elif 'ch3' in selected_chan:
                 sorted_data = np.zeros_like(corrected_slices)

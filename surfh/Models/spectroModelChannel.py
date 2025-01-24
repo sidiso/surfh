@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 import scipy as sp
 from scipy import misc
-from surfh.Models import slicer_new as slicer
+from surfh.Models import slicer
 from surfh.ToolsDir import jax_utils, python_utils, cython_utils, utils, nearest_neighbor_interpolation
 from astropy import units as u
 from astropy.coordinates import Angle
