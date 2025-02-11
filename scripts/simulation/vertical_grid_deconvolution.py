@@ -138,7 +138,7 @@ def initialize_parameters(fusion_dir_path):
 
     return paths, step, step_angle
 
-def reconstruction_method(spectroModel, ndata, templates, result_path, hyperParameter, niter, method, scale_data):
+def reconstruction_method(spectroModel, ndata, result_path, hyperParameter, niter, method):
     """
     Perform the reconstruction method and save results.
 
@@ -157,7 +157,7 @@ def reconstruction_method(spectroModel, ndata, templates, result_path, hyperPara
     value_init = 0
 
     # Create result directory
-    result_dir = f'{method}_MC_{len(spectroModel.instrs)}_MO_4_Temp_{templates.shape[0]}_nit_{str(niter)}_mu_{str("{:.2e}".format(hyperParameter))}_SD_{scale_data}/'
+    result_dir = f'{method}_MC_{len(spectroModel.instrs)}_MO_4__nit_{str(niter)}_mu_{str("{:.2e}".format(hyperParameter))}/'
     path = pathlib.Path(result_path + result_dir)
     path.mkdir(parents=True, exist_ok=True)
 
@@ -205,7 +205,7 @@ def parse_options(fusion_dir, npix, hyper_parameter, niter, method, verbose):
 
     sim_data = spectroModel.forward(sim_cube)
     
-    reconstruction_method(spectroModel, sim_data, None, paths['result_path'], hyper_parameter, niter, method, False)
+    reconstruction_method(spectroModel, sim_data, paths['result_path'], hyper_parameter, niter, method)
 
 
 if __name__ == '__main__':
