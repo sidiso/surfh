@@ -91,7 +91,7 @@ def main():
 
     
     save_corrected_dir = '/home/nmonnier/Data/JWST/Orion_bar/Observation_2/Fusion/Corrected_slices/'
-    mode = [0,1] # 0=1st chan; 1=2nd chan; 2=both chan
+    mode = [0,1] # 0=1st chan; 1=2nd chan; [0,1]=both chan
     raw_dir = '/home/nmonnier/Data/JWST/Orion_bar/Observation_2/Fusion/Raw_slices/'
     for file in sorted(os.listdir(raw_dir)):
         print("File is ", file)

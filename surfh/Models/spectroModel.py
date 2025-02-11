@@ -5,14 +5,14 @@ import matplotlib.pyplot as plt
 
 import scipy as sp
 from scipy import misc
-from surfh.Models import slicer_new as slicer
+from surfh.Models import slicer
 from surfh.ToolsDir import jax_utils, python_utils, matrix_op ,cython_utils, utils, nearest_neighbor_interpolation
 from astropy import units as u
 from astropy.coordinates import Angle
 from numpy.random import standard_normal as randn 
 
 from surfh.Models import instru
-from surfh.DottestModels import MCMO_SigRLSCT_Channel_Model
+from surfh.Models import spectroModelChannel
 from math import ceil
 
 
@@ -122,7 +122,7 @@ class spectroSigRLSCT(LinOp):
                                             for idx, _ in enumerate(self.instrs)]
         
         self.channels = [
-            MCMO_SigRLSCT_Channel_Model.Channel(
+            spectroModelChannel.Channel(
                 instr,
                 alpha_axis,
                 beta_axis,
@@ -278,7 +278,7 @@ class spectroSigRLSCT(LinOp):
             degridded = chan.gridding_t(np.array(sum_t_img, dtype=np.float64), pointing)[0]
             global_img += degridded
             cum_grid[p_idx] = degridded
-        valid_counts = np.sum(cum_grid > 100, axis=0)
+        valid_counts = np.sum(cum_grid > 1, axis=0)
         sum_of_values = np.sum(cum_grid, axis=0)
         weighted_mean = np.divide(sum_of_values, valid_counts, where=valid_counts != 0)
         

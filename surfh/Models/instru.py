@@ -125,6 +125,9 @@ class Coord:
         self.beta -= coord.beta
         return self
 
+    def __mul__(self, scalar: float) -> "Coord":
+        return Coord(self.alpha * scalar, self.beta * scalar)
+
     def rotate(self, degree: float) -> "Coord":
         """Return a `Coord` with rotated coordinate
 

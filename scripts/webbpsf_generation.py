@@ -50,23 +50,25 @@ def compute_monochromatic_psfs2(wave_filter, oversample=4, pixelscale=0.11, fov_
     return psfs_monoch
 
 
-sim_dir_path='/home/nmonnier/Projects/JWST/MRS/surfh/cube_orion/'
-# _, _, wavel_axis, _, _, _ = simulation_data.get_simulation_data(4, 0, sim_dir_path)
 
-wavel_axis = np.load('/home/nmonnier/Data/JWST/Orion_bar/Fusion/Templates/wavel_axis_orion_1ABC_2ABC_3ABC_4ABC_4_templates_SS4.npy') #wavelength_mrs.get_mrs_wavelength('1c')
+# array of wavelength 
+wavel_axis = np.load('/home/nmonnier/Data/JWST/Orion_bar/Observation_1/Fusion/Templates/wavel_axis_orion_1ABC_2ABC_3ABC_4ABC_4_templates_SS4.npy') #wavelength_mrs.get_mrs_wavelength('1c')
 
 oversample = 1
-pixelscale = 0.025 # valeur choisie pour le cas de test
-nb_pixels=501
+# Pixel scale
+pixelscale = 0.05 # valeur choisie pour le cas de test
+# Size of PSF in pixel (here 501x501)
+nb_pixels=251
 fov_arcsec = pixelscale * nb_pixels
 
 norm = 'last'
+# Time code of observation
 date = "2023-01-30T01:16:11"
 
 psfs_monoch = compute_monochromatic_psfs2(wavel_axis, oversample=oversample, pixelscale=pixelscale, fov_arcsec=fov_arcsec, norm=norm, date=date)
 
 psfs_monoch_array = np.array(psfs_monoch)
 
-file_path = "/home/nmonnier/Data/JWST/Orion_bar/Fusion/PSF/"
+file_path = "/home/nmonnier/Data/JWST/Simulation/Vertical_grid/PSF/"
 file_name = f"psfs_pixscale{pixelscale}_npix_{nb_pixels}_fov{fov_arcsec}_chan_1ABC_2ABC_3ABC_4ABC_SS4.npy"
 np.save(file_path + file_name, psfs_monoch_array)

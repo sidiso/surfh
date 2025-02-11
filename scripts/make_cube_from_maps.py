@@ -13,7 +13,7 @@ from astropy import units as u
 from astropy.coordinates import Angle
 from surfh.Simulation import simulation_data
 from surfh.Models import wavelength_mrs, realmiri, instru
-from surfh.DottestModels import MCMO_SigRLSCT_Model
+from surfh.Models import spectroModel
 from surfh.Vizualisation import slices_vizualisation, cube_vizualisation
 from surfh.Simulation import fusion_CT
 from aljabr import LinOp, dottest
@@ -27,7 +27,7 @@ Create Model and simulation
 """
 
 
-fusion_dir_path = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/'
+fusion_dir_path = '/home/nmonnier/Data/JWST/Orion_bar/Observation_2/Fusion/'
 
 template_dir_path = fusion_dir_path +'Templates/'
 save_filter_corrected_dir = fusion_dir_path + 'Filtered_slices/'        
@@ -43,8 +43,8 @@ origin_beta_axis = np.arange(imshape[1]) * step_Angle.degree
 origin_alpha_axis -= np.mean(origin_alpha_axis)
 origin_beta_axis -= np.mean(origin_beta_axis)
 
-wavel_axis = np.load(template_dir_path + 'wavel_axis_orion_1ABC_2ABC_3ABC_4ABC_6_templates_SS4.npy')
-templates = np.load(template_dir_path + 'nmf_orion_1ABC_2ABC_3ABC_4ABC_6_templates_SS4.npy')
+wavel_axis = np.load(template_dir_path + 'wavel_axis_orion_1ABC_2ABC_3ABC_4ABC_12_templates_SS4.npy')
+templates = np.load(template_dir_path + 'nmf_orion_1ABC_2ABC_3ABC_4ABC_12_templates_SS4.npy')
 
 
 print("tempaltes shape = ", templates.shape)
@@ -265,7 +265,7 @@ data_dict = load_data(list_chan, save_filter_corrected_dir)
 # alpha_axis = origin_alpha_axis - np.mean(origin_alpha_axis) + data_dict['target']['2a'][2][0] #np.mean(np.array(list_target_c)[:,0])
 # beta_axis = origin_beta_axis - np.mean(origin_beta_axis) + data_dict['target']['2a'][2][1] #np.mean(np.array(list_target_c)[:,1])
 
-with fits.open('/home/nmonnier/Data/JWST/Orion_bar/Fusion/Raw_slices/ch1a_ch2a_02101_00003_mirifushort_cal.fits') as hdul:
+with fits.open('/home/nmonnier/Data/JWST/Orion_bar/Observation_2/Fusion/Raw_slices/ch1a_ch2a_0210b_00001_mirifushort_cal.fits') as hdul:
       hdr = hdul[1].header
       RA = hdr['RA_REF']
       DEC = hdr['DEC_REF']
@@ -284,7 +284,7 @@ for chan in range(12):
         pointing_chan.append(main_pointing + instru.Coord(RA, DEC))
     pointings.append(instru.CoordList(pointing_chan).pix(step_Angle.degree))
 
-spectroModel = MCMO_SigRLSCT_Model.spectroSigRLSCT(sotf=None, 
+spectro = spectroModel.spectroSigRLSCT(sotf=None, 
                                                     templates=templates, 
                                                     alpha_axis=alpha_axis, 
                                                     beta_axis=beta_axis, 
@@ -293,8 +293,7 @@ spectroModel = MCMO_SigRLSCT_Model.spectroSigRLSCT(sotf=None,
                                                     step_degree=step_Angle.degree, 
                                                     pointings=pointings)
 
-maps = np.load(fusion_dir_path + 'Results/lcg_MC_12_MO_4_Temp_6_nit_200_mu_3.00e+02_SD_True/res_x.npy')
-masks = np.load(fusion_dir_path + 'Masks/binary_mask_1ABC_2ABC_3ABC_4ABC.npy')
+maps = np.load(fusion_dir_path + 'Results/lcg_MC_12_MO_4_Temp_12_nit_200_mu_1.00e+03_SD_True/res_x.npy')
 
 ch1_idx = np.argmin(np.abs(wavel_axis - 7.55))
 ch2_idx = np.argmin(np.abs(wavel_axis - 11.63))
@@ -305,7 +304,9 @@ ch2_slice = slice(ch1_idx, ch2_idx)
 ch3_slice = slice(ch2_idx, ch3_idx)
 ch4_slice = slice(ch3_idx, len(wavel_axis))
 
-y_cube = spectroModel.mapsToCube(maps)
+y_cube = spectro.mapsToCube(maps)
+masks = np.ones_like(y_cube)#enp.load(fusion_dir_path + 'Masks/binary_mask_1ABC_2ABC_3ABC_4ABC.npy')
+
 y_cube[ch1_slice] = y_cube[ch1_slice] * masks[0]
 y_cube[ch2_slice] = y_cube[ch2_slice] * masks[1]
 y_cube[ch3_slice] = y_cube[ch3_slice] * masks[2]
@@ -315,7 +316,7 @@ print(wavel_axis)
 
 flipped_cube = np.array([np.fliplr(y_cube[i]) for i in range(y_cube.shape[0])])
 
-hdul = fits.open('/home/nmonnier/Data/JWST/Orion_bar/Fusion/ChannelCube_ch1-2-3-4-shortmediumlong_s3d.fits')
+hdul = fits.open('/home/nmonnier/Data/JWST/Orion_bar/Observation_2/Fusion/ChannelCube_ch1-2-3-4-shortmediumlong_s3d.fits')
 data_cube = hdul[1].data
 raw_data_cube = hdul[1].data
 hdr = hdul[1].header
@@ -328,36 +329,36 @@ cube_vizualisation.plot_two_cubes(y_cube, wavel_axis, np.rot90(raw_data_cube, 1,
 from astropy.wcs import WCS
 from astropy.table import Table
 
-print(alpha_axis)
-print(beta_axis)
-flipped_cube = np.array([np.rot90(np.fliplr(y_cube[i]), 1) for i in range(y_cube.shape[0])])
+# print(alpha_axis)
+# print(beta_axis)
+# flipped_cube = np.array([np.rot90(np.fliplr(y_cube[i]), 1) for i in range(y_cube.shape[0])])
 
-# # Créer l'objet WCS avec les dimensions et les types de coordonnées
-# # Création de l'objet WCS pour définir les métadonnées globales
-# wcs = WCS(naxis=3)
-# wcs.wcs.crpix = [1, 1, 1]  # Point de référence de chaque axe (pixel 1,1,1)
-# wcs.wcs.crval = [alpha_axis[0], beta_axis[0], wavel_axis[0]]  # Valeurs de départ pour chaque axe
-# wcs.wcs.cdelt = [np.diff(alpha_axis).mean(), np.diff(beta_axis).mean(), np.diff(wavel_axis).mean()]  # Résolution moyenne pour chaque axe
-# wcs.wcs.ctype = ["RA---TAN", "DEC--TAN", "WAVE"]  # Types d'axes : longueur d'onde, RA, et DEC
+# Créer l'objet WCS avec les dimensions et les types de coordonnées
+# Création de l'objet WCS pour définir les métadonnées globales
+wcs = WCS(naxis=3)
+wcs.wcs.crpix = [1, 1, 1]  # Point de référence de chaque axe (pixel 1,1,1)
+wcs.wcs.crval = [alpha_axis[0], beta_axis[0], wavel_axis[0]]  # Valeurs de départ pour chaque axe
+wcs.wcs.cdelt = [np.diff(alpha_axis).mean(), np.diff(beta_axis).mean(), np.diff(wavel_axis).mean()]  # Résolution moyenne pour chaque axe
+wcs.wcs.ctype = ["RA---TAN", "DEC--TAN", "WAVE"]  # Types d'axes : longueur d'onde, RA, et DEC
 
 # flipped_cube[flipped_cube < 100] = np.nan
-# # Créer le PrimaryHDU avec les données et les informations WCS
-# hdu_data = fits.PrimaryHDU(data=flipped_cube, header=wcs.to_header())
+# Créer le PrimaryHDU avec les données et les informations WCS
+hdu_data = fits.PrimaryHDU(data=flipped_cube, header=wcs.to_header())
 
-# # Création d'extensions pour sauvegarder les valeurs exactes des axes
-# # Table pour les longueurs d'onde (axe spectral)
-# wavel_table = Table([wavel_axis], names=['WAVELENGTH'])
-# hdu_wavel = fits.BinTableHDU(wavel_table, name='WAVEL_AXIS')
+# Création d'extensions pour sauvegarder les valeurs exactes des axes
+# Table pour les longueurs d'onde (axe spectral)
+wavel_table = Table([wavel_axis], names=['WAVELENGTH'])
+hdu_wavel = fits.BinTableHDU(wavel_table, name='WAVEL_AXIS')
 
-# # Table pour les coordonnées spatiales RA (alpha) et DEC (beta)
-# alpha_beta_table = Table([alpha_axis, beta_axis], names=['ALPHA_RA', 'BETA_DEC'])
-# hdu_alpha_beta = fits.BinTableHDU(alpha_beta_table, name='SPATIAL_AXES')
+# Table pour les coordonnées spatiales RA (alpha) et DEC (beta)
+alpha_beta_table = Table([alpha_axis, beta_axis], names=['ALPHA_RA', 'BETA_DEC'])
+hdu_alpha_beta = fits.BinTableHDU(alpha_beta_table, name='SPATIAL_AXES')
 
-# # Sauvegarder dans un fichier FITS
-# hdul = fits.HDUList([hdu_data, hdu_wavel, hdu_alpha_beta])
-# output_filename = "/home/nmonnier/Data/JWST/Orion_bar/Fusion/datacube_with_custom_axes.fits"
-# hdul.writeto(output_filename, overwrite=True)
+# Sauvegarder dans un fichier FITS
+hdul = fits.HDUList([hdu_data, hdu_wavel, hdu_alpha_beta])
+output_filename = "/home/nmonnier/Data/JWST/Orion_bar/Observation_2/Fusion/datacube_with_custom_axes.fits"
+hdul.writeto(output_filename, overwrite=True)
 
-# print(f"Fichier FITS '{output_filename}' créé avec succès, contenant le datacube et les axes personnalisés.")
+print(f"Fichier FITS '{output_filename}' créé avec succès, contenant le datacube et les axes personnalisés.")
 
 # cube_vizualisation.plot_cube(np.rot90(flipped_cube, -1, axes=(1,2)), wavel_axis)
