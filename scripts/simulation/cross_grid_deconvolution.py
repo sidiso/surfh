@@ -78,7 +78,7 @@ def create_spectroModel(sotf, templates, origin_alpha_axis, origin_beta_axis, wa
 
     return spectroModel.spectroSigRLSCT(
         sotf=sotf,
-        templates=None,
+        templates=templates,
         alpha_axis=origin_alpha_axis,
         beta_axis=origin_beta_axis,
         wavelength_axis=wavel_axis,
@@ -169,7 +169,7 @@ def initialize_parameters(fusion_dir_path):
 
     return paths, step, step_angle
 
-def reconstruction_method(spectroModel, ndata, result_path, hyperParameter, niter, method):
+def reconstruction_method(spectroModel, ndata, result_path, hyperParameter, niter, method, templates):
     """
     Perform the reconstruction method and save results.
 
@@ -205,11 +205,15 @@ def reconstruction_method(spectroModel, ndata, result_path, hyperParameter, nite
     # Run the method
     res_fusion = quadCrit_fusion.run_method(method, niter, perf_crit=1, calc_crit=True, value_init=value_init)
 
-
-    # Save results
     print(f"Results save in {path}")
-    np.save(path / 'res_x.npy', res_fusion.x)
-    np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
+    # Save results
+    if templates is not None:
+        np.save(path / 'res_x.npy', res_fusion.x)
+        np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
+        np.save(path / 'res_cube.npy', spectroModel.mapsToCube(res_fusion.x))
+    else:
+        np.save(path / 'res_cube.npy', res_fusion.x)
+        np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
 
 
 
@@ -237,7 +241,7 @@ def parse_options(fusion_dir, npix, hyper_parameter, niter, method, bool_templat
 
     sim_data = spectroModel.forward(sim_cube)
     
-    reconstruction_method(spectroModel, sim_data, paths['result_path'], hyper_parameter, niter, method)
+    reconstruction_method(spectroModel, sim_data, paths['result_path'], hyper_parameter, niter, method, templates)
 
 
 if __name__ == '__main__':
