@@ -24,7 +24,6 @@ def load_simulation_data(paths, step_angle, Npix, bool_templates):
     origin_alpha_axis -= np.mean(origin_alpha_axis)
     origin_beta_axis -= np.mean(origin_beta_axis)
     
-    
     wavel_axis = np.load(os.path.join(paths['template_dir'], 'wavel_axis_orion_1ABC_2ABC_3ABC_4ABC_4_templates_SS4.npy'))
     if bool_templates:
         templates = np.load(os.path.join(paths['template_dir'], 'scaled_templates.npy'))
@@ -34,7 +33,7 @@ def load_simulation_data(paths, step_angle, Npix, bool_templates):
 
     sotf = udft.ir2fr(spsf, imshape)
 
-    return origin_alpha_axis, origin_beta_axis, wavel_axis, None, templates
+    return origin_alpha_axis, origin_beta_axis, wavel_axis, sotf, templates
 
 
 
@@ -86,9 +85,12 @@ def create_spectroModel(sotf, templates, origin_alpha_axis, origin_beta_axis, wa
         step_degree=step_angle, 
         pointings=pointings)
 
-def load_skyModel(paths):
+def load_skyModel(paths, bool_templates):
     """Load the sky model."""
-    return np.load(os.path.join(paths['template_dir'], 'sim_cube.npy'))
+    if bool_templates:
+        return np.load(os.path.join(paths['template_dir'], 'sim_maps.npy'))
+    else:
+        return np.load(os.path.join(paths['template_dir'], 'sim_cube.npy'))
 
 def create_skyModel(Npix, wavel, templates):
     """Create the sky model.""" 
@@ -169,7 +171,7 @@ def initialize_parameters(fusion_dir_path):
 
     return paths, step, step_angle
 
-def reconstruction_method(spectroModel, ndata, result_path, hyperParameter, niter, method, templates):
+def reconstruction_method(spectroModel, ndata, result_path, hyperParameter, niter, method, templates, bool_templates):
     """
     Perform the reconstruction method and save results.
 
@@ -188,7 +190,7 @@ def reconstruction_method(spectroModel, ndata, result_path, hyperParameter, nite
     value_init = 0
 
     # Create result directory
-    result_dir = f'{method}_MC_{len(spectroModel.instrs)}_MO_4__nit_{str(niter)}_mu_{str("{:.2e}".format(hyperParameter))}/'
+    result_dir = f'{method}_MC_{len(spectroModel.instrs)}_MO_4_lmm_{bool_templates}_nit_{str(niter)}_mu_{str("{:.2e}".format(hyperParameter))}/'
     path = pathlib.Path(result_path + result_dir)
     path.mkdir(parents=True, exist_ok=True)
 
@@ -235,13 +237,13 @@ def parse_options(fusion_dir, npix, hyper_parameter, niter, method, bool_templat
     instruments = create_instruments()
     pointings = get_dithering(step_angle)
 
-    sim_cube = load_skyModel(paths)
+    sim_cube = load_skyModel(paths, bool_templates)
 
     spectroModel = create_spectroModel(sotf, templates, origin_alpha_axis, origin_beta_axis, wavel_axis, instruments, step_angle, pointings)
 
     sim_data = spectroModel.forward(sim_cube)
     
-    reconstruction_method(spectroModel, sim_data, paths['result_path'], hyper_parameter, niter, method, templates)
+    reconstruction_method(spectroModel, sim_data, paths['result_path'], hyper_parameter, niter, method, templates, bool_templates)
 
 
 if __name__ == '__main__':
