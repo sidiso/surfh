@@ -229,6 +229,17 @@ def reconstruction_method(spectroModel, ndata, result_path, hyperParameter, nite
 @click.option('-v', '--verbose', default=True, type=bool, help='Verbose.')
 def parse_options(fusion_dir, npix, hyper_parameter, niter, method, bool_templates, verbose):
 
+    def print_options(fusion_dir, npix, hyper_parameter, niter, method, bool_templates, verbose):
+        print("Fusion Directory:", fusion_dir)
+        print("Number of Pixels:", npix)
+        print("Hyperparameter Value:", hyper_parameter)
+        print("Number of Iterations:", niter)
+        print("Method Used:", method)
+        print("Load Templates:", bool_templates)
+        print("Verbose:", verbose)
+
+    print_options(fusion_dir, npix, hyper_parameter, niter, method, bool_templates, verbose)
+
     paths, step, step_angle = initialize_parameters(fusion_dir)
 
     Npix = 125
