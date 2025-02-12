@@ -26,8 +26,10 @@ def load_simulation_data(paths, step_angle, Npix, bool_templates):
     
     wavel_axis = np.load(os.path.join(paths['template_dir'], 'wavel_axis_orion_1ABC_2ABC_3ABC_4ABC_4_templates_SS4.npy'))
     if bool_templates:
+        print("Templates loaded")
         templates = np.load(os.path.join(paths['template_dir'], 'scaled_templates.npy'))
     else:
+        print("No templates loaded")
         templates = None
     spsf = np.load(os.path.join(paths['psf_dir'], 'psfs_pixscale0.1_npix_125_fov12.5_chan_1ABC_2ABC_3ABC_4ABC_SS4.npy'))
 
@@ -74,7 +76,7 @@ def create_instruments():
 
 def create_spectroModel(sotf, templates, origin_alpha_axis, origin_beta_axis, wavel_axis, instruments, step_angle, pointings):
     """Create the spectrograph model."""
-
+    print(f"Create spectroModel with Templates {type(templates)}")
     return spectroModel.spectroSigRLSCT(
         sotf=sotf,
         templates=templates,
@@ -88,8 +90,10 @@ def create_spectroModel(sotf, templates, origin_alpha_axis, origin_beta_axis, wa
 def load_skyModel(paths, bool_templates):
     """Load the sky model."""
     if bool_templates:
+        print("Load maps")
         return np.load(os.path.join(paths['template_dir'], 'sim_maps.npy'))
     else:
+        print("Load cube")
         return np.load(os.path.join(paths['template_dir'], 'sim_cube.npy'))
 
 def create_skyModel(Npix, wavel, templates):
@@ -209,13 +213,15 @@ def reconstruction_method(spectroModel, ndata, result_path, hyperParameter, nite
 
     print(f"Results save in {path}")
     # Save results
-    if templates is not None:
-        np.save(path / 'res_x.npy', res_fusion.x)
-        np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
-        np.save(path / 'res_cube.npy', spectroModel.mapsToCube(res_fusion.x))
-    else:
+    if bool_templates is None:
+        print("No templates, save only cube")
         np.save(path / 'res_cube.npy', res_fusion.x)
         np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
+    else:
+        print("Templates loaded, save templates and cube")
+        np.save(path / 'res_x.npy', res_fusion.x)
+        np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
+        np.save(path / 'res_cube.npy', spectroModel.mapsToCube(np.array(res_fusion.x)))
 
 
 
