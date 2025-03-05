@@ -15,8 +15,9 @@ from scipy.interpolate import interp1d
 
 from surfh.Models import wavelength_mrs, realmiri, instru, spectroModel, MiriModel
 from surfh.Simulation.fusion_CT import QuadCriterion_MRS
+from surfh.Algorithm.criterion_spectroImageur import QuadCriterion_spectroImageur
 from surfh.Vizualisation import cube_vizualisation
-from surfh.ToolsDir import matrix_op
+from surfh.ToolsDir import matrix_op, utils
 
 
 def load_simulation_metadata_MRS(paths, step_angle, Npix):
@@ -123,50 +124,14 @@ def load_skyModel(paths):
     return maps, tpl, wavel_axis
 
 
-def create_skyModel(Npix, wavel, templates):
-    """Create the sky model.""" 
-    cube = np.ones((Npix, Npix))
-    square = np.zeros((Npix, Npix))
-    circle = np.zeros((Npix, Npix))
-    cross = np.zeros((Npix, Npix))
-    
-    # Create square
-    square_size = int((2*Npix)//3)
-    square_start = int(Npix / 2) - int(square_size / 2)
-    square_end = square_start + square_size
-    square[square_start:square_end, square_start:square_end] = 1
-    
-    # Create circle
-    circle_radius = int(Npix / 4)
-    circle_center = int(Npix / 2)
-    for i in range(Npix):
-        for j in range(Npix):
-            if np.sqrt((i - circle_center)**2 + (j - circle_center)**2) <= circle_radius:
-                circle[i, j] = 1
-    
-    # Create vertical band
-    vertical_band_width = int(Npix / 8)
-    vertical_band_start = int(Npix / 2) - int(vertical_band_width / 2)
-    vertical_band_end = vertical_band_start + vertical_band_width
-    cross[:, vertical_band_start:vertical_band_end] += 1
-    
-    # Create horizontal band
-    horizontal_band_width = int(Npix / 8)
-    horizontal_band_start = int(Npix / 2) - int(horizontal_band_width / 2)
-    horizontal_band_end = horizontal_band_start + horizontal_band_width
-    cross[horizontal_band_start:horizontal_band_end, :] += 1
-    
-    maps = np.concatenate((cube[np.newaxis,...], square[np.newaxis, ...], circle[np.newaxis, ...], cross[np.newaxis, ...]), axis=0)
-    return matrix_op.linearMixingModel_maps2cube(maps, templates.shape[1], maps.shape, templates)
-
 
 def get_dithering(step_Angle, ifus):
     main_pointing = instru.Coord(0, 0)
 
     pointings = []
-
-    ra_ref = -0.00130#+0.00662
-    dec_ref = 0.0#-0.00563
+    
+    ra_ref = -0.00070
+    dec_ref = 0.0
     pix_res = 0.2/3600
     ra =  [ra_ref , ra_ref + 4.5*pix_res, ra_ref                 , ra_ref+ 4.5*pix_res]
     dec = [dec_ref, dec_ref             , dec_ref + 4.5*pix_res, dec_ref + 4.5*pix_res]
@@ -192,7 +157,7 @@ def initialize_parameters(fusion_dir_path, step=0.1):
 
     return paths, step_angle
 
-def reconstruction_method(spectroModel, ndata, result_path, hyperParameter, niter, method, templates, bool_templates):
+def reconstruction_method(imageurModel, mirim_data, spectroModel, mrs_data, result_path, hyperParameter, niter, method, bool_templates):
     """
     Perform the reconstruction method and save results.
 
@@ -211,44 +176,55 @@ def reconstruction_method(spectroModel, ndata, result_path, hyperParameter, nite
     value_init = 0
 
     # Create result directory
-    result_dir = f'{method}_MC_{len(spectroModel.instrs)}_MO_4_lmm_{bool_templates}_nit_{str(niter)}_mu_{str("{:.2e}".format(hyperParameter))}/'
+    result_dir = f'{method}_MC_{len(spectroModel.instrs)}_MO_4_lmm_{True}_nit_{str(niter)}_mu_{str("{:.2e}".format(hyperParameter))}/'
     path = pathlib.Path(result_path + result_dir)
     path.mkdir(parents=True, exist_ok=True)
 
-    # QuadCriterion initialization
-    quadCrit_fusion = QuadCriterion_MRS(
-        mu_spectro=1,
-        y_spectro=np.copy(ndata),
+    quadCrit_fusion = QuadCriterion_spectroImageur(
+        mu_imager=1.0,
+        y_imager=mirim_data,
+        model_imager=imageurModel,
+        mu_spectro=1.0,
+        y_spectro=mrs_data,
         model_spectro=spectroModel,
         mu_reg=hyperParameter,
         printing=True,
-        gradient="separated"
+        gradient='separated'
     )
 
-    # Run the method
-    res_fusion = quadCrit_fusion.run_method(method, niter, perf_crit=1, calc_crit=True, value_init=value_init)
+    res_fusion = quadCrit_fusion.run_lcg(maximum_iterations=niter, 
+                                         perf_crit=None, 
+                                         calc_crit=True, 
+                                         value_init=value_init)
 
     print(f"Results save in {path}")
     # Save results
     if bool_templates is False:
         print("No templates, save only cube")
         np.save(path / 'res_cube.npy', res_fusion.x)
-        np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
+        np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val_lcg)
     else:
         print("Templates loaded, save templates and cube")
         np.save(path / 'res_x.npy', res_fusion.x)
-        np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
+        np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val_lcg)
         np.save(path / 'res_cube.npy', spectroModel.mapsToCube(np.array(res_fusion.x)))
 
+    utils.plot_maps(res_fusion.x)
+    plt.show()
 
-def parse_options():
+@click.command()
+@click.option('-fd', '--fusion_dir', default='/home/nmonnier/Data/JWST/Simulation/Orion', type=str, help='Fusion directory')
+@click.option('-np', '--npix', default=150, type=int, help='Number of pixels')
+@click.option('-hp', '--hyper_parameter', default=1., type=float, help='Hyperparameter value')
+@click.option('-ni', '--niter', default=5, type=int, help='Number of iteration.')
+@click.option('-m', '--method', default='lcg', type=str, help='Method used (default = lcg).')
+@click.option('-v', '--verbose', default=True, type=bool, help='Verbose.')
+def parse_options(fusion_dir, hyper_parameter, niter):
 
     # Parameters
-    fusion_dir = '/home/nmonnier/Data/JWST/Simulation/Orion'
-    bool_templates = False
     step = 0.1 #arsec
     Npix_MRS = 150
-    Npix_MIRIM = 200
+    Npix_MIRIM = 150
     wavelength_ss = 4
 
     # Reconstruction parameters
@@ -285,23 +261,31 @@ def parse_options():
     print(f"tpl : {tpl.shape}")
     print(f"imshape : {(Npix_MIRIM, Npix_MIRIM)}")
     print(f"step {step}")
-    imageurModel = MiriModel.Mirim_Model_LMM(spsf_mirim, pce_mirim, wavel_axis, tpl, (Npix_MIRIM, Npix_MIRIM), step)
+    try:
+        H_freq = np.load(os.path.join(paths['template_dir'], "H_freq.npy"))
+    except:
+        H_freq = None
+    imageurModel = MiriModel.Mirim_Model_LMM(spsf_mirim, pce_mirim, wavel_axis, tpl, (Npix_MIRIM, Npix_MIRIM), step, H_freq)
     print(f'Imageur ishape {imageurModel.ishape}, oshape {imageurModel.oshape}')
-
+    
 
 
     # Simulate data
-    # mrs_data = spectroModel.forward(maps)
-    # mirim_data = imageurModel.forward(maps)
+    mrs_data = spectroModel.forward(maps)
+    mirim_data = imageurModel.forward(maps)
+    print(f"Mirim data shape is {mirim_data.shape}")
+
+    reconstruction_method(imageurModel, mirim_data, spectroModel, mrs_data, paths["result_path"], hyper_parameter, niter, 'lcg', True)
 
     # Define figure and subplots
     fig, axes = plt.subplots(2, 2, figsize=(10, 10))
     axes = axes.flatten()
+    
 
     # Loop through the four maps
     for i, ax in enumerate(axes):
         im = ax.imshow(
-            maps[i], origin='lower',
+            maps[i],
             extent=[alpha_axis_mirim[0], alpha_axis_mirim[-1], beta_axis_mirim[0], beta_axis_mirim[-1]]
         )
         ax.set_title(f'Maps[{i}]')
@@ -318,17 +302,6 @@ def parse_options():
                 )
     plt.tight_layout()
     plt.show()
-
-
-    
-
-
-    # for chan in spectroModel.channels:
-    #     print(f'ishape {chan.ishape}, oshape {chan.oshape}')
-
-    # sim_data = spectroModel.forward(sim_cube)
-    
-    # reconstruction_method(spectroModel, sim_data, paths['result_path'], hyper_parameter, niter, method, templates, bool_templates)
 
 
 if __name__ == '__main__':
