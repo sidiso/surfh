@@ -18,7 +18,7 @@ from aljabr import LinOp
 # PSFs are full and partitionned to allow the direct sum with the spectro hessian
 class Mirim_Model_LMM(LinOp):
     def __init__(
-        self, psfs_monoch, L_pce, lamb_cube, L_specs, shape_target, pixel_arcsec=0.111
+        self, psfs_monoch, L_pce, lamb_cube, L_specs, shape_target, pixel_arcsec=0.111, precompute_H_freq=None
     ):
         """
 
@@ -56,11 +56,14 @@ class Mirim_Model_LMM(LinOp):
         # H_int = trapezoid(specs * psfs * pce, x=lamb_cube, axis=2)  # (9, 300, 250, 500)
         # TODO: new normalisation added here
         # pce_norms = np.sum(L_pce, axis=1)[:, np.newaxis, np.newaxis, np.newaxis]
-        pce_norms = trapezoid(L_pce * lamb_cube[np.newaxis, ...], x = lamb_cube, axis = 1)[:, np.newaxis, np.newaxis, np.newaxis]
-        new_lamb_cube = lamb_cube[np.newaxis, np.newaxis, :, np.newaxis, np.newaxis]
-        H_int = trapezoid(specs * psfs * pce * new_lamb_cube, x=lamb_cube, axis=2) / pce_norms # (9, 5, 250, 500)
-        
-        H_freq = ir2fr(H_int, shape_target, real=True)
+        if precompute_H_freq is None:
+            pce_norms = trapezoid(L_pce * lamb_cube[np.newaxis, ...], x = lamb_cube, axis = 1)[:, np.newaxis, np.newaxis, np.newaxis]
+            new_lamb_cube = lamb_cube[np.newaxis, np.newaxis, :, np.newaxis, np.newaxis]
+            H_int = trapezoid(specs * psfs * pce * new_lamb_cube, x=lamb_cube, axis=2) / pce_norms # (9, 5, 250, 500)
+            
+            H_freq = ir2fr(H_int, shape_target, real=True)
+        else:
+            H_freq = precompute_H_freq
         self.H_freq = H_freq
         
         n_bands, _ = L_pce.shape
@@ -81,6 +84,9 @@ class Mirim_Model_LMM(LinOp):
     def adjoint(self, y):  # shape of y: (9, 250, 500)
         return np.real(irdftn(np.sum(np.conj(self.H_freq) * rdft2(y)[:, np.newaxis, ...], axis=0), shape = self.shape_target))
 
+    def fwadj(self, point):
+        """Apply `Aᴴ·A` operator."""
+        return self.adjoint(self.forward(point))
 
     # microJansky/arcsec^2 to microJansky/arcsec^2
     def unit_conversion(self, flux, lamb, pixel_arcsec):
