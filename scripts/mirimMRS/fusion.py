@@ -214,11 +214,8 @@ def reconstruction_method(imageurModel, mirim_data, spectroModel, mrs_data, resu
 
 @click.command()
 @click.option('-fd', '--fusion_dir', default='/home/nmonnier/Data/JWST/Simulation/Orion', type=str, help='Fusion directory')
-@click.option('-np', '--npix', default=150, type=int, help='Number of pixels')
 @click.option('-hp', '--hyper_parameter', default=1., type=float, help='Hyperparameter value')
 @click.option('-ni', '--niter', default=5, type=int, help='Number of iteration.')
-@click.option('-m', '--method', default='lcg', type=str, help='Method used (default = lcg).')
-@click.option('-v', '--verbose', default=True, type=bool, help='Verbose.')
 def parse_options(fusion_dir, hyper_parameter, niter):
 
     # Parameters
@@ -237,7 +234,7 @@ def parse_options(fusion_dir, hyper_parameter, niter):
     wavel_axis = wavel_axis[::wavelength_ss]
     
     # MIRIM FoV selection
-    maps = maps[:,150:300,600:750]
+    maps = maps[:,155:305,588:738]
 
 
     print(f"shape maps {maps.shape}, shape tpl {tpl.shape}, shape wavel_axis {wavel_axis.shape}")
@@ -275,7 +272,7 @@ def parse_options(fusion_dir, hyper_parameter, niter):
     mirim_data = imageurModel.forward(maps)
     print(f"Mirim data shape is {mirim_data.shape}")
 
-    reconstruction_method(imageurModel, mirim_data, spectroModel, mrs_data, paths["result_path"], hyper_parameter, niter, 'lcg', True)
+    # reconstruction_method(imageurModel, mirim_data, spectroModel, mrs_data, paths["result_path"], hyper_parameter, niter, 'lcg', True)
 
     # Define figure and subplots
     fig, axes = plt.subplots(2, 2, figsize=(10, 10))
