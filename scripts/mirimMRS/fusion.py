@@ -212,6 +212,44 @@ def reconstruction_method(imageurModel, mirim_data, spectroModel, mrs_data, resu
     utils.plot_maps(res_fusion.x)
     plt.show()
 
+
+def add_gaussian_noise(signal, snr_db):
+    """
+    Ajoute un bruit gaussien à un signal donné pour obtenir un SNR spécifié en dB.
+
+    :param signal: numpy array, le signal original
+    :param snr_db: float, le rapport signal/bruit en dB
+    :return: numpy array, le signal bruité
+    """
+    # Calcul de la puissance du signal
+    signal_power = np.mean(signal**2)
+    
+    # Calcul de la puissance du bruit pour obtenir le SNR désiré
+    noise_power = signal_power / (10**(snr_db / 10))
+    
+    # Génération du bruit gaussien
+    noise = np.random.normal(0, np.sqrt(noise_power), signal.shape)
+    
+    # Ajout du bruit au signal
+    noisy_signal = signal + noise
+
+    signal_power = np.mean(signal**2)
+    noise_power = np.mean(noise**2)
+
+    # Calculate SNR in linear scale
+    snr_linear = signal_power / noise_power
+
+    # Calculate SNR in decibels (dB)
+    snr_db = 10 * np.log10(snr_linear)
+
+    print("SNR (linear scale):", snr_linear)
+    print("SNR (dB):", snr_db)
+
+
+    return noisy_signal
+
+
+
 @click.command()
 @click.option('-fd', '--fusion_dir', default='/home/nmonnier/Data/JWST/Simulation/Orion', type=str, help='Fusion directory')
 @click.option('-hp', '--hyper_parameter', default=1., type=float, help='Hyperparameter value')
@@ -272,33 +310,41 @@ def parse_options(fusion_dir, hyper_parameter, niter):
     mirim_data = imageurModel.forward(maps)
     print(f"Mirim data shape is {mirim_data.shape}")
 
-    # reconstruction_method(imageurModel, mirim_data, spectroModel, mrs_data, paths["result_path"], hyper_parameter, niter, 'lcg', True)
+    # Add noise to the data
+    noisy_mirim_data = np.zeros_like(mirim_data)
+    for i in range(mirim_data.shape[0]):
+        noisy_mirim_data[i] = add_gaussian_noise(mirim_data[i], 30)
 
-    # Define figure and subplots
-    fig, axes = plt.subplots(2, 2, figsize=(10, 10))
-    axes = axes.flatten()
-    
+    noisy_mrs_data = np.zeros_like(mrs_data)
+    for ch_idx, chan in enumerate(spectroModel.channels):
+        reshape_spectro_data = mrs_data[spectroModel._idx[ch_idx] : spectroModel._idx[ch_idx + 1]].reshape(chan.oshape)
+        noisy_mrs_data[spectroModel._idx[ch_idx] : spectroModel._idx[ch_idx + 1]] = add_gaussian_noise(reshape_spectro_data, 30).ravel()
 
-    # Loop through the four maps
-    for i, ax in enumerate(axes):
-        im = ax.imshow(
-            maps[i],
-            extent=[alpha_axis_mirim[0], alpha_axis_mirim[-1], beta_axis_mirim[0], beta_axis_mirim[-1]]
-        )
-        ax.set_title(f'Maps[{i}]')
-        fig.colorbar(im, ax=ax)
+    reconstruction_method(imageurModel, mirim_data, spectroModel, mrs_data, paths["result_path"], hyper_parameter, niter, 'lcg', True)
+
+    # # Define figure and subplots
+    # fig, axes = plt.subplots(2, 2, figsize=(10, 10))
+    # axes = axes.flatten()
+    # # Loop through the four maps
+    # for i, ax in enumerate(axes):
+    #     im = ax.imshow(
+    #         maps[i],
+    #         extent=[alpha_axis_mirim[0], alpha_axis_mirim[-1], beta_axis_mirim[0], beta_axis_mirim[-1]]
+    #     )
+    #     ax.set_title(f'Maps[{i}]')
+    #     fig.colorbar(im, ax=ax)
         
-        # Plot the field of view only for the first subplot
-        for chan in spectroModel.channels:
-            for pointing_idx in range(4):
-                fov = chan.instr.fov + chan.pointings[pointing_idx]
-                ax.plot(
-                    [v.alpha for v in fov.vertices] + [fov.vertices[0].alpha],
-                    [v.beta for v in fov.vertices] + [fov.vertices[0].beta],
-                    '-x'
-                )
-    plt.tight_layout()
-    plt.show()
+    #     # Plot the field of view only for the first subplot
+    #     for chan in spectroModel.channels:
+    #         for pointing_idx in range(4):
+    #             fov = chan.instr.fov + chan.pointings[pointing_idx]
+    #             ax.plot(
+    #                 [v.alpha for v in fov.vertices] + [fov.vertices[0].alpha],
+    #                 [v.beta for v in fov.vertices] + [fov.vertices[0].beta],
+    #                 '-x'
+    #             )
+    # plt.tight_layout()
+    # plt.show()
 
 
 if __name__ == '__main__':
