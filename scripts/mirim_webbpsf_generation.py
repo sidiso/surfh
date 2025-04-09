@@ -68,11 +68,26 @@ fov_arcsec = pixelscale * nb_pixels
 norm = 'last'
 # Time code of observation
 date = "2023-09-25T20:18:27"
+psf_number = len(wavel_axis)
 
-psfs_monoch = compute_monochromatic_psfs2(wavel_axis, oversample=oversample, pixelscale=pixelscale, fov_arcsec=fov_arcsec, norm=norm, date=date)
+miri = webbpsf.MIRI()
+miri.mode = 'imaging'
+miri.pixelscale = pixelscale
+PSF = list()
+for i in range(psf_number):
+    psf_file = miri.calc_psf(monochromatic=wavel_axis[i] * 1e-6,
+                             oversample=oversample,
+                            normalize=norm,
+                            fov_arcsec=fov_arcsec)
+    PSF.append(psf_file[0].data)
+    # print(i)
+    if (i+1)%10 == 0:
+        print("{} / {}".format(i, len(wavel_axis)))
 
-psfs_monoch_array = np.array(psfs_monoch)
+# psfs_monoch = compute_monochromatic_psfs2(wavel_axis, oversample=oversample, pixelscale=pixelscale, fov_arcsec=fov_arcsec, norm=norm, date=date)
+
+psfs_monoch_array = np.array(PSF)
 
 file_path = "/home/nmonnier/Data/JWST/Simulation/Orion/PSF/"
-file_name = f"psfs_pixscale{pixelscale}_npix_{nb_pixels}_chan_1ABC_2ABC_3ABC_4ABC_SS4.npy"
+file_name = f"mirim_psfs_pixscale{pixelscale}_npix_{nb_pixels}.npy"
 np.save(file_path + file_name, psfs_monoch_array)

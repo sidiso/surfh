@@ -9,6 +9,7 @@ from astropy.coordinates import Angle
 from importlib import resources
 import click
 import statistics
+import operator as op
 
 from surfh.Models import wavelength_mrs, realmiri, instru, spectroModel
 from surfh.Simulation.fusion_CT import QuadCriterion_MRS
@@ -89,12 +90,7 @@ def create_spectroModel(sotf, templates, origin_alpha_axis, origin_beta_axis, wa
 
 def load_skyModel(paths, bool_templates):
     """Load the sky model."""
-    if bool_templates:
-        print("Load maps")
-        return np.load(os.path.join(paths['template_dir'], 'sim_maps.npy'))
-    else:
-        print("Load cube")
-        return np.load(os.path.join(paths['template_dir'], 'sim_cube.npy'))
+    return np.load(os.path.join(paths['template_dir'], 'sim_maps.npy')), np.load(os.path.join(paths['template_dir'], 'sim_cube.npy'))
 
 def create_skyModel(Npix, wavel, templates):
     """Create the sky model.""" 
@@ -213,7 +209,7 @@ def reconstruction_method(spectroModel, ndata, result_path, hyperParameter, nite
 
     print(f"Results save in {path}")
     # Save results
-    if bool_templates is False:
+    if bool_templates is None:
         print("No templates, save only cube")
         np.save(path / 'res_cube.npy', res_fusion.x)
         np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
@@ -225,45 +221,50 @@ def reconstruction_method(spectroModel, ndata, result_path, hyperParameter, nite
 
 
 
-@click.command()
-@click.option('-fd', '--fusion_dir', default='/home/nmonnier/Data/JWST/Simulation/Cross_grid/', type=str, help='Fusion directory')
-@click.option('-np', '--npix', default=125, type=int, help='Number of pixels')
-@click.option('-hp', '--hyper_parameter', default=1., type=float, help='Hyperparameter value')
-@click.option('-ni', '--niter', default=5, type=int, help='Number of iteration.')
-@click.option('-m', '--method', default='lcg', type=str, help='Method used (default = lcg).')
-@click.option('-bt', '--bool_templates', default=False, type=bool, help='Load templates')
-@click.option('-v', '--verbose', default=True, type=bool, help='Verbose.')
-def parse_options(fusion_dir, npix, hyper_parameter, niter, method, bool_templates, verbose):
+def parse_options():
 
-    def print_options(fusion_dir, npix, hyper_parameter, niter, method, bool_templates, verbose):
-        print("Fusion Directory:", fusion_dir)
-        print("Number of Pixels:", npix)
-        print("Hyperparameter Value:", hyper_parameter)
-        print("Number of Iterations:", niter)
-        print("Method Used:", method)
-        print("Load Templates:", bool_templates)
-        print("Verbose:", verbose)
-
-    print_options(fusion_dir, npix, hyper_parameter, niter, method, bool_templates, verbose)
+    fusion_dir = '/home/nmonnier/Data/JWST/Simulation/Cross_grid'
 
     paths, step, step_angle = initialize_parameters(fusion_dir)
 
     Npix = 125
-    origin_alpha_axis, origin_beta_axis, wavel_axis, sotf, templates = load_simulation_data(paths, step_angle, Npix, bool_templates)
+    origin_alpha_axis, origin_beta_axis, wavel_axis, sotf, templates = load_simulation_data(paths, step_angle, Npix, True)
 
     instruments = create_instruments()
     pointings = get_dithering(step_angle)
 
-    sim_cube = load_skyModel(paths, bool_templates)
+    sim_maps, sim_cube = load_skyModel(paths, True)
 
     spectroModel = create_spectroModel(sotf, templates, origin_alpha_axis, origin_beta_axis, wavel_axis, instruments, step_angle, pointings)
 
-    for chan in spectroModel.channels:
-        print(f'ishape {chan.ishape}, oshape {chan.oshape}')
+    new_cube = spectroModel.mapsToCube(sim_maps)
 
-    sim_data = spectroModel.forward(sim_cube)
+    sim_data = spectroModel.forward(sim_maps)
+
+    weigthed_proj, _ = spectroModel.plot_slice(sim_data, 11, 50)
     
-    reconstruction_method(spectroModel, sim_data, paths['result_path'], hyper_parameter, niter, method, templates, bool_templates)
+    plt.figure()
+    plt.imshow(np.rot90(np.fliplr(weigthed_proj), -1),extent=[origin_alpha_axis[0], origin_alpha_axis[-1], origin_beta_axis[0], origin_beta_axis[-1]])
+    plt.title("Projected slice")
+    fov = spectroModel.channels[11].instr.fov + spectroModel.channels[11].pointings[2]
+    plt.plot(
+        list(map(op.attrgetter("alpha"), fov.vertices)) + [fov.vertices[0].alpha],
+        list(map(op.attrgetter("beta"), fov.vertices)) + [fov.vertices[0].beta],
+        "-x",
+        label=f'channel '
+    )
+
+    plt.figure()
+    plt.imshow(new_cube[50], extent=[origin_alpha_axis[0], origin_alpha_axis[-1], origin_beta_axis[0], origin_beta_axis[-1]])
+    fov = spectroModel.channels[11].instr.fov + spectroModel.channels[11].pointings[2]
+    plt.plot(
+        list(map(op.attrgetter("alpha"), fov.vertices)) + [fov.vertices[0].alpha],
+        list(map(op.attrgetter("beta"), fov.vertices)) + [fov.vertices[0].beta],
+        "-x",
+        label=f'channel '
+    )
+    plt.legend()
+    plt.show()
 
 
 if __name__ == '__main__':

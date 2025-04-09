@@ -12,7 +12,7 @@ from astropy.coordinates import Angle
 from numpy.random import standard_normal as randn 
 
 from surfh.Models import instru
-from surfh.Models import spectroModelChannel
+from surfh.Models import spectroModelChannel_linear
 from math import ceil
 
 
@@ -122,7 +122,7 @@ class spectroSigRLSCT(LinOp):
                                             for idx, _ in enumerate(self.instrs)]
         
         self.channels = [
-            spectroModelChannel.Channel(
+            spectroModelChannel_linear.Channel(
                 instr,
                 alpha_axis,
                 beta_axis,
@@ -278,6 +278,7 @@ class spectroSigRLSCT(LinOp):
         valid_counts = np.sum(cum_grid > 1, axis=0)
         sum_of_values = np.sum(cum_grid, axis=0)
         weighted_mean = np.divide(sum_of_values, valid_counts, where=valid_counts != 0)
+        
 
         return weighted_mean, global_img
 

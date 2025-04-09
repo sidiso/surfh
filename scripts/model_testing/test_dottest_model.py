@@ -81,22 +81,10 @@ def load_simulation_data(paths, step, step_angle, Npix, nTemplates):
     origin_alpha_axis = np.arange(imshape[0]) * step_angle - np.mean(np.arange(imshape[0]) * step_angle)
     origin_beta_axis = np.arange(imshape[1]) * step_angle - np.mean(np.arange(imshape[1]) * step_angle)
     
-    if nTemplates == 4:
-        wavel_file = 'wavel_axis_orion_1ABC_2ABC_3ABC_4ABC_SS4.npy'
-        templates_file = 'nmf_orion_1ABC_2ABC_3ABC_4ABC_4_templates_SS4.npy'
-    elif nTemplates == 6:
-        wavel_file = 'wavel_axis_orion_1ABC_2ABC_3ABC_4ABC_SS4.npy'
-        templates_file = 'nmf_orion_1ABC_2ABC_3ABC_4ABC_6_templates_SS4.npy'
-    else:
-        raise NameError("No corresponding Templates name")
+    wavel_file = 'wavel_axis_orion_1ABC_2ABC_3ABC_4ABC_SS4.npy'
     
     wavel_axis = np.load(os.path.join(paths['template_dir'], wavel_file))
-    try:
-        templates = np.load(os.path.join(paths['template_dir'], templates_file))
-        templates /= 10e3
-    except:
-        templates = None
-        print("Templates not found, set to None")
+    templates = None
     spsf = np.load(os.path.join(paths['psf_dir'], f'psfs_pixscale{step}_npix_{Npix}_chan_1ABC_2ABC_3ABC_4ABC_SS4.npy'))
 
     sotf = udft.ir2fr(spsf, imshape)
@@ -143,19 +131,16 @@ def create_model(sotf, templates, origin_alpha_axis, origin_beta_axis, wavel_axi
     main_pointing = instru.Coord(0, 0)
 
     pointings = []
-    ra = [360-44.618321664549896, 360-44.61858962226571, 360-44.61814954236108, 360-44.618760529956795]
-    dec = [68.17383920898915, 68.17410269498914, 68.17388699348916, 68.17405526048913]
     for idx, chan in enumerate(instruments.keys()):
-        #pointing_chan = [main_pointing + instru.Coord(RA, DEC) for RA, DEC in data_dict['target'][chan]]
-        pointing_chan = [main_pointing + instru.Coord(ra[idx], dec[idx]) for idx in range(len(ra))]
+        pointing_chan = [main_pointing + instru.Coord(RA, DEC) for RA, DEC in data_dict['target'][chan]]
         pointings.append(instru.CoordList(pointing_chan).pix(step_angle))
 
     # alpha_axis = origin_alpha_axis + data_dict['target']['2a'][2][0]
     # beta_axis = origin_beta_axis + data_dict['target']['2a'][2][1]
     mean_alpha = np.mean([data_dict['target']['3a'][dith][0] for dith in range(4)])
     mean_beta = np.mean([data_dict['target']['3a'][dith][1] for dith in range(4)])
-    alpha_axis = origin_alpha_axis + 360-44.618321664549896#mean_alpha
-    beta_axis = origin_beta_axis + 68.17383920898915#mean_beta
+    alpha_axis = origin_alpha_axis + mean_alpha
+    beta_axis = origin_beta_axis + mean_beta
 
 
     return spectroModel.spectroSigRLSCT(
@@ -236,102 +221,24 @@ def reconstruction_method(spectroModel, ndata, templates, result_path, hyperPara
 
 
 @click.command()
-@click.option('-fd', '--fusion_dir', default='/home/nmonnier/Data/JWST/Orion_bar/Fusion/', type=str, help='Fusion directory')
-@click.option('-np', '--npix', default=501, type=int, help='Number of pixels')
-@click.option('-hp', '--hyper_parameter', default=1., type=float, help='Hyperparameter value')
-@click.option('-ni', '--niter', default=5, type=int, help='Number of iteration.')
 @click.option('-nt', '--n_templates', default=4, type=int, help='Number of Templates.')
-@click.option('-sd', '--scale_data', default=False, type=bool, help='Scale data from Jy  to Jy/str.')
-@click.option('-m', '--method', default='lcg', type=str, help='Method used (default = lcg).')
-@click.option('-v', '--verbose', default=True, type=bool, help='Verbose.')
-def parse_options(fusion_dir, npix, hyper_parameter, niter, n_templates, scale_data, method, verbose):
+def parse_options(n_templates):
 
-    print(f'Options selected are : ') 
-    print(f'\t fusion_dir = {fusion_dir}')
-    print(f'\t npix = {npix}')
-    print(f'\t hyper_parameter = {hyper_parameter}')
-    print(f'\t niter = {niter}')
-    print(f'\t nTemplates = {n_templates}')
-    print(f'\t scale_data = {scale_data}')
-    print(f'\t method = {method}')
 
-    if verbose:
-        log.basicConfig(format="%(levelname)s: %(message)s", level=log.INFO)
-
+    fusion_dir = '/home/nmonnier/Data/JWST/NGC_7023/Fusion/'
+    npix = 125
     list_chan = ['3a', '3b', '3c']
-
-    if verbose:
-        log.info('Initialize basic path parameters')
     step = 0.1  # arcsec
-    paths, step_angle = initialize_parameters(fusion_dir, step)
 
-    if verbose:
-        log.info('Load simulation data')
+    paths, step_angle = initialize_parameters(fusion_dir, step)
     origin_alpha_axis, origin_beta_axis, wavel_axis, templates, sotf = load_simulation_data(paths, step, step_angle, npix, n_templates)
 
-    if verbose:
-        log.info('Load MRS data')
     data_dict = load_data(list_chan, paths["save_filter_corrected_dir"])
 
-    if verbose:
-        log.info('Cerate intruments and spectro models')
     instruments = create_instruments(data_dict, list_chan)
     spectroModel = create_model(sotf, templates, origin_alpha_axis, origin_beta_axis, wavel_axis, instruments, step_angle, data_dict)
 
-    data = list()
-    for chan in list_chan:
-        data.append(np.array(data_dict['data'][chan]).ravel())
-    ndata = np.concatenate(data)
-
-    if scale_data:
-        if verbose:
-            log.info('Data scaling enable')
-        ndata = spectroModel.real_data_janskySR_to_jansky(ndata)
-
-    # # Plot FoV of each instrument
-    # import operator as op
-    # plt.figure()
-    # #Compute mean target 4a
-    # mean_alpha = np.mean([data_dict['target']['3a'][dith][0] for dith in range(4)])
-    # mean_beta = np.mean([data_dict['target']['3a'][dith][1] for dith in range(4)])
-    # alpha_axis = origin_alpha_axis + mean_alpha
-    # beta_axis = origin_beta_axis + mean_beta
-
-    # for idx, chan in enumerate(spectroModel.channels):
-    #     name = chan.instr.name
-    #     for i in range(4):
-    #         fov = chan.instr.fov + chan.pointings[i]
-    #         plt.plot(
-    #             list(map(op.attrgetter("alpha"), fov.vertices)) + [fov.vertices[0].alpha],
-    #             list(map(op.attrgetter("beta"), fov.vertices)) + [fov.vertices[0].beta],
-    #             "-x",
-    #             label=f'channel {name}'
-    #         )
-    # plt.plot(alpha_axis[0],  beta_axis[0], 'o', label='Target')
-    # plt.plot(alpha_axis[0],  beta_axis[-1], 'o')
-    # plt.plot(alpha_axis[-1], beta_axis[0], 'o')
-    # plt.plot(alpha_axis[-1], beta_axis[-1], 'o')
-    #     # plt.legend()
-    # plt.show()    
-    ra = [360-44.618321664549896, 360-44.61858962226571, 360-44.61814954236108, 360-44.618760529956795]
-    dec = [68.17383920898915, 68.17410269498914, 68.17388699348916, 68.17405526048913]
-
-    for idx, chan in enumerate(spectroModel.channels):
-        weigthed_proj, _ = spectroModel.plot_slice(ndata, idx, 50)
-        plt.figure()
-        plt.imshow(weigthed_proj,extent=[spectroModel.alpha_axis[0], spectroModel.alpha_axis[-1], spectroModel.beta_axis[0], spectroModel.beta_axis[-1]], origin='lower')
-        plt.title(f'Channel {chan.instr.name}')
-        # for RA, DEC in data_dict['target']['3a']:
-        #     plt.plot(RA, DEC, 'o', label=f'Channel {chan}')
-        for i in range(4):
-            plt.plot(ra[i], dec[i], 'o', label=f'Channel {chan}')
-        break
-    plt.show()
-
-    if verbose:
-        log.info(f'Start {method} algorithm')
-    reconstruction_method(spectroModel, ndata, templates, paths["result_path"], hyper_parameter, niter, method, scale_data)
-
+    dottest(spectroModel, echo=True)
 
 if __name__ == '__main__':
     parse_options()

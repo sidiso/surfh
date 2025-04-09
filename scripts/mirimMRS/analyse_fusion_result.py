@@ -130,11 +130,11 @@ def get_dithering(step_Angle, ifus):
 
     pointings = []
     
-    ra_ref = -0.00070
-    dec_ref = 0.0
+    ra_ref  = +0.0000
+    dec_ref = -0.0007
     pix_res = 0.2/3600
-    ra =  [ra_ref , ra_ref + 4.5*pix_res, ra_ref                 , ra_ref+ 4.5*pix_res]
-    dec = [dec_ref, dec_ref             , dec_ref + 4.5*pix_res, dec_ref + 4.5*pix_res]
+    dec =  [ra_ref , ra_ref - 4.5*pix_res, ra_ref                 , ra_ref- 4.5*pix_res]
+    ra = [dec_ref, dec_ref             , dec_ref + 4.5*pix_res, dec_ref + 4.5*pix_res]
     for idx, chan in enumerate(ifus.keys()):
         pointing_chan = [main_pointing + instru.Coord(ra[i], dec[i]) for i in range(4)]
         pointings.append(instru.CoordList(pointing_chan).pix(step_Angle))
@@ -213,6 +213,124 @@ def reconstruction_method(imageurModel, mirim_data, spectroModel, mrs_data, resu
     plt.show()
 
 
+def get_MRS_slice(spectroModel, mrs_data, channel_idx, channel_name, wavelength):
+
+    wavelength_idx = np.argmin(np.abs(wavelength_mrs.get_mrs_wavelength(channel_name) - wavelength))
+    weighted_slice, _ = spectroModel.plot_slice(mrs_data, channel_idx, wavelength_idx)
+
+    return weighted_slice
+
+
+def plot_simulation_results(axs, axs2, spectroModel, sim_cube, res_cube, origin_alpha_axis, origin_beta_axis, wavel_axis, Npix, noisy_mirim_data, noisy_mrs_data):
+    wavelengths = [6.5, 14, 21]
+    channel_indices = [1, 7, 10]
+    channel_name = ['1b', '3b', '4b']
+
+    mirim_indices = [1, 5, 7]
+    mirim_filters = ['F770W', 'F1500W', 'F2100W']
+
+    
+
+    for i, (wavelength, channel_idx, mirim_idx) in enumerate(zip(wavelengths, channel_indices, mirim_indices)):
+        
+        name = spectroModel.channels[channel_idx].instr.name
+        wavel_idx = np.argmin(np.abs(wavel_axis - wavelength))
+        mrs_slice = get_MRS_slice(spectroModel, noisy_mrs_data, channel_idx, channel_name[i], wavelength)
+
+        plot_image(axs[i, 0], sim_cube[wavel_idx], origin_alpha_axis, origin_beta_axis, name, spectroModel.channels[channel_idx], title=f'$\lambda = {wavelength}\mu m$')
+        plot_image(axs[i, 1], noisy_mirim_data[mirim_idx], origin_alpha_axis, origin_beta_axis, name, spectroModel.channels[channel_idx], legend=mirim_filters[i])
+        plot_image(axs[i, 2], mrs_slice, origin_alpha_axis, origin_beta_axis, name, spectroModel.channels[channel_idx], legend=channel_name[i])
+        plot_image(axs[i, 3], res_cube[wavel_idx], origin_alpha_axis, origin_beta_axis, name, spectroModel.channels[channel_idx])
+        plot_image(axs[i, 4], sim_cube[wavel_idx] - res_cube[wavel_idx], origin_alpha_axis, origin_beta_axis, name, spectroModel.channels[channel_idx])
+        axs[i, 3].plot(origin_alpha_axis[53],origin_beta_axis[77], '.', color='red')
+        
+
+        # plot_central_column(axs2[i], np.rot90(np.fliplr(res_cube[wavel_idx]), -1), sim_cube[wavel_idx], Npix, wavelength, spectroModel.channels[channel_idx])
+        plot_central_column_with_FoV(axs2[i], np.rot90(np.fliplr(res_cube[wavel_idx]), -1), sim_cube[wavel_idx], Npix, wavelength, spectroModel.channels[channel_idx], origin_alpha_axis, origin_beta_axis)
+
+import operator as op
+
+def plot_image(ax, data, origin_alpha_axis, origin_beta_axis, name, chan, legend=None, title=''):
+    im = ax.imshow(data, extent=[origin_alpha_axis[0], origin_alpha_axis[-1], origin_beta_axis[0], origin_beta_axis[-1]], cmap='viridis')
+
+    # Définir une couleur pour les tracés
+    plot_color = 'red'  # Vous pouvez choisir la couleur que vous préférez
+
+    # Variable pour vérifier si le label a déjà été ajouté
+    label_added = False
+
+    # for i in range(4):
+    #     fov = chan.instr.fov + chan.pointings[i]
+    #     if not label_added:
+    #         ax.plot(
+    #             list(map(op.attrgetter("alpha"), fov.vertices)) + [fov.vertices[0].alpha],
+    #             list(map(op.attrgetter("beta"), fov.vertices)) + [fov.vertices[0].beta],
+    #             "-x",
+    #             color=plot_color,
+    #             linewidth=1,
+    #             label=f'channel {name}',
+    #         )
+    #         label_added = True  # Le label a été ajouté
+    #     else:
+    #         ax.plot(
+    #             list(map(op.attrgetter("alpha"), fov.vertices)) + [fov.vertices[0].alpha],
+    #             list(map(op.attrgetter("beta"), fov.vertices)) + [fov.vertices[0].beta],
+    #             "-x",
+    #             color=plot_color,
+    #             linewidth=1,
+    #         )
+
+    # ax.set_title(title)
+    if legend is not None:
+        ax.text(0.05, 0.95, legend, transform=ax.transAxes, bbox={'facecolor': 'white', 'pad': 10}, va='top', ha='left', fontsize=12)
+    else:
+        ax.text(-0.1, 0.5, title, va='center', ha='center', rotation='vertical', transform=ax.transAxes, fontsize=18)
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+    ax.figure.colorbar(im, ax=ax)
+
+
+
+
+def plot_central_column(ax, res_cube_slice, sim_cube_slice, Npix, wavelength, chan):
+    ax.plot(res_cube_slice[:, Npix//2], label=r'$\widehat{x}$')
+    ax.plot(sim_cube_slice[:, Npix//2], label=r'$x$')
+    ax.set_title(f'Central Column $\lambda = {wavelength}\mu m$')
+    ax.legend()
+
+def plot_central_column_bis(ax, res_cube_slice, sim_cube_slice, Npix, wavelength, method, mu):
+    ax.plot(res_cube_slice[:, Npix//2], label=r'$\widehat{x}$')
+    ax.plot(sim_cube_slice[:, Npix//2], label=r'$x$')
+    ax.set_ylabel(f'{method} $\mu = {mu}$')
+    ax.legend()
+
+def plot_central_column_with_FoV(ax, res_cube_slice, sim_cube_slice, Npix, wavelength, chan, origin_alpha_axis, origin_beta_axis):
+    intersections = []
+    alpha_coupe = origin_alpha_axis[Npix // 2]  
+
+    fov = chan.instr.fov + chan.pointings[0]
+
+    for j in range(len(fov.vertices)):
+        alpha1, beta1 = fov.vertices[j].alpha, fov.vertices[j].beta
+        alpha2, beta2 = fov.vertices[(j + 1) % len(fov.vertices)].alpha, fov.vertices[(j + 1) % len(fov.vertices)].beta
+
+        if (alpha1 - alpha_coupe) * (alpha2 - alpha_coupe) < 0:  
+            t = (alpha_coupe - alpha1) / (alpha2 - alpha1)
+            beta_inter = beta1 + t * (beta2 - beta1)
+            intersections.append(beta_inter)
+
+    beta_axis = origin_beta_axis  # y-coordinates in physical units
+
+    ax.plot(beta_axis, res_cube_slice[:, Npix//2], label=r'$\widehat{x}$')  
+    ax.plot(beta_axis, sim_cube_slice[:, Npix//2], label=r'$x$')  
+    for beta in intersections:
+        ax.axvline(x=beta, color='red', linestyle='--', alpha=0.7, label="Intersection FoV" if beta == intersections[0] else "")
+
+    ax.set_xlabel(r'$\beta$ coordinate') 
+    ax.legend()
+
+
 def add_gaussian_noise(signal, snr_db):
     """
     Ajoute un bruit gaussien à un signal donné pour obtenir un SNR spécifié en dB.
@@ -248,13 +366,10 @@ def add_gaussian_noise(signal, snr_db):
 
     return noisy_signal
 
+def parse_options():
 
-
-@click.command()
-@click.option('-fd', '--fusion_dir', default='/home/nmonnier/Data/JWST/Simulation/Orion', type=str, help='Fusion directory')
-@click.option('-hp', '--hyper_parameter', default=1., type=float, help='Hyperparameter value')
-@click.option('-ni', '--niter', default=5, type=int, help='Number of iteration.')
-def parse_options(fusion_dir, hyper_parameter, niter):
+    fusion_dir = '/home/nmonnier/Data/JWST/Simulation/Orion/'
+    result_dir = fusion_dir + 'Results/' + 'lcg_MC_12_MO_4_lmm_True_nit_2001_mu_5.00e+09'
 
     # Parameters
     step = 0.1 #arsec
@@ -265,89 +380,26 @@ def parse_options(fusion_dir, hyper_parameter, niter):
     # Reconstruction parameters
     paths, step_angle = initialize_parameters(fusion_dir, step)
 
-
     # Load simulation data
     maps, tpl, wavel_axis    = load_skyModel(paths)
     tpl = tpl[:, ::wavelength_ss]
     wavel_axis = wavel_axis[::wavelength_ss]
     
-    alpha_axis_mrs, beta_axis_mrs, soft_mrs = load_simulation_metadata_MRS(paths, step_angle, Npix_MRS)
-    alpha_axis_mirim, beta_axis_mirim, spsf_mirim, pce_mirim = load_simulation_metadata_MIRIM(paths, step_angle, Npix_MIRIM)
-
-    from matplotlib.ticker import MaxNLocator
-    
-    # Fonction pour convertir les degrés en RA (heures)
-    def deg_to_ra(deg):
-        return deg / 15.0  # 1 heure = 15 degrés
-
-    # Fonction pour convertir les degrés en DEC (degrés)
-    def deg_to_dec(deg):
-        return deg  # DEC est déjà en degrés
-
-    # Convertir les axes
-    alpha_axis_ra = deg_to_ra(alpha_axis_mirim)
-    beta_axis_dec = deg_to_dec(beta_axis_mirim)
-
-    # Créer une figure et une grille de sous-graphiques 2x2
-    fig, axes = plt.subplots(2, 2, figsize=(12, 12))
-
-    # Aplatir le tableau axes pour faciliter l'itération
-    axes = axes.flatten()
-
-    # Parcourir chaque image et l'afficher avec sa colorbar
-    for i in range(4):
-        # Afficher l'image en conservant l'aspect ratio
-        cax = axes[i].imshow(maps[i], cmap='viridis')
-
-        # Ajouter une colorbar
-        fig.colorbar(cax, ax=axes[i], orientation='vertical', fraction=0.046, pad=0.04)
-
-        # Ajouter un titre pour chaque image avec une taille agrandie
-        axes[i].set_title(f'Carte d\'abondance n° {i+1}', fontsize=16)
-
-        # Définir les labels des axes
-        axes[i].set_xlabel('RA (heures)')
-        axes[i].set_ylabel('DEC (degrés)')
-
-        # Limiter le nombre de ticks
-        axes[i].xaxis.set_major_locator(MaxNLocator(5))
-        axes[i].yaxis.set_major_locator(MaxNLocator(5))
-
-        # Forcer l'aspect ratio à 1:1 pour éviter la déformation
-        axes[i].set_aspect(1)
-
-    # Ajuster la disposition
-    plt.tight_layout()
-    plt.savefig('maps.png')
-    # Afficher les images
-    plt.show()
-
-
     # MIRIM FoV selection
     maps = maps[:,155:305,588:738]
 
-
     print(f"shape maps {maps.shape}, shape tpl {tpl.shape}, shape wavel_axis {wavel_axis.shape}")
+
+
 
     alpha_axis_mrs, beta_axis_mrs, soft_mrs = load_simulation_metadata_MRS(paths, step_angle, Npix_MRS)
     alpha_axis_mirim, beta_axis_mirim, spsf_mirim, pce_mirim = load_simulation_metadata_MIRIM(paths, step_angle, Npix_MIRIM)
-
-
-
+    # alpha_axis_mirim = np.flip(alpha_axis_mirim)
+    # alpha_axis_mrs = np.flip(alpha_axis_mrs)
+    beta_axis_mirim = np.flip(beta_axis_mirim)
     ifus = create_ifus()
     mrs_pointing = get_dithering(step_angle, ifus)
     spectroModel = create_spectroModel(soft_mrs, tpl, alpha_axis_mrs, beta_axis_mrs, wavel_axis, ifus, step_angle, mrs_pointing)
-    print(f"Shape MRS parameters :")
-    print(f"soft : {soft_mrs.shape}")
-
-    print("-------------")
-    print(f"Shape of  MiriModel parameters :")
-    print(f"spsf_mirim : {spsf_mirim.shape}")
-    print(f"pce_mirim : {pce_mirim.shape}")
-    print(f"wavel_axis : {wavel_axis.shape}")
-    print(f"tpl : {tpl.shape}")
-    print(f"imshape : {(Npix_MIRIM, Npix_MIRIM)}")
-    print(f"step {step}")
     try:
         H_freq = np.load(os.path.join(paths['template_dir'], "H_freq.npy"))
     except:
@@ -355,6 +407,77 @@ def parse_options(fusion_dir, hyper_parameter, niter):
     imageurModel = MiriModel.Mirim_Model_LMM(spsf_mirim, pce_mirim, wavel_axis, tpl, (Npix_MIRIM, Npix_MIRIM), step, H_freq)
     print(f'Imageur ishape {imageurModel.ishape}, oshape {imageurModel.oshape}')
     
+
+
+    plt.figure()
+    for k in range(4):
+        plt.plot(wavel_axis, tpl[k], label=f"tpl {k}")
+    plt.xlabel(r'Wavelength $\lambda$', fontsize=14)
+    plt.legend()
+    plt.tight_layout()
+    # plt.savefig('templates.png')
+
+
+    # Créer une figure et une grille de sous-graphiques 2x2
+    fig, axes = plt.subplots(2, 2, figsize=(12, 12))
+
+    # Aplatir le tableau axes pour faciliter l'itération
+    axes = axes.flatten()
+    
+    # Parcourir chaque image et l'afficher avec sa colorbar
+    for i in range(4):
+        # Afficher l'image en conservant l'aspect ratio
+        cax = axes[i].imshow(maps[i], 
+                             extent=[alpha_axis_mirim[0], alpha_axis_mirim[-1], beta_axis_mirim[0], beta_axis_mirim[-1]], 
+                             cmap='viridis',
+                             )
+
+        # Ajouter une colorbar
+        fig.colorbar(cax, ax=axes[i], orientation='vertical', fraction=0.046, pad=0.04)
+
+        # Ajouter un titre pour chaque image avec une taille agrandie
+        axes[i].set_title(f'Carte d\'abondance n° {i+1}, MIRIM FoV', fontsize=16)
+
+        # Définir les labels des axes
+        axes[i].set_xlabel('RA (degrés)')
+        axes[i].set_ylabel('DEC (degrés)')
+
+        # # Limiter le nombre de ticks
+        # axes[i].xaxis.set_major_locator(MaxNLocator(5))
+        # axes[i].yaxis.set_major_locator(MaxNLocator(5))
+
+        # Forcer l'aspect ratio à 1:1 pour éviter la déformation
+        axes[i].set_aspect(1)
+        label_added = False
+        for j in range(4):
+            if label_added == False:
+
+                fov = spectroModel.channels[-1].instr.fov + spectroModel.channels[-1].pointings[j]
+                axes[i].plot(
+                    list(map(op.attrgetter("alpha"), fov.vertices)) + [fov.vertices[0].alpha],
+                    list(map(op.attrgetter("beta"), fov.vertices)) + [fov.vertices[0].beta],
+                    "-x",
+                    label='MRS Ch4 FoV',
+                    color='red'
+                )
+                label_added = True
+            else:    
+                fov = spectroModel.channels[-1].instr.fov + spectroModel.channels[-1].pointings[j]
+                axes[i].plot(
+                    list(map(op.attrgetter("alpha"), fov.vertices)) + [fov.vertices[0].alpha],
+                    list(map(op.attrgetter("beta"), fov.vertices)) + [fov.vertices[0].beta],
+                    "-x",
+                    color='red'
+                )
+            axes[i].legend()
+
+    # Ajuster la disposition
+    plt.tight_layout()
+    
+    # plt.savefig('maps_FoV.png')
+    # Afficher les images
+    plt.show()
+
 
 
     # Simulate data
@@ -372,7 +495,81 @@ def parse_options(fusion_dir, hyper_parameter, niter):
         reshape_spectro_data = mrs_data[spectroModel._idx[ch_idx] : spectroModel._idx[ch_idx + 1]].reshape(chan.oshape)
         noisy_mrs_data[spectroModel._idx[ch_idx] : spectroModel._idx[ch_idx + 1]] = add_gaussian_noise(reshape_spectro_data, 30).ravel()
 
-    # reconstruction_method(imageurModel, noisy_mirim_data, spectroModel, noisy_mrs_data, paths["result_path"], hyper_parameter, niter, 'lcg', True)
+
+    sim_cube = spectroModel.mapsToCube(maps)
+
+    res_cube = np.load(result_dir + '/res_cube.npy')
+    res_maps = np.load(result_dir + '/res_x.npy')
+    criterion= np.load(result_dir + '/criterion.npy')
+
+    fig, axs = plt.subplots(3, 5)
+    fig2, axs2 = plt.subplots(3, 1)
+    plot_simulation_results(axs, axs2, spectroModel, sim_cube, res_cube, alpha_axis_mrs, beta_axis_mrs, wavel_axis, Npix_MRS, noisy_mirim_data, noisy_mrs_data)
+    # fig.savefig('simulation_results.png')
+
+
+    # Premier point (53,73) pour la coupe --> (53,77) avec les coords
+    plt.figure(figsize=(16, 6))  # Ajuster la taille de la figure pour plus de lisibilité
+
+    # Tracer les données avec des lignes plus fines et des couleurs distinctes
+    plt.plot(sim_cube[:, 75,67], label='True', linewidth=2, color='blue')
+    plt.plot(res_cube[:, 75,67], label='Reconstructed', linewidth=2, color='red')
+    plt.yscale('log')
+
+
+    # Ajouter des titres et des étiquettes aux axes
+    plt.title('Comparaison des données sim et res')
+    plt.xlabel(r'Wavelength $\lambda$', fontsize=14)
+    plt.ylabel(r'Intensity', fontsize=14)
+
+    # Ajouter une grille
+    plt.grid(True)
+
+    # Ajouter une légende avec une taille de police plus grande
+    plt.legend(fontsize=12)
+    plt.tight_layout()
+    plt.savefig('Coupe_wavel_1.png')
+    plt.figure()
+    plt.imshow(res_cube[53], cmap='viridis')
+    plt.plot(75,67, '.', color='red')
+    plt.title("Check coupe wavel")
+
+
+    fig3, axs3 = plt.subplots(3, 4, figsize=(16, 8))  # Ajuster la taille de la figure pour plus de lisibilité
+
+    # Ajuster l'espacement entre les sous-graphiques
+    plt.subplots_adjust(hspace=0.4, wspace=0.4)
+
+    # Tracer les données avec des titres et des barres de couleur
+    for i in range(4):
+        im1 = axs3[0, i].imshow(maps[i], cmap='viridis')
+        axs3[0, i].set_title(r'True Map $a$ n° {}'.format(i+1))
+        axs3[0, i].axis('off')  # Désactiver les axes si ce n'est pas nécessaire
+        fig3.colorbar(im1, ax=axs3[0, i], orientation='vertical', fraction=0.046, pad=0.04)
+
+        im2 = axs3[1, i].imshow(res_maps[i], cmap='viridis')
+        axs3[1, i].set_title(r'Reconstructed Map $\widehat{{a}}$ n° {}'.format(i+1))
+        axs3[1, i].axis('off')  # Désactiver les axes si ce n'est pas nécessaire
+        fig3.colorbar(im2, ax=axs3[1, i], orientation='vertical', fraction=0.046, pad=0.04)
+
+        im3 = axs3[2, i].imshow(maps[i]-res_maps[i], cmap='viridis')
+        axs3[2, i].set_title(r'Diff Map $(a - \widehat{{a}})$ n° {}'.format(i+1))
+        axs3[2, i].axis('off')  # Désactiver les axes si ce n'est pas nécessaire
+        fig3.colorbar(im3, ax=axs3[2, i], orientation='vertical', fraction=0.046, pad=0.04)
+
+
+    # Ajouter un titre global à la figure
+    fig3.suptitle('True and reconstructed maps differences', fontsize=18)
+    plt.tight_layout()
+    # plt.savefig('maps_diff.png')
+
+
+
+    plt.figure()
+    plt.plot(criterion)
+    plt.yscale('log')
+                
+   
 
     # # Define figure and subplots
     # fig, axes = plt.subplots(2, 2, figsize=(10, 10))
@@ -396,7 +593,7 @@ def parse_options(fusion_dir, hyper_parameter, niter):
     #                 '-x'
     #             )
     # plt.tight_layout()
-    # plt.show()
+    plt.show()
 
 
 if __name__ == '__main__':

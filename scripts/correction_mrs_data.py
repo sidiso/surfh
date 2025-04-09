@@ -21,7 +21,7 @@ from surfh.Vizualisation import slices_vizualisation
 
 console = Console()
 
-def load_simulation_data(npix=501):
+def load_simulation_data(npix=125, step=0.1):
     """
     Load simulation data and the wavelength information.
     """
@@ -31,12 +31,9 @@ def load_simulation_data(npix=501):
         spectrums = fits.open(path_cube_orion + "spectra_mir_orion.fits")[1].data
         wavel_axis = spectrums.wavelength
 
-        return (
-            0.025,
-            wavel_axis,
-        )
+        return wavel_axis
     
-    step, wavel_axis = orion()
+    wavel_axis = orion()
     step_Angle = Angle(step, u.arcsec)
     tpl_ss = 3
     wavel_axis = wavel_axis[::tpl_ss]
@@ -57,11 +54,10 @@ def extract_name_information(fits_path):
     return splitted_filename[0], splitted_filename[1], splitted_filename[3]
 
 
-def setup_channel_model(origin_alpha_axis, origin_beta_axis, targ_ra, targ_dec, ifu, wavelength_cube):
+def setup_channel_model(origin_alpha_axis, origin_beta_axis, targ_ra, targ_dec, ifu, wavelength_cube, step):
     """
     Set up channel model with super resolution and global wavelength.
     """
-    step = 0.025
     step_angle = Angle(step, u.arcsec).degree
 
     super_resolution_factor = instru.get_srf(
@@ -90,9 +86,9 @@ def setup_channel_model(origin_alpha_axis, origin_beta_axis, targ_ra, targ_dec, 
 def main():
 
     
-    save_corrected_dir = '/home/nmonnier/Data/JWST/Orion_bar/Observation_2/Fusion/Corrected_slices/'
+    save_corrected_dir = '/home/nmonnier/Data/JWST/NGC_7023/Fusion/Corrected_slices/'
     mode = [0,1] # 0=1st chan; 1=2nd chan; [0,1]=both chan
-    raw_dir = '/home/nmonnier/Data/JWST/Orion_bar/Observation_2/Fusion/Raw_slices/'
+    raw_dir = '/home/nmonnier/Data/JWST/NGC_7023/Fusion/Raw_slices/'
     for file in sorted(os.listdir(raw_dir)):
         print("File is ", file)
         first_chan, second_chan, dithering_number = extract_name_information(os.path.basename(raw_dir + file))
@@ -109,15 +105,16 @@ def main():
 
 
             # Load simulation data
-            Nx = 501
-            origin_alpha_axis, origin_beta_axis, wavelength_cube = load_simulation_data(npix=Nx)
+            Nx = 125
+            step = 0.1 # arcsec
+            origin_alpha_axis, origin_beta_axis, wavelength_cube = load_simulation_data(npix=Nx, step=step)
 
             # Extract target coordinates from FITS file
             targ_ra, targ_dec = fits_toolbox.get_fits_target_coordinates(raw_dir + file)
 
             # Setup channel model
             ifu, targ_ra, targ_dec = realmiri.get_IFU(raw_dir + file, chan_name=selected_chan)
-            model_channel = setup_channel_model(origin_alpha_axis, origin_beta_axis, targ_ra, targ_dec, ifu, wavelength_cube)
+            model_channel = setup_channel_model(origin_alpha_axis, origin_beta_axis, targ_ra, targ_dec, ifu, wavelength_cube, step)
 
             # Process FITS data and generate labeled image
             jwst_model = datamodels.open(raw_dir + file)
@@ -144,7 +141,7 @@ def main():
                                                                                         mrs_raw_data, 
                                                                                         ifu.wavel_axis,
                                                                                         mod)
-
+            slices_shape = corrected_slices.shape
             console.log("[bold blue]--- Process completed successfully! ---[/bold blue]")
 
             # Sort slices in the right order
@@ -195,7 +192,7 @@ def main():
 
 
 
-            fits_toolbox.corrected_slices_to_fits(corrected_slice_fits, ifu.fov.angle, targ_ra, targ_dec, filename, selected_chan)
+            fits_toolbox.corrected_slices_to_fits(corrected_slice_fits, ifu.fov.angle, targ_ra, targ_dec, filename, selected_chan, slices_shape)
 
             # slices_vizualisation.visualize_corrected_slices(corrected_slices.shape, corrected_slices)
 

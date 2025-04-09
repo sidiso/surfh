@@ -1,7 +1,7 @@
 from astropy.io import fits
 import numpy as np
 
-def corrected_slices_to_fits(corrected_slices, rotation, target_RA, target_DEC, filename, selected_chan):
+def corrected_slices_to_fits(corrected_slices, rotation, target_RA, target_DEC, filename, selected_chan, slices_shape):
 
     PA_V3 = rotation
     TARG_RA = target_RA
@@ -14,6 +14,9 @@ def corrected_slices_to_fits(corrected_slices, rotation, target_RA, target_DEC, 
     header = hdu.header
 
     # Add metadata to the header
+    header['NSlits'] = slices_shape[0]   # Number of slits
+    header['NWavel'] = slices_shape[1]   # Number of wavelength points
+    header['Nalpha'] = slices_shape[2]   # Number of alpha points
     header['PA_V3'] = PA_V3   # Position Angle (V3) in degrees
     header['TARG_RA'] = TARG_RA   # Target Right Ascension (in degrees)
     header['TARG_DEC'] = TARG_DEC   # Target Declination (in degrees)
