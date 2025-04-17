@@ -86,12 +86,16 @@ def setup_channel_model(origin_alpha_axis, origin_beta_axis, targ_ra, targ_dec, 
 def main():
 
     
-    save_corrected_dir = '/home/nmonnier/Data/JWST/NGC_7023/Fusion/Corrected_slices/'
+    save_corrected_dir = '/home/nmonnier/Data/JWST/Point_source/Fusion/Corrected_slices/'
     mode = [0,1] # 0=1st chan; 1=2nd chan; [0,1]=both chan
-    raw_dir = '/home/nmonnier/Data/JWST/NGC_7023/Fusion/Raw_slices/'
+    raw_dir = '/home/nmonnier/Data/JWST/Point_source/Fusion/Raw_slices/'
     for file in sorted(os.listdir(raw_dir)):
         print("File is ", file)
         first_chan, second_chan, dithering_number = extract_name_information(os.path.basename(raw_dir + file))
+
+        # DEBUG
+        if 'ch1a_ch2a_04102' not in file:
+            continue
 
         for mod in mode:
             if mod == 0:
@@ -135,6 +139,12 @@ def main():
             sorted_labeled_image = distorsion_correction.sort_labels_by_centroid(label_image)
             print(model_channel.oshape)
             print(model_channel.oshape[1:])
+
+            # # Debug
+            # mean_alpha, mean_beta = distorsion_correction.mrs_slices_debugging(model_channel, sorted_labeled_image, detector2world, mrs_raw_data, ifu.wavel_axis, mod)
+            # print(f"For file {file} and channel {selected_chan}, mean alpha is {mean_alpha} and mean beta is {mean_beta}")
+            # continue
+
             corrected_slices = distorsion_correction.mrs_slices_distrorsion_correction(model_channel, 
                                                                                         sorted_labeled_image, 
                                                                                         detector2world, 

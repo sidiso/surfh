@@ -101,6 +101,25 @@ def perform_shepard_interpolation(alpha_valid, lambda_valid,
 
 
 
+def mrs_slices_debugging(model_channel, sorted_labeled_image, detector2world, data, chan_wavelength, mode):
+    i = 0
+    mean_alpha = []
+    mean_beta = []
+    for slit in range(len(np.unique(sorted_labeled_image))):
+        
+        if slit == 0:
+            continue
+        
+        pixel_set = np.where(sorted_labeled_image == slit)
+        alpha, beta, lam = detector2world(pixel_set[1], pixel_set[0])
+        mean_alpha_slit = np.mean(alpha)
+        mean_beta_slit = np.mean(beta)
+
+        mean_alpha.append(mean_alpha_slit)
+        mean_beta.append(mean_beta_slit)
+    
+    return np.mean(mean_alpha), np.mean(mean_beta)
+    
 
 
 def mrs_slices_distrorsion_correction(model_channel, sorted_labeled_image, detector2world, data, chan_wavelength, mode):

@@ -127,7 +127,7 @@ def create_instruments(data_dict, list_chan):
             print(f"Rotation {chan} = {data_dict['rotation'][chan]}")
             spec_blur = instru.SpectralBlur(np.mean([r_min, r_max]))
             instruments[chan] = instru.IFU(
-                fov=instru.FOV(fov_x, fov_y, origin=instru.Coord(0, 0), angle=-(data_dict['rotation'][chan]-7.5)),
+                fov=instru.FOV(fov_x, fov_y, origin=instru.Coord(0, 0), angle=data_dict['rotation'][chan]),
                 det_pix_size=det_pix_size,
                 n_slit=n_slit,
                 w_blur=spec_blur,
@@ -143,19 +143,24 @@ def create_model(sotf, templates, origin_alpha_axis, origin_beta_axis, wavel_axi
     main_pointing = instru.Coord(0, 0)
 
     pointings = []
-    ra = [360-44.618321664549896, 360-44.61858962226571, 360-44.61814954236108, 360-44.618760529956795]
-    dec = [68.17383920898915, 68.17410269498914, 68.17388699348916, 68.17405526048913]
+
+    ra = [315.38216470139986, 315.3818968109811, 315.38233680667923, 315.38172580550366]
+    dec = [68.1737618072801, 68.17402533111624, 68.17380958724748, 68.17397786701078]
     for idx, chan in enumerate(instruments.keys()):
-        #pointing_chan = [main_pointing + instru.Coord(RA, DEC) for RA, DEC in data_dict['target'][chan]]
-        pointing_chan = [main_pointing + instru.Coord(ra[idx], dec[idx]) for idx in range(len(ra))]
+        pointing_chan = [main_pointing + instru.Coord(RA, DEC) for RA, DEC in data_dict['target'][chan]]
+        # pointing_chan = [main_pointing + instru.Coord(ra[idx], dec[idx]) for idx in range(len(ra))]
         pointings.append(instru.CoordList(pointing_chan).pix(step_angle))
 
     # alpha_axis = origin_alpha_axis + data_dict['target']['2a'][2][0]
     # beta_axis = origin_beta_axis + data_dict['target']['2a'][2][1]
     mean_alpha = np.mean([data_dict['target']['3a'][dith][0] for dith in range(4)])
     mean_beta = np.mean([data_dict['target']['3a'][dith][1] for dith in range(4)])
-    alpha_axis = origin_alpha_axis + 360-44.618321664549896#mean_alpha
-    beta_axis = origin_beta_axis + 68.17383920898915#mean_beta
+    
+    alpha_axis = origin_alpha_axis + mean_alpha
+    beta_axis = origin_beta_axis + mean_beta
+
+    # alpha_axis = origin_alpha_axis + ra[0]#360-44.618321664549896#mean_alpha
+#     # beta_axis = origin_beta_axis + dec[0]#68.17383920898915#mean_beta
 
 
     return spectroModel.spectroSigRLSCT(
@@ -313,19 +318,61 @@ def parse_options(fusion_dir, npix, hyper_parameter, niter, n_templates, scale_d
     # plt.plot(alpha_axis[-1], beta_axis[-1], 'o')
     #     # plt.legend()
     # plt.show()    
-    ra = [360-44.618321664549896, 360-44.61858962226571, 360-44.61814954236108, 360-44.618760529956795]
-    dec = [68.17383920898915, 68.17410269498914, 68.17388699348916, 68.17405526048913]
+
+
+    from astropy.wcs import WCS
+    # Exemple de données
+    ra = [315.38216470139986, 315.3818968109811, 315.38233680667923, 315.38172580550366]
+    dec = [68.1737618072801, 68.17402533111624, 68.17380958724748, 68.17397786701078]
+
+    # Supposons que spectroModel.alpha_axis et spectroModel.beta_axis soient des tableaux numpy
+    # Exemple de données pour alpha_axis et beta_axis
+    # alpha_axis = np.linspace(315.38, 315.39, 125)
+    # beta_axis = np.linspace(68.173, 68.175, 125)
+    mean_alpha = np.mean([data_dict['target']['3a'][dith][0] for dith in range(4)])
+    mean_beta = np.mean([data_dict['target']['3a'][dith][1] for dith in range(4)])
+    
+    alpha_axis = origin_alpha_axis + mean_alpha
+    beta_axis = origin_beta_axis + mean_beta
+
+    # Créer un WCS
+    wcs = WCS(naxis=2)
+    wcs.wcs.crpix = [125//2, 125//2]  # Centre de l'image en pixels
+    wcs.wcs.crval = [alpha_axis.mean(), beta_axis.mean()]  # Centre de l'image en coordonnées mondiales
+    wcs.wcs.cdelt = [(alpha_axis[-1] - alpha_axis[0]) / len(alpha_axis), (beta_axis[-1] - beta_axis[0]) / len(beta_axis)]  # Taille des pixels
+    wcs.wcs.ctype = ["RA---TAN", "DEC--TAN"]
 
     for idx, chan in enumerate(spectroModel.channels):
         weigthed_proj, _ = spectroModel.plot_slice(ndata, idx, 50)
         plt.figure()
-        plt.imshow(weigthed_proj,extent=[spectroModel.alpha_axis[0], spectroModel.alpha_axis[-1], spectroModel.beta_axis[0], spectroModel.beta_axis[-1]], origin='lower')
-        plt.title(f'Channel {chan.instr.name}')
-        # for RA, DEC in data_dict['target']['3a']:
-        #     plt.plot(RA, DEC, 'o', label=f'Channel {chan}')
-        for i in range(4):
-            plt.plot(ra[i], dec[i], 'o', label=f'Channel {chan}')
+
+        # Utiliser WCS pour l'affichage
+        ax = plt.subplot(projection=wcs)
+        ax.imshow(weigthed_proj, origin='lower')
+        ax.set_xlabel('RA')
+        ax.set_ylabel('Dec')
+        ax.set_title(f'Channel {chan.instr.name}')
+        # Transformer les coordonnées RA et DEC en coordonnées pixel
+        ra_pix, dec_pix = wcs.wcs_world2pix(ra, dec, 0)
+
+        # # Tracer les points avec les coordonnées RA et DEC
+        # for i in range(4):
+        #     ax.plot(ra_pix[i], dec_pix[i], marker="+", markersize=10, markeredgewidth=2, color="red", label="Projection Center")
+        #     print(f"Coordinates in pixels: {ra_pix[i]}, {dec_pix[i]}")
+
+            
+        #     ax.plot(data_dict['target']['3a'][i][0], data_dict['target']['3a'][i][1], marker="+", markersize=5, markeredgewidth=2, color="blue", label="Target")
+
+    
+
+        # Afficher la légende
+        ax.legend()
+
+        # Afficher la grille WCS
+        ax.coords.grid(True, color='white', ls='dotted')
+
         break
+
     plt.show()
 
     if verbose:
