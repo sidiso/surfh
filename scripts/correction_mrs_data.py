@@ -86,16 +86,16 @@ def setup_channel_model(origin_alpha_axis, origin_beta_axis, targ_ra, targ_dec, 
 def main():
 
     
-    save_corrected_dir = '/home/nmonnier/Data/JWST/Point_source/Fusion/Corrected_slices/'
+    save_corrected_dir = '/home/nmonnier/Data/JWST/small_NGC/Fusion/Corrected_slices/'
     mode = [0,1] # 0=1st chan; 1=2nd chan; [0,1]=both chan
-    raw_dir = '/home/nmonnier/Data/JWST/Point_source/Fusion/Raw_slices/'
+    raw_dir = '/home/nmonnier/Data/JWST/small_NGC/Fusion/Raw_slices/'
     for file in sorted(os.listdir(raw_dir)):
         print("File is ", file)
         first_chan, second_chan, dithering_number = extract_name_information(os.path.basename(raw_dir + file))
 
-        # DEBUG
-        if 'ch1a_ch2a_04102' not in file:
-            continue
+        # # DEBUG
+        # if 'ch1a_ch2a_04102' not in file:
+        #     continue
 
         for mod in mode:
             if mod == 0:
@@ -130,6 +130,7 @@ def main():
             yy, xx = np.meshgrid(x_pixel_idx, y_pixel_idx)
 
             detector2world = jwst_model.meta.wcs.get_transform('detector', 'world')
+            print(detector2world.inputs)
             coordinates = detector2world(xx, yy)
             binary_grid[~np.isnan(coordinates[0].T)] = 1
 
@@ -154,26 +155,37 @@ def main():
             slices_shape = corrected_slices.shape
             console.log("[bold blue]--- Process completed successfully! ---[/bold blue]")
 
-            # Sort slices in the right order
+            # # Sort slices in the right order
+            # if 'ch1' in selected_chan:
+            #     sorted_data = np.zeros_like(corrected_slices)
+
+            #     new_order = [0,11,1,12,2,13,3,14,4,15,5,16,6,17,7,18,8,19,9,20,10]
+            #     for i in range(corrected_slices.shape[0]):
+            #         sorted_data[new_order[i]] = corrected_slices[i]
+            #     # slices_vizualisation.visualize_corrected_slices(data_shape, data)
+            #     sorted_data = np.roll(sorted_data, 10, 0)
             if 'ch1' in selected_chan:
                 sorted_data = np.zeros_like(corrected_slices)
-
-                new_order = [0,11,1,12,2,13,3,14,4,15,5,16,6,17,7,18,8,19,9,20,10]
+                new_order = [10, 20, 9, 19, 8, 18, 7, 17, 6, 16, 5, 15, 4, 14, 3, 13, 2, 12, 1, 11, 0]
                 for i in range(corrected_slices.shape[0]):
                     sorted_data[new_order[i]] = corrected_slices[i]
-                # slices_vizualisation.visualize_corrected_slices(data_shape, data)
-                sorted_data = np.roll(sorted_data, 10, 0)
 
             elif 'ch2' in selected_chan:
                 sorted_data = np.zeros_like(corrected_slices)
-
-                new_order = [8,0,9,1,10,2,11,3,12,4,13,5,14,6,15,7,16]
+                new_order = [0, 9, 1, 10, 2, 11, 3, 12, 4, 13, 5, 14, 6, 15, 7, 16, 8]
                 for i in range(corrected_slices.shape[0]):
                     sorted_data[new_order[i]] = corrected_slices[i]
-                # slices_vizualisation.visualize_corrected_slices(data_shape, data)
-                sorted_data = np.roll(sorted_data, 9, 0)
-                # Correct data so slices are in right order
-                # sorted_data = np.array([sorted_data[:, i*24:(i+1)*24] for i in range(17)])
+
+            # elif 'ch2' in selected_chan:
+            #     sorted_data = np.zeros_like(corrected_slices)
+
+            #     new_order = [8,0,9,1,10,2,11,3,12,4,13,5,14,6,15,7,16]
+            #     for i in range(corrected_slices.shape[0]):
+            #         sorted_data[new_order[i]] = corrected_slices[i]
+            #     # slices_vizualisation.visualize_corrected_slices(data_shape, data)
+            #     sorted_data = np.roll(sorted_data, 9, 0)
+            #     # Correct data so slices are in right order
+            #     # sorted_data = np.array([sorted_data[:, i*24:(i+1)*24] for i in range(17)])
 
             elif 'ch3' in selected_chan:
                 sorted_data = np.zeros_like(corrected_slices)

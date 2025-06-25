@@ -14,8 +14,8 @@ from pathlib import Path
 
 
 def main():
-    save_corrected_dir = '/home/nmonnier/Data/JWST/Point_source/Fusion/Corrected_slices/'
-    save_filter_corrected_dir = '/home/nmonnier/Data/JWST/Point_source/Fusion/Filtered_slices/'
+    save_corrected_dir = '/home/nmonnier/Data/JWST/small_NGC/Fusion/Corrected_slices/'
+    save_filter_corrected_dir = '/home/nmonnier/Data/JWST/small_NGC/Fusion/Filtered_slices/'
 
     for filename in sorted(os.listdir(save_corrected_dir)):  # iterates over all the files in 'path'
         fits_name = Path(filename).stem
