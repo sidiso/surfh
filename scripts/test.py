@@ -5,12 +5,16 @@ from astropy.wcs import WCS
 from reproject import reproject_interp
 from matplotlib.patches import Polygon
 
+
+
 # Get all FITS files
+
+dir = "/home/nmonnier/Data/JWST/NGC_7023/"
 fits_files = [
-    "/home/nmonnier/Data/JWST/NGC_7023/jw01192001001_0310v_00001_mirifulong_s3d.fits",
-    "/home/nmonnier/Data/JWST/NGC_7023/jw01192001001_0310v_00002_mirifulong_s3d.fits",
-    "/home/nmonnier/Data/JWST/NGC_7023/jw01192001001_0310v_00003_mirifulong_s3d.fits",
-    "/home/nmonnier/Data/JWST/NGC_7023/jw01192001001_0310v_00004_mirifulong_s3d.fits",
+    dir + "jw01192001001_0310v_00001_mirifulong_s3d.fits",
+    dir + "jw01192001001_0310v_00002_mirifulong_s3d.fits",
+    dir + "jw01192001001_0310v_00003_mirifulong_s3d.fits",
+    dir + "jw01192001001_0310v_00004_mirifulong_s3d.fits",
 ]
 
 # Select a reference file (first FITS file)
