@@ -21,7 +21,7 @@ Instrument modeling
 
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from math import ceil, floor
 from typing import List, Tuple
 
@@ -280,7 +280,8 @@ class FOV:
 
     alpha_width: float
     beta_width: float
-    origin: Coord = Coord(0, 0)
+    # origin: Coord = Coord(0, 0)
+    origin: Coord = field(default_factory=lambda: Coord(0, 0))
     angle: float = 0
 
     def local_coords(

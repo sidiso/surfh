@@ -21,6 +21,7 @@ from numpy import ndarray as array
 import jax
 from jax import numpy as jnp
 from functools import partial
+from scipy.interpolate import griddata
 
 
 class Channel():
@@ -197,6 +198,107 @@ class Channel():
                                                 optimized_global_coords, 
                                                 (len(np.arange(local_cube.shape[0])), len(self.alpha_axis), len(self.beta_axis)))
         return global_cube
+
+    def test_project_mrsFov_to_specroFoV(self, MRSdata, pointing: instru.Coord):
+        alpha_grid, beta_grid = np.meshgrid(self.alpha_axis, self.beta_axis, indexing='ij')
+        optimized_global_coords = np.stack([alpha_grid.ravel(), beta_grid.ravel()], axis=-1)  # shape (Nx*Ny, 2)
+
+        X_mrs, Y_mrs = np.meshgrid(self.local_alpha_axis, self.local_beta_axis, indexing='ij')  # forme (Nxmrs, Nymrs)
+        mrs_coords = np.stack([X_mrs.ravel(), Y_mrs.ravel()], axis=0)  # shape (2, N)
+
+        # === 3. Appliquer rotation et translation ===
+        theta = np.deg2rad(self.instr.fov.angle)
+        R = np.array([
+            [np.cos(theta), -np.sin(theta)],
+            [np.sin(theta),  np.cos(theta)]
+        ])
+        rotated_coords = R @ mrs_coords  # shape (2, N)
+        rotated_coords[0, :] += pointing.alpha  # RA
+        rotated_coords[1, :] += pointing.beta  # DEC
+        rotated_coords = rotated_coords.T  # shape (N, 2)
+        # === 4. Interpolation de mrsFoV sur la grille RA/DEC ===
+        mrsFoV_resampled = griddata(
+            points=rotated_coords,
+            values=MRSdata.ravel(),
+            xi=optimized_global_coords,
+            method='linear',
+            fill_value=0
+        )
+
+        # === 5. Reformater en image 2D ===
+        mrsFoV_on_spectroFoV = mrsFoV_resampled.reshape((len(self.alpha_axis), len(self.beta_axis)))
+        return mrsFoV_on_spectroFoV
+
+
+    def project_MRS_on_global(self, MRSdata, 
+                            RA0, DEC0, angle_deg,
+                            RA_grid, DEC_grid,
+                            method='linear', fill_value=0):
+        """
+        Projette une image MRSdata dans une grille globale RA/DEC.
+
+        Paramètres
+        ----------
+        MRSdata : 2D array
+            Image locale à projeter.
+        local_alpha_axis : 1D array
+            Coordonnées locales alpha (axe horizontal) en degrés.
+        local_beta_axis : 1D array
+            Coordonnées locales beta (axe vertical) en degrés.
+        RA0, DEC0 : float
+            Coordonnées du pointage (centre de l'image) en degrés.
+        angle_deg : float
+            Angle de rotation de l'image locale, en degrés.
+        RA_grid, DEC_grid : 2D arrays
+            Grille globale des coordonnées RA/DEC sur laquelle projeter.
+        method : str
+            Méthode d'interpolation ('linear', 'nearest', etc.).
+        fill_value : float
+            Valeur par défaut en dehors des zones interpolées.
+
+        Retour
+        ------
+        projected_image : 2D array
+            Image projetée dans le repère global.
+        """
+        # Grille locale
+        X_local, Y_local = np.meshgrid(self.local_alpha_axis, self.local_beta_axis, indexing='ij')  # Shape (Ny, Nx)
+
+        # Aplatir et empiler en coordonnées locales (alpha, beta)
+        coords_local = np.stack([X_local.ravel(), Y_local.ravel()], axis=0)  # (2, N)
+
+        # Appliquer la rotation
+        theta = np.deg2rad(angle_deg)
+        R = np.array([
+            [np.cos(theta), -np.sin(theta)],
+            [np.sin(theta),  np.cos(theta)]
+        ])
+        coords_rotated = R @ coords_local  # (2, N)
+
+        # Appliquer le pointage RA/DEC
+        coords_rotated[0, :] += RA0
+        coords_rotated[1, :] += DEC0
+
+        # Préparer les points RA/DEC globaux pour l'interpolation
+        coords_rotated = coords_rotated.T  # (N, 2)
+        coords_target = np.stack([RA_grid.ravel(), DEC_grid.ravel()], axis=-1)  # (M, 2)
+        
+
+        # Interpolation
+        values = MRSdata.ravel()
+        interpolated = griddata(
+            points=coords_rotated,
+            values=values,
+            xi=coords_target,
+            method=method,
+            fill_value=fill_value
+        )
+
+        # Reshape pour avoir une image
+        projected_image = interpolated.reshape(RA_grid.shape)
+        return projected_image
+
+
 
     def NN_gridding(self, blurred_cube: array, wavel_indexes: array) -> array:
         gridded = blurred_cube.ravel()[wavel_indexes].reshape(self.instr_cube_shape[0], 
