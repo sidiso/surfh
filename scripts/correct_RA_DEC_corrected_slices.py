@@ -1,22 +1,7 @@
 import numpy as np
 import os
 from rich import print
-from rich.progress import track
-from rich.console import Console
 from astropy.io import fits
-
-from astropy import units as u
-from astropy.coordinates import Angle
-
-from jwst import datamodels
-
-from surfh.Simulation import simulation_data
-from surfh.Models import wavelength_mrs, realmiri, instru
-from surfh.DottestModels import MCMO_SigRLSCT_Channel_Model
-from surfh.Preprocessing import distorsion_correction
-from surfh.Vizualisation import slices_vizualisation
-from surfh.ToolsDir import fits_toolbox
-
 
 
 def extract_name_raw(dir):
@@ -27,9 +12,11 @@ def extract_name_corr_filt(dir):
     keywords = dir.split('_')
     return keywords[0], keywords[1]
 
-raw_slices_dir = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Raw_slices/'
-corrected_slices_dir = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Corrected_slices/'
-filtered_slices_dir = '/home/nmonnier/Data/JWST/Orion_bar/Fusion/Filtered_slices/'
+
+dir = '/home/nmonnier/Data/JWST/Point_source/Fusion/'
+raw_slices_dir = dir + 'Raw_slices/'
+corrected_slices_dir = dir + 'Corrected_slices/'
+filtered_slices_dir = dir + 'Filtered_slices/'
 
 corrected_files = os.listdir(corrected_slices_dir)
 filtered_files = os.listdir(filtered_slices_dir)
@@ -45,8 +32,8 @@ for file in os.listdir(raw_slices_dir):
                 print(f'Writting metadata from {file} to {slice_file}')
                 raw_hdulist = fits.open(raw_slices_dir+file)
                 header = raw_hdulist[1].header
-                new_ra = header['RA_V1']
-                new_dec = header['DEC_V1']
+                new_ra = header['RA_REF']
+                new_dec = header['DEC_REF']
                 raw_hdulist.close()
                 corrected_hdulist = fits.open(corrected_slices_dir+slice_file)
                 header = corrected_hdulist[0].header
@@ -62,8 +49,8 @@ for file in os.listdir(raw_slices_dir):
                 print(f'Writting metadata from {file} to {slice_file}')
                 raw_hdulist = fits.open(raw_slices_dir+file)
                 header = raw_hdulist[1].header
-                new_ra = header['RA_V1']
-                new_dec = header['DEC_V1']
+                new_ra = header['RA_REF']
+                new_dec = header['DEC_REF']
                 raw_hdulist.close()
                 corrected_hdulist = fits.open(corrected_slices_dir+slice_file)
                 header = corrected_hdulist[0].header
@@ -79,8 +66,8 @@ for file in os.listdir(raw_slices_dir):
                 print(f'Writting metadata from {file} to {slice_file}')
                 raw_hdulist = fits.open(raw_slices_dir+file)
                 header = raw_hdulist[1].header
-                new_ra = header['RA_V1']
-                new_dec = header['DEC_V1']
+                new_ra = header['RA_REF']
+                new_dec = header['DEC_REF']
                 raw_hdulist.close()
                 corrected_hdulist = fits.open(filtered_slices_dir+slice_file)
                 header = corrected_hdulist[0].header
@@ -96,8 +83,8 @@ for file in os.listdir(raw_slices_dir):
                 print(f'Writting metadata from {file} to {slice_file}')
                 raw_hdulist = fits.open(raw_slices_dir+file)
                 header = raw_hdulist[1].header
-                new_ra = header['RA_V1']
-                new_dec = header['DEC_V1']
+                new_ra = header['RA_REF']
+                new_dec = header['DEC_REF']
                 raw_hdulist.close()
                 corrected_hdulist = fits.open(filtered_slices_dir+slice_file)
                 header = corrected_hdulist[0].header
