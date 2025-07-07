@@ -23,7 +23,7 @@ def compute_monochromatic_psfs2(wave_filter, oversample=4, pixelscale=0.11, fov_
     """
     miri = webbpsf.MIRI()
     miri.mode = 'IFU'
-    miri.band= '1C'
+    # miri.band= '1C'
     miri.pixelscale = pixelscale
     if date is not None:
         miri.load_wss_opd_by_date(date, plot=False, choice="closest")
@@ -53,26 +53,26 @@ def compute_monochromatic_psfs2(wave_filter, oversample=4, pixelscale=0.11, fov_
 
 
 # array of wavelength 
-# wavel_axis = np.load('/home/nmonnier/Data/JWST/Orion_bar/Observation_1/Fusion/Templates/wavel_axis_orion_1ABC_2ABC_3ABC_4ABC_4_templates_SS4.npy') #wavelength_mrs.get_mrs_wavelength('1c')
-spectrums = fits.open("/home/nmonnier/Data/JWST/Simulation/Orion/Templates/spectra_mir_orion.fits")[1].data
-wavel_axis = spectrums.wavelength
-wavel_axis = wavel_axis[::4] # SS 
+wavel_axis = np.load('/home/nmonnier/Data/JWST/Orion_bar/Observation_1/Fusion/Templates/wavel_axis_orion_1ABC_2ABC_3ABC_4ABC_4_templates_SS4.npy') #wavelength_mrs.get_mrs_wavelength('1c')
+# spectrums = fits.open("/home/nmonnier/Data/JWST/Simulation/Orion/Templates/spectra_mir_orion.fits")[1].data
+# wavel_axis = spectrums.wavelength
+# wavel_axis = wavel_axis[::4] # SS 
 
 oversample = 1
 # Pixel scale
 pixelscale = 0.1 # valeur choisie pour le cas de test
 # Size of PSF in pixel (here 501x501)
-nb_pixels=150
+nb_pixels=125
 fov_arcsec = pixelscale * nb_pixels
 
 norm = 'last'
 # Time code of observation
-date = "2023-09-25T20:18:27"
+date = "2024-06-06T03:12:26"
 
 psfs_monoch = compute_monochromatic_psfs2(wavel_axis, oversample=oversample, pixelscale=pixelscale, fov_arcsec=fov_arcsec, norm=norm, date=date)
 
 psfs_monoch_array = np.array(psfs_monoch)
 
-file_path = "/home/nmonnier/Data/JWST/Simulation/Orion/PSF/"
+file_path = "/home/nmonnier/Data/JWST/Point_source/Fusion/PSF/"
 file_name = f"psfs_pixscale{pixelscale}_npix_{nb_pixels}_chan_1ABC_2ABC_3ABC_4ABC_SS4.npy"
 np.save(file_path + file_name, psfs_monoch_array)

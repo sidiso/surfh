@@ -13,7 +13,7 @@ from rich.console import Console
 from astropy import units as u
 from astropy.coordinates import Angle
 from surfh.Simulation import simulation_data
-from surfh.Models import wavelength_mrs, realmiri, instru
+from surfh.Models import wavelength_mrs, realmiri, instru, metadataMRS
 from surfh.Models import spectroModel
 from surfh.Vizualisation import slices_vizualisation, cube_vizualisation
 from surfh.Simulation import fusion_CT
@@ -42,18 +42,27 @@ def create_model(sotf, templates, origin_alpha_axis, origin_beta_axis, wavel_axi
     print("Creating pointings for each channel...")
     print(data_dict['target'])
 
-
+    # Delta offsets for each channel based on the pointing reference ch1
     delta_pointing = [(0,0),
-                      (-0.087/3600, -0.288/3600),
-                      (-0.654/3600, -0.002/3600),
-                      (+0.644/3600, +0.261/3600)]
+                      (0.087/3600, 0.288/3600),
+                      (0.654/3600, 0.002/3600),
+                      (-0.644/3600, -0.261/3600)]
+    
+    # Pointing correction for SN2023fyq
+    pointing_correction = {'1a' : (0, 0),  '1b' : (-1.00E-07, -2.70E-05),  '1c' : (2.72E-05, 5.48E-05),  # ch1
+                           '2a' : (-2.81E-05, 2.84E-05), '2b' : (-2.78E-05, -5.28E-05), '2c' : (3.47E-05, -4.86E-05),  # ch2
+                           '3a' : (-1.20E-06, 1.20E-06), '3b' : (-1.90E-06, -6.73E-05), '3c' : (-1.00E-06,-5.60E-05),  # ch3
+                           '4a' : (-1.07E-04, -2.91E-04), '4b' : (-1.10E-04,-3.23E-04), '4c' : (-1.40E-04,-2.86E-04)} # ch4
 
-    RA_REF  = data_dict['target']['2a'][0][0]  # Reference RA for pointing
-    DEC_REF = data_dict['target']['2a'][0][1]  # Reference DEC for pointing
+    RA_REF  = data_dict['targetREF']['1a'][0]  # Reference RA for pointing
+    DEC_REF = data_dict['targetREF']['1a'][1]  # Reference DEC for pointing
     for idx, chan in enumerate(instruments.keys()):
-        DETLA_RA = delta_pointing[idx][0]
-        DELTA_DEC = delta_pointing[idx][1]
-        pointing_chan = [main_pointing + instru.Coord(RA   - DITH_RA, DEC  + DITH_DEC) for (RA, DEC), (DITH_RA, DITH_DEC) in zip(data_dict['target'][chan], data_dict['dither'][chan])]
+        RA_CENTER = RA_REF  - data_dict['targetREF'][chan][0]
+        DEC_CENTER = DEC_REF - data_dict['targetREF'][chan][1]
+        DETLA_RA, DELTA_DEC = metadataMRS.get_chan_delta_pointing(chan)        # RA - DITH_RA seems so be the working solution here
+        RA_CORR, DEC_CORR = (pointing_correction[chan][0], pointing_correction[chan][1])
+        print(f"Chan {chan}, RA_CORR = {RA_CORR}; DEC_CORR = {DEC_CORR}")
+        pointing_chan = [main_pointing + instru.Coord( -RA_CORR - DITH_RA + DETLA_RA, -DEC_CORR + DITH_DEC + DELTA_DEC) for (RA, DEC), (DITH_RA, DITH_DEC) in zip(data_dict['target'][chan], data_dict['dither'][chan])]
         # pointing_chan = [main_pointing + instru.Coord(ra[idx], dec[idx]) for idx in range(len(ra))]
         pointings.append(instru.CoordList(pointing_chan).pix(step_angle))
         print("pointing_chan = ", pointing_chan)
@@ -63,8 +72,8 @@ def create_model(sotf, templates, origin_alpha_axis, origin_beta_axis, wavel_axi
     # beta_axis = origin_beta_axis + data_dict['target']['2a'][2][1]
     mean_alpha = np.mean([data_dict['target']['1a'][dith][0] for dith in range(4)])
     mean_beta = np.mean([data_dict['target']['1a'][dith][1] for dith in range(4)])
-    mean_alpha = data_dict['target']['2a'][0][0] 
-    mean_beta = data_dict['target']['2a'][0][1] 
+    mean_alpha = 0#data_dict['target']['1a'][0][0] 
+    mean_beta = 0#data_dict['target']['1a'][0][1] 
     print("mean_alpha = ", mean_alpha)
     print("mean_beta = ", mean_beta)
     alpha_axis = origin_alpha_axis + mean_alpha
@@ -134,7 +143,7 @@ def create_instruments(data_dict, list_chan):
 
 def load_data(list_chan, save_filter_corrected_dir):
     """Load data for the specified channels."""
-    data_dict = {'data': {}, 'target': {}, 'dither': {}, 'rotation': {}}
+    data_dict = {'data': {}, 'target': {}, 'targetV1' :{}, 'targetREF': {}, 'dither': {}, 'rotation': {}}
 
     datashape = {
         '1a': (21, 1050, 19), '1b': (21, 1213, 19), '1c': (21, 1400, 19),
@@ -145,6 +154,8 @@ def load_data(list_chan, save_filter_corrected_dir):
     for chan in list_chan:
         data_dict['data'][chan] = []
         data_dict['target'][chan] = []
+        data_dict['targetV1'][chan] = []
+        data_dict['targetREF'][chan] = []
         data_dict['dither'][chan] = []
         data_dict['rotation'][chan] = 0.
     i=0
@@ -161,6 +172,10 @@ def load_data(list_chan, save_filter_corrected_dir):
                     TARG_DEC = header['TARG_DEC']   # Adjust DEC to match the expected range
                     DITHER_RA = header['XOFFSET']
                     DITHER_DEC = header['YOFFSET']
+                    RA_V1 = header['RA_V1']
+                    DEC_V1 = header['DEC_V1']
+                    RA_REF = header['RA_REF']
+                    DEC_REF = header['DEC_REF']
                     data_shape = (header['NSlits'], header['NWavel'], header['Nalpha'])
                     data = hdul[0].data
                     ndata = data.reshape(data_shape[1], data_shape[0], data_shape[2])
@@ -172,6 +187,8 @@ def load_data(list_chan, save_filter_corrected_dir):
 
                     data_dict['data'][chan].append(ndata)
                     data_dict['target'][chan].append((TARG_RA, TARG_DEC))
+                    data_dict['targetV1'][chan]= (RA_V1, DEC_V1)
+                    data_dict['targetREF'][chan] = (RA_REF, DEC_REF)
                     data_dict['dither'][chan].append((DITHER_RA, DITHER_DEC))
                     print(TARG_RA, TARG_DEC)
                     # data_dict['target'][chan].append((permutations[idx][i%4][0], permutations[idx][i%4][1]))
@@ -210,13 +227,13 @@ def initialize_parameters(fusion_dir_path, step=0.1):
     return paths, step_angle
 
 
-def parse_options(ndith=[0,1,2,3]):
+def parse_options(ndith=[0,1,2,3], chan_idx=0, slice_idx=-1):
 
+    # fusion_dir = "/home/nmonnier/Data/JWST/Point_source/Fusion/"
     fusion_dir = "/home/nmonnier/Data/JWST/Point_source/Fusion/"
-    # fusion_dir = "/home/nmonnier/Data/JWST/small_NGC/Fusion/"
     npix = 125
     
-    list_chan = ['1a','2a']
+    list_chan = ['1a', '1b', '1c', '2a', '2b', '2c', '3a', '3b', '3c', '4a', '4b', '4c']
 
     step = 0.1  # arcsec
     paths, step_angle = initialize_parameters(fusion_dir, step)
@@ -235,7 +252,8 @@ def parse_options(ndith=[0,1,2,3]):
 
 
     print(f"spectroModel pointings = {spectroModel.pointings}")
-    numpy_slice = spectroModel.test_project_mrs_slice(ndata, 1, -1, ndith=ndith)
+    numpy_slice, degrid1, degrid2 = spectroModel.test_project_mrs_slice(ndata, chan_idx, slice_idx, ndith=ndith)
+
 
     return numpy_slice, alpha_coord, beta_coord, data_dict, spectroModel
 
@@ -431,7 +449,15 @@ def main():
         ref_shape = (ref_hdu[1].header["NAXIS2"], ref_hdu[1].header["NAXIS1"])  # 2D shape
 
     ndith = [0,1,2,3]  # Dithers to use for the test
-    numpy_slice, alpha_coord, beta_coord, data_dict , spectroModel= parse_options(ndith)
+    chan_idx = 9  # Channel index to test
+    slice_idx = -1  # Last slice index to test
+    numpy_slice, alpha_coord, beta_coord, data_dict , spectroModel= parse_options(ndith, chan_idx, slice_idx)
+
+    # TODEL : Chan 1a
+    chan_idx = 10  # Channel index to test
+    slice_idx = 0  # Last slice index to test
+    numpy_slice_a, _, _, _ , _= parse_options(ndith, chan_idx, slice_idx)
+
     # alpha_coord = alpha_coord-360 # Ajustement pour correspondre à la projection de l'image FITS
     custom_wcs = create_custom_wcs(alpha_coord, beta_coord)
     shape_source = numpy_slice.shape
@@ -459,12 +485,12 @@ def main():
     print("Footprint min/max:", np.nanmin(footprint), np.nanmax(footprint))
     
 
-    # Affichage des coins des images
-    plt.figure()
-    plot_corners(fits_wcs_2d, fits_slice.shape, label="FITS slice", color='blue')
-    plot_corners(custom_wcs, numpy_slice.shape, label="Not Weighted")
-    plt.legend()
-    plt.show()
+    # # Affichage des coins des images
+    # plt.figure()
+    # plot_corners(fits_wcs_2d, fits_slice.shape, label="FITS slice", color='blue')
+    # plot_corners(custom_wcs, numpy_slice.shape, label="Not Weighted")
+    # plt.legend()
+    # plt.show()
 
 
     # Scale both image to the same range
@@ -472,59 +498,71 @@ def main():
     numpy_slice_reprojected = numpy_slice_reprojected* (np.nanmax(fits_slice)/np.nanmax(numpy_slice_reprojected))
 
 
-    # --- Affichage ---
-    fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(8, 8), subplot_kw={'projection': fits_wcs_2d})
-    # ax.imshow(fits_slice, origin='lower', cmap='gray', alpha=0.7, label="FITS slice")
-    im0 = ax[0, 0].imshow(numpy_slice_reprojected, origin='lower', cmap='plasma', alpha=1, label="Surfh Projected Slice")
-    ax[0, 0].set_title("Surfh Projected Slice")
+    # # --- Affichage ---
+    # fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(8, 8), subplot_kw={'projection': fits_wcs_2d})
+    # # ax.imshow(fits_slice, origin='lower', cmap='gray', alpha=0.7, label="FITS slice")
+    # im0 = ax[0, 0].imshow(numpy_slice_reprojected, origin='lower', cmap='plasma', alpha=1, label="Surfh Projected Slice")
+    # ax[0, 0].set_title("Surfh Projected Slice")
 
-    im1 = ax[0, 1].imshow(fits_slice, origin='lower', cmap='plasma', alpha=1, label="FITS Slice")
-    ax[0, 1].set_title("FITS Slice")
+    # im1 = ax[0, 1].imshow(fits_slice, origin='lower', cmap='plasma', alpha=1, label="FITS Slice")
+    # ax[0, 1].set_title("FITS Slice")
     
-    im2 = ax[1, 0].imshow(numpy_slice_reprojected - fits_slice, origin='lower', cmap='plasma', alpha=1, label="Surfh Original Slice")
-    ax[1, 0].set_title("Difference (Surfh - FITS)")
+    # im2 = ax[1, 0].imshow(numpy_slice_reprojected - fits_slice, origin='lower', cmap='plasma', alpha=1, label="Surfh Original Slice")
+    # ax[1, 0].set_title("Difference (Surfh - FITS)")
 
-    # relative difference
-    relative_difference = 100 * (numpy_slice_reprojected - fits_slice) / fits_slice
-    relative_difference[np.isnan(relative_difference)] = 0  # Remplacer NaN par 0
-    relative_difference[relative_difference > 200] = 200
-    im3 = ax[1, 1].imshow(relative_difference, origin='lower', cmap='plasma', alpha=1, label="Relative Difference")
-    ax[1, 1].set_title("Relative Difference (%)")
+    # # relative difference
+    # relative_difference = 100 * (numpy_slice_reprojected - fits_slice) / fits_slice
+    # relative_difference[np.isnan(relative_difference)] = 0  # Remplacer NaN par 0
+    # relative_difference[relative_difference > 200] = 200
+    # im3 = ax[1, 1].imshow(relative_difference, origin='lower', cmap='plasma', alpha=1, label="Relative Difference")
+    # ax[1, 1].set_title("Relative Difference (%)")
 
-    # Centre FITS (optionnel, pour véri fication)
-    crpix1 = fits_slice.shape[1] / 2
-    crpix2 = fits_slice.shape[0] / 2
-    ax[0, 0].plot(crpix1, crpix2, marker='x', color='white', markersize=10, label='FITS center')
+    # # Centre FITS (optionnel, pour véri fication)
+    # crpix1 = fits_slice.shape[1] / 2
+    # crpix2 = fits_slice.shape[0] / 2
+    # ax[0, 0].plot(crpix1, crpix2, marker='x', color='white', markersize=10, label='FITS center')
 
-    # for dith in range(4):
-    #     alpha, beta = data_dict['target']['2a'][dith]
-    #     print(f"Dither {dith+1} - Alpha: {alpha}, Beta: {beta}")
-    #     ax[0, 0].plot(alpha, beta, marker='+', color='red', markersize=12, label='Target (alpha, beta)')
+    # # for dith in range(4):
+    # #     alpha, beta = data_dict['target']['2a'][dith]
+    # #     print(f"Dither {dith+1} - Alpha: {alpha}, Beta: {beta}")
+    # #     ax[0, 0].plot(alpha, beta, marker='+', color='red', markersize=12, label='Target (alpha, beta)')
 
 
-    # ax.legend()
+    # # ax.legend()
     
     
-    plt.colorbar(im0,ax=ax[0, 0])
-    plt.colorbar(im1,ax=ax[0, 1])
-    plt.colorbar(im2,ax=ax[1, 0])
-    plt.colorbar(im3,ax=ax[1, 1])
+    # plt.colorbar(im0,ax=ax[0, 0])
+    # plt.colorbar(im1,ax=ax[0, 1])
+    # plt.colorbar(im2,ax=ax[1, 0])
+    # plt.colorbar(im3,ax=ax[1, 1])
 
-    plt.show()
+    # plt.show()
 
-
-    plt.figure()
     extent = [alpha_coord.min(), alpha_coord.max(), beta_coord.min(), beta_coord.max()]
 
-    plt.imshow(numpy_slice, origin='lower', cmap='viridis', extent=extent)
+    plt.figure()
+    plt.imshow(numpy_slice, origin='lower', cmap='viridis', extent=extent, alpha=0.5)
+    plt.imshow(numpy_slice_a, origin='lower', cmap='viridis', extent=extent, alpha=0.5)
     plt.colorbar()
-    for dith in range(4):
-        alpha, beta = spectroModel.pointings[1][dith].alpha, spectroModel.pointings[1][dith].beta
-        print(f"Dither {dith+1} - Alpha: {alpha}, Beta: {beta}")
-        plt.plot(alpha, beta, marker='+', color='red', markersize=12, label='Target (alpha, beta)')
+    
+    fig, ax = plt.subplots(nrows=2)
     
 
+    numpy_slice[np.where(numpy_slice==np.nanmax(numpy_slice))] = np.nanmax(numpy_slice)  # Set max value to NaN for better visualization
+    numpy_slice_a[np.where(numpy_slice_a==np.nanmax(numpy_slice_a))] = np.nanmax(numpy_slice_a)  # Set max value to NaN for better visualization
+    ax[0].imshow(numpy_slice, origin='lower', cmap='viridis', extent=extent, alpha=1)
+    ax[1].imshow(numpy_slice_a, origin='lower', cmap='viridis', extent=extent, alpha=1)
+    # plt.colorbar()
+    # for dith in range(4):
+    #     alpha, beta = spectroModel.pointings[1][dith].alpha, spectroModel.pointings[1][dith].beta
+    #     print(f"Dither {dith+1} - Alpha: {alpha}, Beta: {beta}")
+    #     plt.plot(alpha, beta, marker='+', color='red', markersize=12, label='Target (alpha, beta)')
     plt.show()
+
+    tmp = np.zeros((numpy_slice.shape[0], numpy_slice.shape[1]))
+    cube = np.stack((numpy_slice, tmp, tmp, tmp, tmp, numpy_slice_a, tmp, tmp), axis=0)
+    print("Cube shape = ", cube.shape)
+    # cube_vizualisation.plot_cube(cube, np.arange(cube.shape[0]))
 
 if __name__ == "__main__":
     main()

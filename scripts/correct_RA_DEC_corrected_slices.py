@@ -36,8 +36,12 @@ for file in os.listdir(raw_slices_dir):
                 xoffset = header_glob['XOFFSET'] / 3600
                 yoffset = header_glob['YOFFSET'] / 3600
                 header_sci = raw_hdulist[1].header
-                new_ra = header_sci['RA_V1']/3600
-                new_dec = header_sci['DEC_V1']/3600
+                new_ra = header_sci['RA_V1']#/3600
+                new_dec = header_sci['DEC_V1']#/3600
+                new_ra_v1 = header_sci['RA_V1']
+                new_dec_v1 = header_sci['DEC_V1']
+                new_ra_ref = header_sci['RA_REF']
+                new_dec_ref = header_sci['DEC_REF']
                 raw_hdulist.close()
 
                 corrected_hdulist = fits.open(corrected_slices_dir+slice_file)
@@ -46,6 +50,10 @@ for file in os.listdir(raw_slices_dir):
                 header['TARG_DEC'] = new_dec
                 header['XOFFSET'] = xoffset
                 header['YOFFSET'] = yoffset
+                header['RA_V1']   = (new_ra_v1, '(deg) RA of telescope V1 axis')
+                header['DEC_V1']  = (new_dec_v1, '(deg) Dec of telescope V1 axis')
+                header['RA_REF']  = (new_ra_ref, '(deg) Right Ascension of the reference point')
+                header['DEC_REF'] = (new_dec_ref, '(deg) Declination of the reference point')
                 corrected_hdulist.writeto(corrected_slices_dir+slice_file, overwrite=True)
                 corrected_hdulist.close()
 
@@ -59,8 +67,12 @@ for file in os.listdir(raw_slices_dir):
                 xoffset = header_glob['XOFFSET'] / 3600
                 yoffset = header_glob['YOFFSET'] / 3600
                 header_sci = raw_hdulist[1].header
-                new_ra = header_sci['RA_V1']/3600
-                new_dec = header_sci['DEC_V1']/3600
+                new_ra = header_sci['RA_V1']#/3600
+                new_dec = header_sci['DEC_V1']#/3600
+                new_ra_v1 = header_sci['RA_V1']
+                new_dec_v1 = header_sci['DEC_V1']
+                new_ra_ref = header_sci['RA_REF']
+                new_dec_ref = header_sci['DEC_REF']
                 raw_hdulist.close()
 
                 corrected_hdulist = fits.open(corrected_slices_dir+slice_file)
@@ -69,6 +81,10 @@ for file in os.listdir(raw_slices_dir):
                 header['TARG_DEC'] = new_dec
                 header['XOFFSET'] = xoffset
                 header['YOFFSET'] = yoffset
+                header['RA_V1']   = (new_ra_v1, '(deg) RA of telescope V1 axis')
+                header['DEC_V1']  = (new_dec_v1, '(deg) Dec of telescope V1 axis')
+                header['RA_REF']  = (new_ra_ref, '(deg) Right Ascension of the reference point')
+                header['DEC_REF'] = (new_dec_ref, '(deg) Declination of the reference point')
                 corrected_hdulist.writeto(corrected_slices_dir+slice_file, overwrite=True)
                 corrected_hdulist.close()
 
@@ -82,8 +98,12 @@ for file in os.listdir(raw_slices_dir):
                 xoffset = header_glob['XOFFSET'] / 3600
                 yoffset = header_glob['YOFFSET'] / 3600
                 header_sci = raw_hdulist[1].header
-                new_ra = header_sci['RA_V1']/3600
-                new_dec = header_sci['DEC_V1']/3600
+                new_ra = header_sci['RA_V1']#/3600
+                new_dec = header_sci['DEC_V1']#/3600
+                new_ra_v1 = header_sci['RA_V1']
+                new_dec_v1 = header_sci['DEC_V1']
+                new_ra_ref = header_sci['RA_REF']
+                new_dec_ref = header_sci['DEC_REF']
                 raw_hdulist.close()
 
                 corrected_hdulist = fits.open(filtered_slices_dir+slice_file)
@@ -92,6 +112,10 @@ for file in os.listdir(raw_slices_dir):
                 header['TARG_DEC'] = new_dec
                 header['XOFFSET'] = xoffset
                 header['YOFFSET'] = yoffset
+                header['RA_V1']   = (new_ra_v1, '(deg) RA of telescope V1 axis')
+                header['DEC_V1']  = (new_dec_v1, '(deg) Dec of telescope V1 axis')
+                header['RA_REF']  = (new_ra_ref, '(deg) Right Ascension of the reference point')
+                header['DEC_REF'] = (new_dec_ref, '(deg) Declination of the reference point')
                 corrected_hdulist.writeto(filtered_slices_dir+slice_file, overwrite=True)
                 corrected_hdulist.close()
 
@@ -105,8 +129,12 @@ for file in os.listdir(raw_slices_dir):
                 xoffset = header_glob['XOFFSET'] / 3600
                 yoffset = header_glob['YOFFSET'] / 3600
                 header_sci = raw_hdulist[1].header
-                new_ra = header_sci['RA_V1']/3600
-                new_dec = header_sci['DEC_V1']/3600
+                new_ra = header_sci['RA_V1']#/3600
+                new_dec = header_sci['DEC_V1']#/3600
+                new_ra_v1 = header_sci['RA_V1']
+                new_dec_v1 = header_sci['DEC_V1']
+                new_ra_ref = header_sci['RA_REF']
+                new_dec_ref = header_sci['DEC_REF']
                 raw_hdulist.close()
 
                 corrected_hdulist = fits.open(filtered_slices_dir+slice_file)
@@ -115,5 +143,9 @@ for file in os.listdir(raw_slices_dir):
                 header['TARG_DEC'] = new_dec
                 header['XOFFSET'] = xoffset
                 header['YOFFSET'] = yoffset
+                header['RA_V1']   = (new_ra_v1, '(deg) RA of telescope V1 axis')
+                header['DEC_V1']  = (new_dec_v1, '(deg) Dec of telescope V1 axis')
+                header['RA_REF']  = (new_ra_ref, '(deg) Right Ascension of the reference point')
+                header['DEC_REF'] = (new_dec_ref, '(deg) Declination of the reference point')
                 corrected_hdulist.writeto(filtered_slices_dir+slice_file, overwrite=True)
                 corrected_hdulist.close()

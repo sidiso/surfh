@@ -43,6 +43,9 @@ def get_IFU(filename, chan_name=None, wavel_from_file=False):
     """
     Return Instrumental IFU regarding metadata of the fits file.
     """
+    # DELETE This print statement
+    print("HEYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYy - In get_IFU. I don't want to be here")
+
     hdul = fits.open(filename)
     hdr = hdul[0].header
     targ_ra  = hdul[1].header['RA_V1']

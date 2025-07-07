@@ -291,6 +291,7 @@ class spectroSigRLSCT(LinOp):
         chan = self.channels[n_chan]
         # Get shape of output image
         global_img = np.zeros(self.imshape)
+        global_img2 = np.zeros(self.imshape)
         cum_grid = np.zeros((len(self.pointings[n_chan]), self.imshape[0], self.imshape[1]))
 
         # Select data for specific wavelength
@@ -313,6 +314,7 @@ class spectroSigRLSCT(LinOp):
 
 
         cg = []
+        cg2 = []
         # for p_idx, pointing in enumerate([self.pointings[n_chan][0]]):
         # p_idx = 0
         # pointing = self.pointings[n_chan][p_idx]
@@ -367,16 +369,19 @@ class spectroSigRLSCT(LinOp):
                         RA_grid=RA_grid,
                         DEC_grid=DEC_grid)   
 
+            degridded2 = chan.gridding_t(np.array(sum_t_img, dtype=np.float64), pointing)
             
             # plt.figure(figsize=(10, 10))
             # plt.imshow(sum_t_img[0], cmap='viridis')
             # plt.colorbar()
             # plt.show()
             # axes[p_idx].imshow(degridded, cmap='viridis', aspect='auto')
-            degridded = degridded
             global_img += degridded
+            global_img2 += degridded2[0]
+
             cum_grid[p_idx] = degridded
             cg.append(np.ma.masked_less(degridded, 1))
+            cg2.append(np.ma.masked_less(degridded2[0], 1))
 
         #     im = axes[p_idx].imshow(degridded, origin='lower', extent=[
         #     ], cmap='viridis')
@@ -394,7 +399,7 @@ class spectroSigRLSCT(LinOp):
 
 
 
-        return np.ma.mean(cg, axis=0)
+        return np.ma.mean(cg, axis=0), global_img, np.ma.mean(cg2, axis=0)
 
 
 
