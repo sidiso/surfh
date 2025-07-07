@@ -13,6 +13,7 @@ def extract_name_corr_filt(dir):
     return keywords[0], keywords[1]
 
 
+# dir = '/home/nmonnier/Data/JWST/small_NGC/Fusion/'
 dir = '/home/nmonnier/Data/JWST/Point_source/Fusion/'
 raw_slices_dir = dir + 'Raw_slices/'
 corrected_slices_dir = dir + 'Corrected_slices/'
@@ -31,14 +32,20 @@ for file in os.listdir(raw_slices_dir):
             if(dith in slice_file):
                 print(f'Writting metadata from {file} to {slice_file}')
                 raw_hdulist = fits.open(raw_slices_dir+file)
-                header = raw_hdulist[1].header
-                new_ra = header['RA_REF']
-                new_dec = header['DEC_REF']
+                header_glob = raw_hdulist[0].header
+                xoffset = header_glob['XOFFSET'] / 3600
+                yoffset = header_glob['YOFFSET'] / 3600
+                header_sci = raw_hdulist[1].header
+                new_ra = header_sci['RA_V1']/3600
+                new_dec = header_sci['DEC_V1']/3600
                 raw_hdulist.close()
+
                 corrected_hdulist = fits.open(corrected_slices_dir+slice_file)
                 header = corrected_hdulist[0].header
                 header['TARG_RA'] = new_ra
                 header['TARG_DEC'] = new_dec
+                header['XOFFSET'] = xoffset
+                header['YOFFSET'] = yoffset
                 corrected_hdulist.writeto(corrected_slices_dir+slice_file, overwrite=True)
                 corrected_hdulist.close()
 
@@ -48,14 +55,20 @@ for file in os.listdir(raw_slices_dir):
             if(dith in slice_file):
                 print(f'Writting metadata from {file} to {slice_file}')
                 raw_hdulist = fits.open(raw_slices_dir+file)
-                header = raw_hdulist[1].header
-                new_ra = header['RA_REF']
-                new_dec = header['DEC_REF']
+                header_glob = raw_hdulist[0].header
+                xoffset = header_glob['XOFFSET'] / 3600
+                yoffset = header_glob['YOFFSET'] / 3600
+                header_sci = raw_hdulist[1].header
+                new_ra = header_sci['RA_V1']/3600
+                new_dec = header_sci['DEC_V1']/3600
                 raw_hdulist.close()
+
                 corrected_hdulist = fits.open(corrected_slices_dir+slice_file)
                 header = corrected_hdulist[0].header
                 header['TARG_RA'] = new_ra
                 header['TARG_DEC'] = new_dec
+                header['XOFFSET'] = xoffset
+                header['YOFFSET'] = yoffset
                 corrected_hdulist.writeto(corrected_slices_dir+slice_file, overwrite=True)
                 corrected_hdulist.close()
 
@@ -65,14 +78,20 @@ for file in os.listdir(raw_slices_dir):
             if(dith in slice_file):
                 print(f'Writting metadata from {file} to {slice_file}')
                 raw_hdulist = fits.open(raw_slices_dir+file)
-                header = raw_hdulist[1].header
-                new_ra = header['RA_REF']
-                new_dec = header['DEC_REF']
+                header_glob = raw_hdulist[0].header
+                xoffset = header_glob['XOFFSET'] / 3600
+                yoffset = header_glob['YOFFSET'] / 3600
+                header_sci = raw_hdulist[1].header
+                new_ra = header_sci['RA_V1']/3600
+                new_dec = header_sci['DEC_V1']/3600
                 raw_hdulist.close()
+
                 corrected_hdulist = fits.open(filtered_slices_dir+slice_file)
                 header = corrected_hdulist[0].header
                 header['TARG_RA'] = new_ra
                 header['TARG_DEC'] = new_dec
+                header['XOFFSET'] = xoffset
+                header['YOFFSET'] = yoffset
                 corrected_hdulist.writeto(filtered_slices_dir+slice_file, overwrite=True)
                 corrected_hdulist.close()
 
@@ -82,13 +101,19 @@ for file in os.listdir(raw_slices_dir):
             if(dith in slice_file):
                 print(f'Writting metadata from {file} to {slice_file}')
                 raw_hdulist = fits.open(raw_slices_dir+file)
-                header = raw_hdulist[1].header
-                new_ra = header['RA_REF']
-                new_dec = header['DEC_REF']
+                header_glob = raw_hdulist[0].header
+                xoffset = header_glob['XOFFSET'] / 3600
+                yoffset = header_glob['YOFFSET'] / 3600
+                header_sci = raw_hdulist[1].header
+                new_ra = header_sci['RA_V1']/3600
+                new_dec = header_sci['DEC_V1']/3600
                 raw_hdulist.close()
+
                 corrected_hdulist = fits.open(filtered_slices_dir+slice_file)
                 header = corrected_hdulist[0].header
                 header['TARG_RA'] = new_ra
                 header['TARG_DEC'] = new_dec
+                header['XOFFSET'] = xoffset
+                header['YOFFSET'] = yoffset
                 corrected_hdulist.writeto(filtered_slices_dir+slice_file, overwrite=True)
                 corrected_hdulist.close()

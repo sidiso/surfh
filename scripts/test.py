@@ -9,12 +9,12 @@ from matplotlib.patches import Polygon
 
 # Get all FITS files
 
-dir = "/home/nmonnier/Data/JWST/NGC_7023/"
+dir = "/home/nmonnier/Data/JWST/PIPELINE/small_NGC/stage2/"
 fits_files = [
-    dir + "jw01192001001_0310v_00001_mirifulong_s3d.fits",
-    dir + "jw01192001001_0310v_00002_mirifulong_s3d.fits",
-    dir + "jw01192001001_0310v_00003_mirifulong_s3d.fits",
-    dir + "jw01192001001_0310v_00004_mirifulong_s3d.fits",
+    dir + "jw01192001001_0310v_00001_mirifushort_s3d.fits",
+    dir + "jw01192001001_0310v_00002_mirifushort_s3d.fits",
+    dir + "jw01192001001_0310v_00003_mirifushort_s3d.fits",
+    dir + "jw01192001001_0310v_00004_mirifushort_s3d.fits",
 ]
 
 # Select a reference file (first FITS file)
@@ -35,8 +35,8 @@ for file in fits_files:
         data_in[np.isnan(data_in)] = 0  # Replace NaNs with zeros
 
         # Extract a single slice (e.g., middle slice along NAXIS3)
-        slice_idx = 0 #data_in.shape[0] // 2  # Middle wavelength slice
-        slice_2d = data_in[0, :, :]  # Shape: (NAXIS2, NAXIS1)
+        slice_idx = -1 #data_in.shape[0] // 2  # Middle wavelength slice
+        slice_2d = data_in[slice_idx, :, :]  # Shape: (NAXIS2, NAXIS1)
 
         print("Min:", np.nanmin(slice_2d), "Max:", np.nanmax(slice_2d))
         print("Mean:", np.nanmean(slice_2d))

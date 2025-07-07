@@ -261,6 +261,7 @@ class Channel():
         projected_image : 2D array
             Image projetée dans le repère global.
         """
+        print(f"RA0: {RA0}, DEC0: {DEC0}, angle_deg: {angle_deg}")
         # Grille locale
         X_local, Y_local = np.meshgrid(self.local_alpha_axis, self.local_beta_axis, indexing='ij')  # Shape (Ny, Nx)
 
@@ -283,6 +284,7 @@ class Channel():
         coords_rotated = coords_rotated.T  # (N, 2)
         coords_target = np.stack([RA_grid.ravel(), DEC_grid.ravel()], axis=-1)  # (M, 2)
         
+        print(f"mean RA_grid: {np.mean(RA_grid)}, mean DEC_grid: {np.mean(DEC_grid)}")
 
         # Interpolation
         values = MRSdata.ravel()

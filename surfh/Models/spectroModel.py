@@ -285,7 +285,7 @@ class spectroSigRLSCT(LinOp):
         return weighted_mean, global_img
 
 
-    def test_project_mrs_slice(self, all_data, n_chan, nslice):
+    def test_project_mrs_slice(self, all_data, n_chan, nslice, ndith=[0]):
 
         # Get shape of specific IFU band
         chan = self.channels[n_chan]
@@ -303,17 +303,25 @@ class spectroSigRLSCT(LinOp):
         # Grille RA/DEC globale
         print("spectroModel pointing is : ", self.pointings)
         print(f'self.pointings[0].alpha = {self.pointings[0][0]}')
-        RA_axis = self.pointings[0][0].alpha + (np.arange(Nx) - Nx // 2) * -self.step_degree
-        DEC_axis = self.pointings[0][0].beta + (np.arange(Ny) - Ny // 2) * self.step_degree
+        # RA_axis = self.pointings[0][0].alpha + (np.arange(Nx) - Nx // 2) * -self.step_degree
+        # DEC_axis = self.pointings[0][0].beta + (np.arange(Ny) - Ny // 2) * self.step_degree
+        # RA_axis = np.flip(self.alpha_axis)
+        RA_axis = self.alpha_axis
+        DEC_axis = self.beta_axis
+
         RA_grid, DEC_grid = np.meshgrid(RA_axis, DEC_axis, indexing='xy')
 
 
         cg = []
         # for p_idx, pointing in enumerate([self.pointings[n_chan][0]]):
-        p_idx = 1
-        pointing = self.pointings[n_chan][p_idx]
-        print(f"pointing alpha : {pointing.alpha}, beta : {pointing.beta}")
-        if True:
+        # p_idx = 0
+        # pointing = self.pointings[n_chan][p_idx]
+        
+        for dith in ndith:
+            p_idx = dith
+            print(f"p_idx : {p_idx}")
+            pointing = self.pointings[n_chan][p_idx]
+            print(f"pointing alpha : {pointing.alpha}, beta : {pointing.beta}")
             print("!!!!!!!!!!!!!!!!!!!!!!")
             local_img = np.zeros(chan.local_im_shape)
             for slit_idx in range(chan.instr.n_slit):
@@ -335,14 +343,13 @@ class spectroSigRLSCT(LinOp):
 
             sum_t_img = np.array(sum_t_img)
             sum_t_img[sum_t_img<1] = 0
-
             # TODEL 
             print("sum_t_img shape : ", sum_t_img.shape)
             # sum_t_img[0] = np.rot90(sum_t_img[0], 2)
 
-            plt.figure()
-            plt.imshow(sum_t_img[0], cmap='viridis')
-            plt.colorbar()
+            # plt.figure()  
+            # plt.imshow(sum_t_img[0], cmap='viridis')
+            # plt.colorbar()
 
             # sum_t_img[:,5] = sum_t_img[:,6]
             # sum_t_img[:,153] = sum_t_img[:,152]
@@ -353,14 +360,13 @@ class spectroSigRLSCT(LinOp):
             # axes[p_idx].imshow(np.array(sum_t_img[0], dtype=np.float64), cmap='viridis')
             # degridded = chan.test_project_mrsFov_to_specroFoV(np.array(sum_t_img, dtype=np.float64), pointing)
             degridded = chan.project_MRS_on_global(
-                        MRSdata=np.array((sum_t_img[0]), dtype=np.float64),
+                        MRSdata=np.array(((sum_t_img[0])), dtype=np.float64),
                         RA0=pointing.alpha,
                         DEC0=pointing.beta,
                         angle_deg=chan.instr.fov.angle,
                         RA_grid=RA_grid,
                         DEC_grid=DEC_grid)   
-            
-            
+
             
             # plt.figure(figsize=(10, 10))
             # plt.imshow(sum_t_img[0], cmap='viridis')

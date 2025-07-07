@@ -42,8 +42,18 @@ def create_model(sotf, templates, origin_alpha_axis, origin_beta_axis, wavel_axi
     print("Creating pointings for each channel...")
     print(data_dict['target'])
 
+
+    delta_pointing = [(0,0),
+                      (-0.087/3600, -0.288/3600),
+                      (-0.654/3600, -0.002/3600),
+                      (+0.644/3600, +0.261/3600)]
+
+    RA_REF  = data_dict['target']['2a'][0][0]  # Reference RA for pointing
+    DEC_REF = data_dict['target']['2a'][0][1]  # Reference DEC for pointing
     for idx, chan in enumerate(instruments.keys()):
-        pointing_chan = [main_pointing + instru.Coord(RA, DEC) for RA, DEC in data_dict['target'][chan]]
+        DETLA_RA = delta_pointing[idx][0]
+        DELTA_DEC = delta_pointing[idx][1]
+        pointing_chan = [main_pointing + instru.Coord(RA   - DITH_RA, DEC  + DITH_DEC) for (RA, DEC), (DITH_RA, DITH_DEC) in zip(data_dict['target'][chan], data_dict['dither'][chan])]
         # pointing_chan = [main_pointing + instru.Coord(ra[idx], dec[idx]) for idx in range(len(ra))]
         pointings.append(instru.CoordList(pointing_chan).pix(step_angle))
         print("pointing_chan = ", pointing_chan)
@@ -53,12 +63,15 @@ def create_model(sotf, templates, origin_alpha_axis, origin_beta_axis, wavel_axi
     # beta_axis = origin_beta_axis + data_dict['target']['2a'][2][1]
     mean_alpha = np.mean([data_dict['target']['1a'][dith][0] for dith in range(4)])
     mean_beta = np.mean([data_dict['target']['1a'][dith][1] for dith in range(4)])
-    # mean_alpha = data_dict['target']['1a'][0][0] 
-    # mean_beta = data_dict['target']['1a'][0][1] 
+    mean_alpha = data_dict['target']['2a'][0][0] 
+    mean_beta = data_dict['target']['2a'][0][1] 
     print("mean_alpha = ", mean_alpha)
     print("mean_beta = ", mean_beta)
     alpha_axis = origin_alpha_axis + mean_alpha
+    # alpha_axis = np.flip(alpha_axis)  # Flip the axis to match the expected orientation
+
     beta_axis = origin_beta_axis + mean_beta
+    
     # alpha_axis = origin_alpha_axis + ra[0]#360-44.618321664549896#mean_alpha
 #     # beta_axis = origin_beta_axis + dec[0]#68.17383920898915#mean_beta
 
@@ -67,8 +80,10 @@ def create_model(sotf, templates, origin_alpha_axis, origin_beta_axis, wavel_axi
     # beta_axis = origin_beta_axis + 68.17373041466647 #+ (1.2372487603595346/3600)
     
     # Dither 002
-    alpha_axis = origin_alpha_axis + 315.38195270058264 - 360 #+ (-0.07481027889940606/3600)
-    beta_axis = origin_beta_axis + 68.1739939386045 #+ (1.2372487603595346/3600)
+    # alpha_axis = origin_alpha_axis + 186.44099109978166 - 360 #+ (-0.07481027889940606/3600)
+    # beta_axis = origin_beta_axis + 12.663165115171752 #+ (1.2372487603595346/3600)
+    print("mean alpha_axis = ", np.mean(alpha_axis))
+    print("mean beta_axis = ", np.mean(beta_axis))
 
     return spectroModel.spectroSigRLSCT(
         sotf=sotf,
@@ -119,7 +134,7 @@ def create_instruments(data_dict, list_chan):
 
 def load_data(list_chan, save_filter_corrected_dir):
     """Load data for the specified channels."""
-    data_dict = {'data': {}, 'target': {}, 'rotation': {}}
+    data_dict = {'data': {}, 'target': {}, 'dither': {}, 'rotation': {}}
 
     datashape = {
         '1a': (21, 1050, 19), '1b': (21, 1213, 19), '1c': (21, 1400, 19),
@@ -130,41 +145,37 @@ def load_data(list_chan, save_filter_corrected_dir):
     for chan in list_chan:
         data_dict['data'][chan] = []
         data_dict['target'][chan] = []
+        data_dict['dither'][chan] = []
         data_dict['rotation'][chan] = 0.
     i=0
 
-    coords = []
-    for file in sorted(os.listdir(save_filter_corrected_dir)):
-        for chan in list_chan:
-            if 'ch1a' in file:
-                with fits.open(os.path.join(save_filter_corrected_dir, file)) as hdul:
-                    header = hdul[0].header
-                    TARG_RA = header['TARG_RA']     
-                    TARG_DEC = header['TARG_DEC']       
-                    coords.append((TARG_RA, TARG_DEC))      
-
+    print("Order of channels loading : ")
     for file in sorted(os.listdir(save_filter_corrected_dir)):
         for chan in list_chan:
             if chan in file:
                 with fits.open(os.path.join(save_filter_corrected_dir, file)) as hdul:
+                    print(f"Loading data for channel {chan} from file {file}")
                     header = hdul[0].header
                     PA_V3 = header['PA_V3']
-                    TARG_RA = header['TARG_RA']
-                    TARG_DEC = header['TARG_DEC']
+                    TARG_RA = header['TARG_RA']  # Adjust RA to match the expected range
+                    TARG_DEC = header['TARG_DEC']   # Adjust DEC to match the expected range
+                    DITHER_RA = header['XOFFSET']
+                    DITHER_DEC = header['YOFFSET']
                     data_shape = (header['NSlits'], header['NWavel'], header['Nalpha'])
                     data = hdul[0].data
                     ndata = data.reshape(data_shape[1], data_shape[0], data_shape[2])
                     ndata = ndata.transpose(1, 0, 2)
 
                     # TODEL debug Targ RA/DEC dither 002
-                    TARG_RA = 315.38195270058264 - 360# + (-0.4932087719687388/3600)
-                    TARG_DEC = 68.1739939386045# + (2.1608617613007937/3600)
+                    # TARG_RA = 186.44099109978166 - 360# + (-0.4932087719687388/3600)
+                    # TARG_DEC = 12.663165115171752# + (2.1608617613007937/3600)
 
                     data_dict['data'][chan].append(ndata)
                     data_dict['target'][chan].append((TARG_RA, TARG_DEC))
+                    data_dict['dither'][chan].append((DITHER_RA, DITHER_DEC))
                     print(TARG_RA, TARG_DEC)
                     # data_dict['target'][chan].append((permutations[idx][i%4][0], permutations[idx][i%4][1]))
-                    data_dict['rotation'][chan] = PA_V3
+                    data_dict['rotation'][chan] = 8.2#PA_V3
                     i += 1
 
     return data_dict
@@ -199,9 +210,10 @@ def initialize_parameters(fusion_dir_path, step=0.1):
     return paths, step_angle
 
 
-def parse_options():
+def parse_options(ndith=[0,1,2,3]):
 
-    fusion_dir = "/home/nmonnier/Data/JWST/small_NGC/Fusion/"
+    fusion_dir = "/home/nmonnier/Data/JWST/Point_source/Fusion/"
+    # fusion_dir = "/home/nmonnier/Data/JWST/small_NGC/Fusion/"
     npix = 125
     
     list_chan = ['1a','2a']
@@ -223,9 +235,9 @@ def parse_options():
 
 
     print(f"spectroModel pointings = {spectroModel.pointings}")
-    numpy_slice = spectroModel.test_project_mrs_slice(ndata, 1, -1)
+    numpy_slice = spectroModel.test_project_mrs_slice(ndata, 1, -1, ndith=ndith)
 
-    return numpy_slice, alpha_coord, beta_coord
+    return numpy_slice, alpha_coord, beta_coord, data_dict, spectroModel
 
 
 
@@ -397,11 +409,20 @@ def plot_corners(wcs, shape, label=None, color='red', marker='o'):
 
 
 def main():
+    
+    # dir = "/home/nmonnier/Data/JWST/PIPELINE/Point_source/stage2/"
+    # fits_files = [
+    #     # dir + "jw06659001001_05101_00001_mirifushort_s3d.fits",
+    #     # dir + "jw06659001001_05101_00002_mirifushort_s3d.fits",
+    #     # dir + "jw06659001001_05101_00003_mirifushort_s3d.fits",
+    #     dir + "jw06659001001_05101_00004_mirifushort_s3d.fits",
+    # ]
+# 
     dir = "/home/nmonnier/Data/JWST/PIPELINE/small_NGC/stage2/"
     fits_files = [
         # dir + "jw01192001001_0310v_00001_mirifushort_s3d.fits",
-        dir + "jw01192001001_0310v_00002_mirifushort_s3d.fits",
-        # dir + "jw01192001001_0310v_00003_mirifushort_s3d.fits",
+        # dir + "jw01192001001_0310v_00002_mirifushort_s3d.fits",
+        dir + "jw01192001001_0310v_00003_mirifushort_s3d.fits",
         # dir + "jw01192001001_0310v_00004_mirifushort_s3d.fits",
     ]
     fits_file = fits_files[0]
@@ -409,7 +430,8 @@ def main():
         ref_wcs = WCS(ref_hdu[1].header, ref_hdu)  # Pass HDUList to handle -TAB coordinates
         ref_shape = (ref_hdu[1].header["NAXIS2"], ref_hdu[1].header["NAXIS1"])  # 2D shape
 
-    numpy_slice, alpha_coord, beta_coord = parse_options()
+    ndith = [0,1,2,3]  # Dithers to use for the test
+    numpy_slice, alpha_coord, beta_coord, data_dict , spectroModel= parse_options(ndith)
     # alpha_coord = alpha_coord-360 # Ajustement pour correspondre à la projection de l'image FITS
     custom_wcs = create_custom_wcs(alpha_coord, beta_coord)
     shape_source = numpy_slice.shape
@@ -469,11 +491,17 @@ def main():
     im3 = ax[1, 1].imshow(relative_difference, origin='lower', cmap='plasma', alpha=1, label="Relative Difference")
     ax[1, 1].set_title("Relative Difference (%)")
 
-    # Centre FITS (optionnel, pour vérification)
+    # Centre FITS (optionnel, pour véri fication)
     crpix1 = fits_slice.shape[1] / 2
     crpix2 = fits_slice.shape[0] / 2
     ax[0, 0].plot(crpix1, crpix2, marker='x', color='white', markersize=10, label='FITS center')
-    
+
+    # for dith in range(4):
+    #     alpha, beta = data_dict['target']['2a'][dith]
+    #     print(f"Dither {dith+1} - Alpha: {alpha}, Beta: {beta}")
+    #     ax[0, 0].plot(alpha, beta, marker='+', color='red', markersize=12, label='Target (alpha, beta)')
+
+
     # ax.legend()
     
     
@@ -485,7 +513,18 @@ def main():
     plt.show()
 
 
+    plt.figure()
+    extent = [alpha_coord.min(), alpha_coord.max(), beta_coord.min(), beta_coord.max()]
 
+    plt.imshow(numpy_slice, origin='lower', cmap='viridis', extent=extent)
+    plt.colorbar()
+    for dith in range(4):
+        alpha, beta = spectroModel.pointings[1][dith].alpha, spectroModel.pointings[1][dith].beta
+        print(f"Dither {dith+1} - Alpha: {alpha}, Beta: {beta}")
+        plt.plot(alpha, beta, marker='+', color='red', markersize=12, label='Target (alpha, beta)')
+    
+
+    plt.show()
 
 if __name__ == "__main__":
     main()

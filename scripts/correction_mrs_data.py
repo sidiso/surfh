@@ -85,10 +85,10 @@ def setup_channel_model(origin_alpha_axis, origin_beta_axis, targ_ra, targ_dec, 
 
 def main():
 
-    
-    save_corrected_dir = '/home/nmonnier/Data/JWST/small_NGC/Fusion/Corrected_slices/'
+    dir = '/home/nmonnier/Data/JWST/small_NGC/Fusion/'
+    save_corrected_dir = dir + 'Corrected_slices/'
     mode = [0,1] # 0=1st chan; 1=2nd chan; [0,1]=both chan
-    raw_dir = '/home/nmonnier/Data/JWST/small_NGC/Fusion/Raw_slices/'
+    raw_dir = dir + 'Raw_slices/'
     for file in sorted(os.listdir(raw_dir)):
         print("File is ", file)
         first_chan, second_chan, dithering_number = extract_name_information(os.path.basename(raw_dir + file))
