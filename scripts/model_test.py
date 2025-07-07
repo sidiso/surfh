@@ -1,42 +1,19 @@
 import numpy as np
 import os
-import udft
-from astropy.io import fits
-import pathlib
 import matplotlib.pyplot as plt
 
 from rich import print
-from rich.progress import track
-from rich.console import Console
 
-from astropy import units as u
-from astropy.coordinates import Angle
-from surfh.Simulation import simulation_data
-from surfh.Models import wavelength_mrs, realmiri, instru
-from surfh.Models import spectroModel
-from surfh.Vizualisation import slices_vizualisation, cube_vizualisation
-from surfh.Simulation import fusion_CT
 from surfh.Preprocessing import model_creation
+from surfh.ToolsDir import reconstruction
 
-from aljabr import LinOp, dottest
-from scipy import ndimage
-from surfh.Simulation.fusion_CT import QuadCriterion_MRS
-import argparse
 import click
-import itertools
-
 import logging as log
-
-from astropy.io import fits
-from astropy.wcs import WCS
-import numpy as np
-from reproject import reproject_interp
-from matplotlib.patches import Polygon
 
 
 
 @click.command()
-@click.option('-fd', '--fusion_dir', default='/home/nmonnier/Data/JWST/Orion_bar/Fusion/', type=str, help='Fusion directory')
+@click.option('-fd', '--fusion_dir', default='/home/nmonnier/Data/JWST/Point_source/Fusion/', type=str, help='Fusion directory')
 @click.option('-np', '--npix', default=125, type=int, help='Number of pixels')
 @click.option('-hp', '--hyper_parameter', default=1., type=float, help='Hyperparameter value')
 @click.option('-ni', '--niter', default=5, type=int, help='Number of iteration.')
@@ -85,37 +62,11 @@ def parse_options(fusion_dir, npix, hyper_parameter, niter, n_templates, scale_d
     ndata = np.concatenate(data)
 
     if scale_data:
-        if verbose:
-            log.info('Data scaling enable')
+        log.info('Data scaling enable')
         ndata = MRSModel.real_data_janskySR_to_jansky(ndata)
 
-    print(len(MRSModel.pointings))
-    for pointing in MRSModel.pointings:
-        print(f"Pointing list is {pointing}")
-    # print(f"spectroModel pointings = {MRSModel.pointings}")
-    ndith=[0,1,2,3] 
-    chan_idx=3
-    slice_idx=-1
-    numpy_slice, degrid1, degrid2 = MRSModel.test_project_mrs_slice(ndata, chan_idx, slice_idx, ndith=ndith)
-    chan_idx=4
-    numpy_slice, degrid1, degrid3 = MRSModel.test_project_mrs_slice(ndata, chan_idx, slice_idx, ndith=ndith)
-
-
-    plt.imshow(degrid2, alpha=0.5)
-
-    plt.imshow(degrid3, alpha=0.8)
-    plt.colorbar()
-    plt.show()
-
-    # adj1 = MRSModel.adjoint(ndata)
-    # fw1  = MRSModel.forward(adj1)
-    # adj2 = MRSModel.adjoint(fw1)
-
-    # print(f"Adjoint shape is {adj2.shape}")
-
-    # plt.imshow(adj2[1000])
-    # plt.colorbar()
-    # plt.show()
+    log.info(f'Start {method} algorithm')
+    reconstruction.reconstruction_method(MRSModel, ndata, templates, paths["result_path"], hyper_parameter, niter, method, scale_data)
 
 
 if __name__ == "__main__":

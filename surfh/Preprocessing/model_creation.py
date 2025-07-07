@@ -22,12 +22,11 @@ def create_model(sotf, templates, wavel_axis, instruments, step_angle, data_dict
                       '1a':(0.654/3600, 0.002/3600),
                       '1a':(-0.644/3600, -0.261/3600)}
 
-    RA_REF  = data_dict['target']['2a'][0][0]  # Reference RA for pointing
-    DEC_REF = data_dict['target']['2a'][0][1]  # Reference DEC for pointing
     for idx, chan in enumerate(instruments.keys()):
         DETLA_RA, DELTA_DEC = metadataMRS.get_chan_delta_pointing(chan)
+        RA_CORR, DEC_CORR = metadataMRS.get_pointing_correction_SN2023fyq(chan)
         # RA - DITH_RA seems so be the working solution here
-        pointing_chan = [main_pointing + instru.Coord(RA   - DITH_RA + DETLA_RA, DEC  + DITH_DEC + DELTA_DEC) for (RA, DEC), (DITH_RA, DITH_DEC) in zip(data_dict['target'][chan], data_dict['dither'][chan])]
+        pointing_chan = [main_pointing + instru.Coord(-RA_CORR - DITH_RA + DETLA_RA, -DEC_CORR + DITH_DEC + DELTA_DEC) for (RA, DEC), (DITH_RA, DITH_DEC) in zip(data_dict['target'][chan], data_dict['dither'][chan])]
         pointings.append(instru.CoordList(pointing_chan).pix(step_angle))
 
     origin_alpha_axis = (np.arange(imshape[0]) * step_angle - np.mean(np.arange(imshape[0]) * step_angle))
@@ -122,8 +121,8 @@ def load_data(list_chan, save_filter_corrected_dir):
 # TODO: Change this function, almost useless now. alpha and beta axis are now created in the model creation
 def load_simulation_data(paths):
     """Load simulation data."""
-    wavel_axis = np.load(os.path.join(paths['template_dir'], 'wavel_axis_orion_1ABC_2ABC_3ABC_4ABC_SS4.npy'))
-    templates = np.load(os.path.join(paths['template_dir'], 'nmf_orion_1ABC_2ABC_3ABC_4ABC_4_templates_SS4.npy'))
+    wavel_axis = np.load(os.path.join(paths['template_dir'], 'wavel_axis_SN2023fyq_1ABC_2ABC_3ABC_4ABC_SS4.npy'))
+    templates = np.load(os.path.join(paths['template_dir'], 'nmf_SN2023fyq_1ABC_2ABC_3ABC_4ABC_6_templates_SS4.npy'))
     otf = np.load(os.path.join(paths['psf_dir'], 'psfs_pixscale0.1_npix_125_chan_1ABC_2ABC_3ABC_4ABC_SS4.npy'))
     imshape = (otf.shape[1], otf.shape[2])
     sotf = udft.ir2fr(otf, imshape)
