@@ -440,6 +440,45 @@ class Channel():
         return blurred
 
 
+    def multi_dith_sliceToCube(self, inarray, ndith=[0]):
+        global_img = np.zeros( (self.wslice.stop-self.wslice.start, self.imshape[0], self.imshape[1]))
+        cg2 = []
+        
+        for p_idx, pointing in enumerate(self.pointings):
+            local_cube = np.zeros((self.wslice.stop-self.wslice.start,
+                                   self.local_im_shape[0],
+                                   self.local_im_shape[1]))
+            for slit_idx in range(self.instr.n_slit):
+                oversampled_sliced = np.repeat(
+                        np.expand_dims(
+                            np.reshape(inarray, 
+                                       self.oshape)[p_idx, slit_idx],
+                            axis=2,
+                        ),
+                        self.slicer.npix_slit_beta_width,
+                        axis=2,
+                    )/(self.slicer.npix_slit_beta_width * self.srf)
+                
+                blurred_t_sliced = np.zeros(self.slicer.get_slit_shape_t())
+                blurred_t_sliced[:,: self.oshape[3] * self.srf : self.srf,:] = jax_utils.wblur_t(oversampled_sliced.astype(np.float32), self.wpsf_dirac[:,:,:].conj())
+             
+             
+                local_cube += self.slicer.slicing_t(blurred_t_sliced, slit_idx, (self.wslice.stop-self.wslice.start, 
+                                                                                 self.local_im_shape[0],
+                                                                                 self.local_im_shape[1]))
+                
+            sum_t_img = jax_utils.idft(jax_utils.dft(local_cube) * self._otf_sr.conj()*self.decalf.conj(), 
+                                        self.local_im_shape)
+
+            sum_t_img = np.array(sum_t_img)
+            sum_t_img[sum_t_img<1] = 0
+
+            degridded = self.gridding_t(np.array(sum_t_img, dtype=np.float64), pointing)
+            global_img += degridded
+
+            cg2.append(np.ma.masked_less(degridded, 1))
+
+        return np.ma.mean(cg2, axis=0)
 
     def project_FOV(self):
         for p_idx, pointing in enumerate(self.pointings):

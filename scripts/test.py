@@ -16,7 +16,13 @@ fits_files = [
     dir + "jw01192001001_0310v_00003_mirifushort_s3d.fits",
     dir + "jw01192001001_0310v_00004_mirifushort_s3d.fits",
 ]
-
+# dir = "/home/nmonnier/Data/JWST/PIPELINE/Point_source/stage2/"
+# fits_files = [
+#     dir + "jw06659001001_05101_00001_mirifushort_s3d.fits",
+#     dir + "jw06659001001_05101_00002_mirifushort_s3d.fits",
+#     dir + "jw06659001001_05101_00003_mirifushort_s3d.fits",
+#     dir + "jw06659001001_05101_00004_mirifushort_s3d.fits",
+# ]
 # Select a reference file (first FITS file)
 ref_file = fits_files[0]
 with fits.open(ref_file) as ref_hdu:
@@ -98,14 +104,14 @@ for file in fits_files:
         i = i+1
     
 
-x_center, y_center, _ = ref_wcs.all_world2pix(315.38216470139986, 68.1737618072801, wave_center, 0)
-ax.plot(x_center, y_center, marker="+", markersize=10, markeredgewidth=2, color="red", label="Projection Center")
-x_center, y_center, _ = ref_wcs.all_world2pix(315.3818968109811, 68.17402533111624, wave_center, 0)
-ax.plot(x_center, y_center, marker="+", markersize=10, markeredgewidth=2, color="red", label="Projection Center")
-x_center, y_center, _ = ref_wcs.all_world2pix(315.38233680667923, 68.17380958724748, wave_center, 0)
-ax.plot(x_center, y_center, marker="+", markersize=10, markeredgewidth=2, color="red", label="Projection Center")
-x_center, y_center, _ = ref_wcs.all_world2pix(315.38172580550366, 68.17397786701078, wave_center, 0)
-ax.plot(x_center, y_center, marker="+", markersize=10, markeredgewidth=2, color="red", label="Projection Center")
+# x_center, y_center, _ = ref_wcs.all_world2pix(315.38216470139986, 68.1737618072801, wave_center, 0)
+# ax.plot(x_center, y_center, marker="+", markersize=10, markeredgewidth=2, color="red", label="Projection Center")
+# x_center, y_center, _ = ref_wcs.all_world2pix(315.3818968109811, 68.17402533111624, wave_center, 0)
+# ax.plot(x_center, y_center, marker="+", markersize=10, markeredgewidth=2, color="red", label="Projection Center")
+# x_center, y_center, _ = ref_wcs.all_world2pix(315.38233680667923, 68.17380958724748, wave_center, 0)
+# ax.plot(x_center, y_center, marker="+", markersize=10, markeredgewidth=2, color="red", label="Projection Center")
+# x_center, y_center, _ = ref_wcs.all_world2pix(315.38172580550366, 68.17397786701078, wave_center, 0)
+# ax.plot(x_center, y_center, marker="+", markersize=10, markeredgewidth=2, color="red", label="Projection Center")
 
 # Labels and grid
 ax.set_xlabel("Right Ascension")

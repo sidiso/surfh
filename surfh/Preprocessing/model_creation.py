@@ -12,6 +12,10 @@ from astropy.io import fits
 from surfh.Models import wavelength_mrs, instru, metadataMRS
 from surfh.Models import spectroModel
 
+
+def get_axis(model):
+    return model.alpha_axis, model.beta_axis
+
 def create_model(sotf, templates, wavel_axis, instruments, step_angle, data_dict, imshape):
     """Create the spectrograph model."""
     main_pointing = instru.Coord(0, 0)
@@ -23,18 +27,24 @@ def create_model(sotf, templates, wavel_axis, instruments, step_angle, data_dict
                       '1a':(-0.644/3600, -0.261/3600)}
 
     for idx, chan in enumerate(instruments.keys()):
-        DETLA_RA, DELTA_DEC = metadataMRS.get_chan_delta_pointing(chan)
-        RA_CORR, DEC_CORR = metadataMRS.get_pointing_correction_SN2023fyq(chan)
+        # DETLA_RA, DELTA_DEC = metadataMRS.get_chan_delta_pointing(chan)
+        # RA_CORR, DEC_CORR = metadataMRS.get_pointing_correction_SN2023fyq(chan)
         # RA - DITH_RA seems so be the working solution here
-        pointing_chan = [main_pointing + instru.Coord(-RA_CORR - DITH_RA + DETLA_RA, -DEC_CORR + DITH_DEC + DELTA_DEC) for (RA, DEC), (DITH_RA, DITH_DEC) in zip(data_dict['target'][chan], data_dict['dither'][chan])]
+        # pointing_chan = [main_pointing + instru.Coord(-RA_CORR - DITH_RA + DETLA_RA, -DEC_CORR + DITH_DEC + DELTA_DEC) for (RA, DEC), (DITH_RA, DITH_DEC) in zip(data_dict['target'][chan], data_dict['dither'][chan])]
+        RA_CORR, DEC_CORR = metadataMRS.get_band_delta_pointing(chan)
+        pointing_chan = [main_pointing + instru.Coord( -RA_CORR - DITH_RA, -DEC_CORR + DITH_DEC) for (RA, DEC), (DITH_RA, DITH_DEC) in zip(data_dict['target'][chan], data_dict['dither'][chan])]
         pointings.append(instru.CoordList(pointing_chan).pix(step_angle))
+
 
     origin_alpha_axis = (np.arange(imshape[0]) * step_angle - np.mean(np.arange(imshape[0]) * step_angle))
     origin_beta_axis = np.arange(imshape[1]) * step_angle - np.mean(np.arange(imshape[1]) * step_angle)
 
-    print(pointings[3])
-    mean_alpha = np.mean([pointings[3][dith].alpha for dith in range(4)])
-    mean_beta = np.mean([pointings[3][dith].beta for dith in range(4)])
+    # TODO : Warning here Mean is 0 because the pointings are centered on 0,0
+    # mean_alpha = np.mean([pointings[9][dith].alpha for dith in range(4)])
+    # mean_beta = np.mean([pointings[9][dith].beta for dith in range(4)])
+    mean_alpha = 0#np.mean([data_dict['target']['1a'][dith][0] for dith in range(4)])
+    mean_beta = 0#np.mean([data_dict['target']['1a'][dith][1] for dith in range(4)])
+
     # mean_alpha = data_dict['target']['1a'][0][0] 
     # mean_beta = data_dict['target']['1a'][0][1] 
     alpha_axis = origin_alpha_axis + mean_alpha
@@ -87,11 +97,13 @@ def create_instruments(data_dict, list_chan):
 
 def load_data(list_chan, save_filter_corrected_dir):
     """Load data for the specified channels."""
-    data_dict = {'data': {}, 'target': {}, 'dither': {}, 'rotation': {}}
+    data_dict = {'data': {}, 'target': {}, 'targetV1' :{}, 'targetREF': {}, 'dither': {}, 'rotation': {}}
 
     for chan in list_chan:
         data_dict['data'][chan] = []
         data_dict['target'][chan] = []
+        data_dict['targetV1'][chan] = []
+        data_dict['targetREF'][chan] = []
         data_dict['dither'][chan] = []
         data_dict['rotation'][chan] = 0.
 
@@ -102,10 +114,15 @@ def load_data(list_chan, save_filter_corrected_dir):
                 with fits.open(os.path.join(save_filter_corrected_dir, file)) as hdul:
                     print(f"Loading data for channel {chan} from file {file}")
                     header = hdul[0].header
+                    PA_V3 = header['PA_V3']
                     TARG_RA = header['TARG_RA']  # Adjust RA to match the expected range
                     TARG_DEC = header['TARG_DEC']   # Adjust DEC to match the expected range
                     DITHER_RA = header['XOFFSET']
                     DITHER_DEC = header['YOFFSET']
+                    RA_V1 = header['RA_V1']
+                    DEC_V1 = header['DEC_V1']
+                    RA_REF = header['RA_REF']
+                    DEC_REF = header['DEC_REF']
                     data_shape = (header['NSlits'], header['NWavel'], header['Nalpha'])
                     data = hdul[0].data
                     ndata = data.reshape(data_shape[1], data_shape[0], data_shape[2])
@@ -113,19 +130,36 @@ def load_data(list_chan, save_filter_corrected_dir):
 
                     data_dict['data'][chan].append(ndata)
                     data_dict['target'][chan].append((TARG_RA, TARG_DEC))
+                    data_dict['targetV1'][chan]= (RA_V1, DEC_V1)
+                    data_dict['targetREF'][chan] = (RA_REF, DEC_REF)
                     data_dict['dither'][chan].append((DITHER_RA, DITHER_DEC))
                     data_dict['rotation'][chan] = metadataMRS.get_MRS_rotation(chan)
-
     return data_dict
 
 # TODO: Change this function, almost useless now. alpha and beta axis are now created in the model creation
-def load_simulation_data(paths):
+def load_simulation_data(paths, list_chan):
     """Load simulation data."""
-    wavel_axis = np.load(os.path.join(paths['template_dir'], 'wavel_axis_SN2023fyq_1ABC_2ABC_3ABC_4ABC_SS4.npy'))
-    templates = np.load(os.path.join(paths['template_dir'], 'nmf_SN2023fyq_1ABC_2ABC_3ABC_4ABC_6_templates_SS4.npy'))
+    # wavel_axis = np.load(os.path.join(paths['template_dir'], 'wavel_axis_SN2023fyq_1ABC_2ABC_3ABC_4ABC_SS4.npy'))
+    # templates = np.load(os.path.join(paths['template_dir'], 'nmf_SN2023fyq_1ABC_2ABC_3ABC_4ABC_6_templates_SS4.npy'))
+    wavel_axis = np.load(os.path.join(paths['template_dir'], 'wavel_axis_SN2023fyq_1ABC_2ABC_3ABC_4AB_SS4.npy'))
+    templates = np.load(os.path.join(paths['template_dir'], 'nmf_SN2023fyq_1ABC_2ABC_3ABC_4AB_6_templates_SS4.npy'))
     otf = np.load(os.path.join(paths['psf_dir'], 'psfs_pixscale0.1_npix_125_chan_1ABC_2ABC_3ABC_4ABC_SS4.npy'))
     imshape = (otf.shape[1], otf.shape[2])
+
+    # Sort wavelegnth regarding the channel list
+    indexes = np.where((wavel_axis>wavelength_mrs.get_mrs_wavelength(list_chan[0])[0]) & (wavel_axis<wavelength_mrs.get_mrs_wavelength(list_chan[-1])[-1]))[0]
+    window_slice = slice(indexes[0]-1, indexes[-1] +1, None) # 
+
+    wavel_axis = wavel_axis[window_slice]
+    otf = otf[window_slice]
+
+    # otf = otf[:-25,:,:]  # Remove the last 25 slices, they are not used in the simulation
     sotf = udft.ir2fr(otf, imshape)
+
+    print(wavel_axis)
+    print(wavel_axis.shape)
+    print(sotf.shape)
+
     return wavel_axis, templates, sotf
 
 

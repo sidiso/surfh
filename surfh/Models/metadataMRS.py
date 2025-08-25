@@ -1,5 +1,5 @@
 
-
+import pysiaf
 
 def get_MRS_rotation(chan=None):
     """Get the rotation angle for MRS channels."""
@@ -17,6 +17,29 @@ def get_MRS_rotation(chan=None):
     else:
         raise ValueError(f"Unknown channel: {chan}")
     
+
+def get_band_delta_pointing(chan=None):
+    """Get the (RA, DEC) delta coordinate from the based on reference point : center of chan 1a"""
+    if chan is None:
+        raise ValueError("Channel must be specified")
+
+    instrument = 'MIRI'
+    siaf = pysiaf.Siaf(instrument)
+    mrs_aper_ch = [x for x in siaf.apertures.keys() if 'MIRIFU_CHANNEL' in x]
+
+    v3_ref = siaf['MIRIFU_CHANNEL1A'].V3Ref
+    v2_ref = siaf['MIRIFU_CHANNEL1A'].V2Ref
+
+    search_term =  chan
+    matches = [item for item in mrs_aper_ch if search_term.lower() in item.lower()]
+
+    aperture = siaf[matches[0]]
+
+    v3_center = aperture.V3Ref
+    v2_center = aperture.V2Ref
+
+    return  ((v2_center - v2_ref) / 3600, (v3_center - v3_ref) / 3600)
+
 
 def get_chan_delta_pointing(chan=None):
     """Get the (RA, DEC) delta coordinate from the based on reference point : center of chan 1"""
@@ -43,3 +66,11 @@ def get_pointing_correction_SN2023fyq(chan=None):
                            '4a' : (-1.07E-04, -2.91E-04), '4b' : (-1.10E-04,-3.23E-04), '4c' : (-1.40E-04,-2.86E-04)} # ch4
     
     return pointing_correction[chan]
+
+
+def get_FoV_offset(chan=None):
+    if chan is None:
+        raise ValueError("Channel must be specified")
+    
+    if chan == '1a':
+        return (0,0)

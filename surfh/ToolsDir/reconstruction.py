@@ -2,6 +2,7 @@ import pathlib
 import numpy as np
 
 from surfh.Simulation.fusion_CT import QuadCriterion_MRS
+from surfh.Vizualisation import cube_vizualisation
 
 
 
@@ -61,3 +62,6 @@ def reconstruction_method(spectroModel, ndata, templates, result_path, hyperPara
         np.save(path / 'res_x.npy', res_fusion.x)
         np.save(path / 'res_cube.npy', y_cube)
         np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
+
+    
+    # cube_vizualisation.plot_cube(y_cube, spectroModel.wavelength_axis)

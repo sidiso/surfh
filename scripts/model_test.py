@@ -6,6 +6,7 @@ from rich import print
 
 from surfh.Preprocessing import model_creation
 from surfh.ToolsDir import reconstruction
+from surfh.Vizualisation import cube_vizualisation
 
 import click
 import logging as log
@@ -36,7 +37,7 @@ def parse_options(fusion_dir, npix, hyper_parameter, niter, n_templates, scale_d
     if verbose:
         log.basicConfig(format="%(levelname)s: %(message)s", level=log.INFO)
 
-    list_chan = ['1a', '1b', '1c', '2a', '2b', '2c', '3a', '3b', '3c', '4a', '4b', '4c']
+    list_chan = ['1a', '1b', '1c', '2a', '2b', '2c', '3a', '3b', '3c', '4a', '4b']
     imshape = (npix, npix)
 
     log.info('Initialize basic path parameters')
@@ -45,7 +46,7 @@ def parse_options(fusion_dir, npix, hyper_parameter, niter, n_templates, scale_d
 
 
     log.info('Load simulation data')
-    wavel_axis, templates, sotf = model_creation.load_simulation_data(paths)
+    wavel_axis, templates, sotf = model_creation.load_simulation_data(paths, list_chan)
 
 
     log.info('Load MRS data')
@@ -64,6 +65,36 @@ def parse_options(fusion_dir, npix, hyper_parameter, niter, n_templates, scale_d
     if scale_data:
         log.info('Data scaling enable')
         ndata = MRSModel.real_data_janskySR_to_jansky(ndata)
+
+
+
+    # ndith = [0,1,2,3]  # Dithers to use for the test
+    # chan_idx = 1  # Channel index to test
+    # slice_idx = -1  # Last slice index to test
+    # _,_,slice_0 = MRSModel.test_project_mrs_slice(ndata, chan_idx, slice_idx, ndith=ndith)
+    # # chan_idx = 2  # Channel index to test
+    # # slice_idx = -1  # Last slice index to test
+    # # _,_,slice_1 = MRSModel.test_project_mrs_slice(ndata, chan_idx, slice_idx, ndith=ndith)
+
+
+    # adj0 = MRSModel.adjoint(ndata)
+    # # fw = MRSModel.forward(adj0)
+    # # adj1 = MRSModel.adjoint(fw)
+
+
+    # # alpha_coord, beta_coord = model_creation.get_axis(MRSModel)
+    # # extent = [alpha_coord.min(), alpha_coord.max(), beta_coord.min(), beta_coord.max()]
+    # plt.figure()
+    # # plt.imshow(slice_0, cmap='viridis', alpha=0.5)
+    # # plt.imshow(slice_1, cmap='viridis', extent=extent, alpha=0.5)
+    # # plt.colorbar()
+
+    # cube_vizualisation.plot_cube(adj0, np.arange(adj0.shape[0]))
+
+    # MRSModel.project_FOV()   
+
+    # plt.show()    
+   
 
     log.info(f'Start {method} algorithm')
     reconstruction.reconstruction_method(MRSModel, ndata, templates, paths["result_path"], hyper_parameter, niter, method, scale_data)
