@@ -57,12 +57,17 @@ def create_model(sotf, templates, origin_alpha_axis, origin_beta_axis, wavel_axi
     RA_REF  = data_dict['targetREF']['1a'][0]  # Reference RA for pointing
     DEC_REF = data_dict['targetREF']['1a'][1]  # Reference DEC for pointing
     for idx, chan in enumerate(instruments.keys()):
-        RA_CENTER = RA_REF  - data_dict['targetREF'][chan][0]
-        DEC_CENTER = DEC_REF - data_dict['targetREF'][chan][1]
-        DETLA_RA, DELTA_DEC = metadataMRS.get_chan_delta_pointing(chan)        # RA - DITH_RA seems so be the working solution here
-        RA_CORR, DEC_CORR = (pointing_correction[chan][0], pointing_correction[chan][1])
-        print(f"Chan {chan}, RA_CORR = {RA_CORR}; DEC_CORR = {DEC_CORR}")
-        pointing_chan = [main_pointing + instru.Coord( -RA_CORR - DITH_RA + DETLA_RA, -DEC_CORR + DITH_DEC + DELTA_DEC) for (RA, DEC), (DITH_RA, DITH_DEC) in zip(data_dict['target'][chan], data_dict['dither'][chan])]
+        # RA_CENTER = RA_REF  - data_dict['targetREF'][chan][0]
+        # DEC_CENTER = DEC_REF - data_dict['targetREF'][chan][1]
+# # 
+#         DETLA_RA, DELTA_DEC = metadataMRS.get_chan_delta_pointing(chan)
+#         RA_CORR, DEC_CORR = metadataMRS.get_pointing_correction_SN2023fyq(chan)
+#         # RA - DITH_RA seems so be the working solution here
+#         pointing_chan = [main_pointing + instru.Coord(-RA_CORR - DITH_RA + DETLA_RA, -DEC_CORR + DITH_DEC + DELTA_DEC) for (RA, DEC), (DITH_RA, DITH_DEC) in zip(data_dict['target'][chan], data_dict['dither'][chan])]
+
+
+        RA_CORR, DEC_CORR = metadataMRS.get_band_delta_pointing(chan)
+        pointing_chan = [main_pointing + instru.Coord( -RA_CORR - DITH_RA, -DEC_CORR + DITH_DEC) for (RA, DEC), (DITH_RA, DITH_DEC) in zip(data_dict['target'][chan], data_dict['dither'][chan])]
         # pointing_chan = [main_pointing + instru.Coord(ra[idx], dec[idx]) for idx in range(len(ra))]
         pointings.append(instru.CoordList(pointing_chan).pix(step_angle))
         print("pointing_chan = ", pointing_chan)
@@ -192,7 +197,7 @@ def load_data(list_chan, save_filter_corrected_dir):
                     data_dict['dither'][chan].append((DITHER_RA, DITHER_DEC))
                     print(TARG_RA, TARG_DEC)
                     # data_dict['target'][chan].append((permutations[idx][i%4][0], permutations[idx][i%4][1]))
-                    data_dict['rotation'][chan] = 8.2#PA_V3
+                    data_dict['rotation'][chan] = metadataMRS.get_MRS_rotation(chan)
                     i += 1
 
     return data_dict
@@ -229,11 +234,12 @@ def initialize_parameters(fusion_dir_path, step=0.1):
 
 def parse_options(ndith=[0,1,2,3], chan_idx=0, slice_idx=-1):
 
-    # fusion_dir = "/home/nmonnier/Data/JWST/Point_source/Fusion/"
     fusion_dir = "/home/nmonnier/Data/JWST/Point_source/Fusion/"
+    # fusion_dir = "/home/nmonnier/Data/JWST/small_NGC/Fusion/"
     npix = 125
     
     list_chan = ['1a', '1b', '1c', '2a', '2b', '2c', '3a', '3b', '3c', '4a', '4b', '4c']
+    # list_chan = ['1a', '2a']  
 
     step = 0.1  # arcsec
     paths, step_angle = initialize_parameters(fusion_dir, step)
@@ -254,6 +260,14 @@ def parse_options(ndith=[0,1,2,3], chan_idx=0, slice_idx=-1):
     print(f"spectroModel pointings = {spectroModel.pointings}")
     numpy_slice, degrid1, degrid2 = spectroModel.test_project_mrs_slice(ndata, chan_idx, slice_idx, ndith=ndith)
 
+
+    cube = spectroModel.all_slice_to_cube(ndata, ndith=ndith)
+    print(f"Caca cube shape = {cube.shape}")
+    idx = np.where(np.sum(cube, axis=(1, 2)) != 0)[0]
+    print("idx = ", idx)
+    n_cube = cube[idx, ...]
+
+    cube_vizualisation.plot_cube(n_cube, np.arange(n_cube.shape[0]))
 
     return numpy_slice, alpha_coord, beta_coord, data_dict, spectroModel
 
@@ -448,13 +462,15 @@ def main():
         ref_wcs = WCS(ref_hdu[1].header, ref_hdu)  # Pass HDUList to handle -TAB coordinates
         ref_shape = (ref_hdu[1].header["NAXIS2"], ref_hdu[1].header["NAXIS1"])  # 2D shape
 
-    ndith = [0,1,2,3]  # Dithers to use for the test
-    chan_idx = 9  # Channel index to test
+    ndith = [0]  # Dithers to use for the test
+    chan_idx = 0  # Channel index to test
     slice_idx = -1  # Last slice index to test
     numpy_slice, alpha_coord, beta_coord, data_dict , spectroModel= parse_options(ndith, chan_idx, slice_idx)
+    raise ValueError("STOP")
+
 
     # TODEL : Chan 1a
-    chan_idx = 10  # Channel index to test
+    chan_idx = 1  # Channel index to test
     slice_idx = 0  # Last slice index to test
     numpy_slice_a, _, _, _ , _= parse_options(ndith, chan_idx, slice_idx)
 
@@ -545,6 +561,11 @@ def main():
     plt.imshow(numpy_slice_a, origin='lower', cmap='viridis', extent=extent, alpha=0.5)
     plt.colorbar()
     
+    plt.figure()
+    plt.imshow(numpy_slice, origin='lower', cmap='viridis', extent=extent)
+    plt.figure()
+    plt.imshow(numpy_slice_a, origin='lower', cmap='viridis', extent=extent)
+
     fig, ax = plt.subplots(nrows=2)
     
 
@@ -553,10 +574,10 @@ def main():
     ax[0].imshow(numpy_slice, origin='lower', cmap='viridis', extent=extent, alpha=1)
     ax[1].imshow(numpy_slice_a, origin='lower', cmap='viridis', extent=extent, alpha=1)
     # plt.colorbar()
-    # for dith in range(4):
-    #     alpha, beta = spectroModel.pointings[1][dith].alpha, spectroModel.pointings[1][dith].beta
-    #     print(f"Dither {dith+1} - Alpha: {alpha}, Beta: {beta}")
-    #     plt.plot(alpha, beta, marker='+', color='red', markersize=12, label='Target (alpha, beta)')
+    for dith in range(4):
+        alpha, beta = spectroModel.pointings[1][dith].alpha, spectroModel.pointings[1][dith].beta
+        print(f"Dither {dith+1} - Alpha: {alpha}, Beta: {beta}")
+        plt.plot(alpha, beta, marker='+', color='red', markersize=12, label='Target (alpha, beta)')
     plt.show()
 
     tmp = np.zeros((numpy_slice.shape[0], numpy_slice.shape[1]))

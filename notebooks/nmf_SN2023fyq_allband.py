@@ -46,9 +46,10 @@ hdr = hdul[1].header
 
 wavel = np.array(hdul[5].data[0])[0,:,0]
 
-wavel = wavel[:-10]
-raw_data_cube = data_cube[:-10,:,:] 
-
+# wavel = wavel[:-10]
+# raw_data_cube = data_cube[:-10,:,:] 
+wavel = wavel[:9935]
+raw_data_cube = data_cube[:9935,:,:]
 
 # plt.figure()
 # plt.title("Raw data  cube, slice 100")
@@ -80,20 +81,24 @@ masked_array = rotated_cube[:, coords[0][1]:coords[2][1], coords[0][0]:coords[3]
 # plt.show()
 
 masked_array = interpolate_negatives(masked_array)
-
-neg_masked_array = masked_array.copy()
-neg_masked_array[neg_masked_array>0] = 0
-
 masked_array[np.isnan(masked_array)] = 0
 masked_array_fitlered_data_cube = ndimage.median_filter(masked_array.copy(), size=15, axes=[0])
-data = rearrange(data_cube, 'L I J -> (I J) L') # from spectro data
-masked_array_fitlered_data = rearrange(masked_array_fitlered_data_cube, 'L I J -> (I J) L') # from spectro data
+
+masked_array_fitlered_data_cube_SS4 = masked_array_fitlered_data_cube[::4,:,:]
+# masked_array_fitlered_data_cube_SS4 = masked_array_fitlered_data_cube_SS4[:-25,:,:] # remove last 25 slices to match the wavel axis
+wavel_SS4 = wavel[::4]
+# wavel_SS4 = wavel_SS4[:-25] # remove last 25 slices to match the wavel axis
+
+
+# cube_vizualisation.plot_cube(masked_array_fitlered_data_cube_SS4, wavel_SS4)
+# plt.show()
+masked_array_fitlered_data = rearrange(masked_array_fitlered_data_cube_SS4, 'L I J -> (I J) L') # from spectro data
 # plt.figure()
 # plt.title("Masked data mean spectra")
 # plt.plot(wavel, np.nanmean(masked_array, axis=(1,2)))
 # plt.figure()
 # plt.title("Filtered Masked data mean spectra")
-# plt.plot(wavel, np.nanmean(masked_array_fitlered_data_cube, axis=(1,2)))
+# plt.plot(wavel_SS4, np.nanmean(masked_array_fitlered_data_cube_SS4, axis=(1,2)))
 # plt.show()
 
 
@@ -131,7 +136,7 @@ plt.title('Mean relative error Reconstruction Errors by Number of Components')
 plt.xlabel('Number of Components')
 plt.ylabel('MRE')
 plt.grid(True)
-# plt.show()
+plt.show()
 
 
 from sklearn.decomposition import NMF
@@ -145,28 +150,32 @@ nmf.fit(masked_array_fitlered_data)
 # Extract the components (eigenvectors)
 components = nmf.components_
 
-plt.figure()
-for i in range(components.shape[0]):
-    plt.plot(wavel, components[i], label=i)
-plt.legend()
+# plt.figure()
+# for i in range(components.shape[0]):
+#     plt.plot(wavel_SS4, components[i], label=i)
+# plt.legend()
  
-plt.figure()
-plt.plot(wavel, np.mean(components, axis=0))
-
+# plt.figure()
+# plt.plot(wavel_SS4, np.mean(components, axis=0))
+# plt.show()
 masked_array_fitlered_data_cube[masked_array_fitlered_data_cube==0] = np.nan
 masked_array[masked_array==0] = np.nan
 
-plt.figure()
 scale_f = np.max(np.mean(masked_array_fitlered_data_cube, axis=(1,2)))/np.max(np.mean(components, axis=0))
 #scale_f = np.mean(fitlered_data_cube, axis=(1,2))[-1]/np.mean(components, axis=0)[-1]
 
 
-SS_wavel = wavel[::4]
-wavel_SS4 = np.load('/home/nmonnier/Data/JWST/Point_source/Fusion/Templates/wavel_axis_orion_1ABC_2ABC_3ABC_4ABC_SS4.npy')
+# SS_wavel = wavel[::4]
+# wavel_SS4 = np.load('/home/nmonnier/Data/JWST/Point_source/Fusion/Templates/wavel_axis_orion_1ABC_2ABC_3ABC_4ABC_SS4.npy')
+# plt.figure()
 
-SS_components = np.zeros((components.shape[0], len(SS_wavel)))
-for i in range(components.shape[0]):
-    SS_components[i] = components[i,::4]
-
-np.save('/home/nmonnier/Data/JWST/Point_source/Fusion/Templates/nmf_SN2023fyq_1ABC_2ABC_3ABC_4ABC_6_templates_SS4.npy', SS_components)
-np.save('/home/nmonnier/Data/JWST/Point_source/Fusion/Templates/wavel_axis_SN2023fyq_1ABC_2ABC_3ABC_4ABC_SS4.npy', SS_wavel)
+# SS_components = np.zeros((components.shape[0], len(SS_wavel)))
+# for i in range(components.shape[0]):
+#     SS_components[i] = components[i,::4]
+# plt.show()
+print(f"Components shape: {components.shape}")
+print(f"Wavel shape: {wavel_SS4.shape}")
+# np.save('/home/nmonnier/Data/JWST/Point_source/Fusion/Templates/nmf_SN2023fyq_1ABC_2ABC_3ABC_4ABC_6_templates_SS4.npy', components)
+# np.save('/home/nmonnier/Data/JWST/Point_source/Fusion/Templates/wavel_axis_SN2023fyq_1ABC_2ABC_3ABC_4ABC_SS4.npy', wavel_SS4)
+np.save('/home/nmonnier/Data/JWST/Point_source/Fusion/Templates/nmf_SN2023fyq_1ABC_2ABC_3ABC_4AB_6_templates_SS4.npy', components)
+np.save('/home/nmonnier/Data/JWST/Point_source/Fusion/Templates/wavel_axis_SN2023fyq_1ABC_2ABC_3ABC_4AB_SS4.npy', wavel_SS4)
