@@ -7,6 +7,7 @@ from rich import print
 from surfh.Preprocessing import model_creation
 from surfh.ToolsDir import reconstruction
 from surfh.Vizualisation import cube_vizualisation
+from surfh.ToolsDir.fits_toolbox import save_numpy_to_fits
 
 import click
 import logging as log
@@ -94,7 +95,24 @@ def parse_options(fusion_dir, npix, hyper_parameter, niter, n_templates, scale_d
     # MRSModel.project_FOV()   
 
     # plt.show()    
-   
+    
+    path_file = '/home/nmonnier/Data/JWST/NGC_7023/Fusion/'
+    res_dir = 'Results/lcg_MC_9_MO_4_Temp_6_nit_500_mu_5.00e+06_SD_True/'
+    wavelengths = np.load(path_file + res_dir + 'wavel.npy')
+
+    metadata = {'PA_V3': data_dict['PA_V3']['1c'], 
+                'TARG_RA': data_dict['target']['1c'][0], 'TARG_DEC':data_dict['target']['1c'][1], 
+                'RA_V1': data_dict['targetV1']['1c'][0], 'DEC_V1': data_dict['targetV1']['1c'][1], 
+                'RA_REF': data_dict['targetREF']['1c'][0], 'DEC_REF': data_dict['targetREF']['1c'][1],
+                'ALPHA_AXIS':MRSModel.alpha_axis, 'BETA_AXIS':MRSModel.beta_axis, 'WAVELENGTH':wavelengths}
+
+    for key in metadata.keys():
+        print(f"{key}: {metadata[key]}")
+    data = np.load(path_file + res_dir + 'res_cube.npy')
+
+    save_numpy_to_fits(data, metadata, path_file + res_dir + 'res_cube.fits')
+    raise ValueError("STOP")
+
 
     log.info(f'Start {method} algorithm')
     reconstruction.reconstruction_method(MRSModel, ndata, templates, paths["result_path"], hyper_parameter, niter, method, scale_data)

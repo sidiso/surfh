@@ -54,8 +54,6 @@ def create_model(sotf, templates, origin_alpha_axis, origin_beta_axis, wavel_axi
                            '3a' : (-1.20E-06, 1.20E-06), '3b' : (-1.90E-06, -6.73E-05), '3c' : (-1.00E-06,-5.60E-05),  # ch3
                            '4a' : (-1.07E-04, -2.91E-04), '4b' : (-1.10E-04,-3.23E-04), '4c' : (-1.40E-04,-2.86E-04)} # ch4
 
-    RA_REF  = data_dict['targetREF']['1a'][0]  # Reference RA for pointing
-    DEC_REF = data_dict['targetREF']['1a'][1]  # Reference DEC for pointing
     for idx, chan in enumerate(instruments.keys()):
         # RA_CENTER = RA_REF  - data_dict['targetREF'][chan][0]
         # DEC_CENTER = DEC_REF - data_dict['targetREF'][chan][1]
@@ -75,8 +73,8 @@ def create_model(sotf, templates, origin_alpha_axis, origin_beta_axis, wavel_axi
 
     # alpha_axis = origin_alpha_axis + data_dict['target']['2a'][2][0]
     # beta_axis = origin_beta_axis + data_dict['target']['2a'][2][1]
-    mean_alpha = np.mean([data_dict['target']['1a'][dith][0] for dith in range(4)])
-    mean_beta = np.mean([data_dict['target']['1a'][dith][1] for dith in range(4)])
+    # mean_alpha = np.mean([data_dict['target']['1a'][dith][0] for dith in range(4)])
+    # mean_beta = np.mean([data_dict['target']['1a'][dith][1] for dith in range(4)])
     mean_alpha = 0#data_dict['target']['1a'][0][0] 
     mean_beta = 0#data_dict['target']['1a'][0][1] 
     print("mean_alpha = ", mean_alpha)
@@ -234,11 +232,12 @@ def initialize_parameters(fusion_dir_path, step=0.1):
 
 def parse_options(ndith=[0,1,2,3], chan_idx=0, slice_idx=-1):
 
-    fusion_dir = "/home/nmonnier/Data/JWST/Point_source/Fusion/"
+    # fusion_dir = "/home/nmonnier/Data/JWST/Point_source/Fusion/"
     # fusion_dir = "/home/nmonnier/Data/JWST/small_NGC/Fusion/"
+    fusion_dir = "/home/nmonnier/Data/JWST/NGC_7023/Fusion/"
     npix = 125
     
-    list_chan = ['1a', '1b', '1c', '2a', '2b', '2c', '3a', '3b', '3c', '4a', '4b', '4c']
+    list_chan = ['2a', '2b', '2c', '3a', '3b', '3c']
     # list_chan = ['1a', '2a']  
 
     step = 0.1  # arcsec

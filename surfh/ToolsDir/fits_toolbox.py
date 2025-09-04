@@ -1,5 +1,7 @@
 from astropy.io import fits
+from scipy.ndimage import rotate
 import numpy as np
+
 
 def corrected_slices_to_fits(corrected_slices, rotation, target_RA, target_DEC, filename, selected_chan, slices_shape):
 
@@ -46,7 +48,6 @@ def get_fits_target_coordinates(fits_path):
         hdr = hdul[1].header
         targ_ra = hdr['RA_V1']
         targ_dec = hdr['DEC_V1']
-
     return targ_ra, targ_dec
 
 def get_fits_target_coordinates_corrected_data(fits_path):
@@ -57,12 +58,92 @@ def get_fits_target_coordinates_corrected_data(fits_path):
         hdr = hdul[0].header
         targ_ra = hdr['TARG_RA']
         targ_dec = hdr['TARG_DEC']
-
     return targ_ra, targ_dec
 
 
 def get_data_from_fits(fits_path):
     with fits.open(fits_path) as hdul:
         data = hdul[0].data
-
     return data
+
+
+def save_numpy_to_fits(data, metadata, filename):
+    """
+    Sauvegarde un cube numpy (nw, ny, nx) en FITS
+    avec des coordonnées linéaires pour les 3 axes.
+    """
+
+    unit_alpha = 'deg'
+    unit_beta = 'deg'
+    unit_wavelength = 'um'
+
+    alpha_axis  = metadata['ALPHA_AXIS']
+    beta_axis   = metadata['BETA_AXIS']
+    wavelength  = metadata['WAVELENGTH']
+
+    alpha_axis += metadata['RA_REF']
+    beta_axis  += metadata['DEC_REF']
+
+    hdu = fits.PrimaryHDU(data=data)
+    header = hdu.header
+
+    # data[0] = rotate(data[0], angle=metadata['PA_V3'], reshape=False)
+    # data[1] = rotate(data[1], angle=180-metadata['PA_V3'], reshape=False)
+    # data[2] = rotate(data[2], angle=180-(90-metadata['PA_V3']), reshape=False)    
+    # data[3] = rotate(data[3], angle=-metadata['PA_V3'], reshape=False)
+    # data[4] = rotate(data[4], angle=-(180-metadata['PA_V3']), reshape=False)
+    # data[5] = rotate(data[5], angle=-(180-(90-metadata['PA_V3'])), reshape=False) 
+
+    for i in range(data.shape[0]):
+        data[i] = rotate(data[i], angle=-(180-metadata['PA_V3']), reshape=False)
+
+
+    # --- Métadonnées générales ---
+    header['AUTHOR']   = 'Nicolas Monnier'
+    header['NWAVEL']   = data.shape[0]   # Nombre de points spectraux
+    header['NAXIS1']   = data.shape[2]   # taille en alpha
+    header['NAXIS2']   = data.shape[1]   # taille en beta
+
+    header['PA_V3']    = metadata['PA_V3']    # Position Angle (V3) in degrees
+    header['TARG_RA']  = metadata['TARG_RA']   # Target Right Ascension (in degrees)
+    header['TARG_DEC'] = metadata['TARG_DEC']  # Target Declination (in degrees)
+    header['RA_V1']    = metadata['RA_V1']   # Target RA in V1 frame (in degrees)
+    header['DEC_V1']   = metadata['DEC_V1']  # Target DEC in V1 frame (in degrees)
+    header['RA_REF']   = metadata['RA_REF']   # Reference RA (in degrees)
+    header['DEC_REF']  = metadata['DEC_REF']  # Reference DEC (in degrees)
+
+    # --- Axe spatial X (alpha) ---
+    da = np.mean(np.diff(alpha_axis))
+    header['CTYPE1'] = 'ALPHA'
+    header['CUNIT1'] = unit_alpha
+    header['CRVAL1'] = alpha_axis[0]
+    header['CDELT1'] = da
+    header['CRPIX1'] = 1
+
+    # --- Axe spatial Y (beta) ---
+    db = np.mean(np.diff(beta_axis))
+    header['CTYPE2'] = 'BETA'
+    header['CUNIT2'] = unit_beta
+    header['CRVAL2'] = beta_axis[0]
+    header['CDELT2'] = db
+    header['CRPIX2'] = 1
+
+    # --- Axe spectral (approx linéaire) ---
+    dw = np.mean(np.diff(wavelength))
+    header['CTYPE3'] = 'WAVE'
+    header['CUNIT3'] = unit_wavelength
+    header['CRVAL3'] = wavelength[0]
+    header['CDELT3'] = dw
+    header['CRPIX3'] = 1
+
+    # --- Table WCS-TABLE contenant le vecteur des longueurs d’onde ---
+    col = fits.Column(name='wavelength', format=f'{len(wavelength)}E', dim=f'({len(wavelength)})', array=[wavelength])
+    wcstable_hdu = fits.BinTableHDU.from_columns([col])
+    wcstable_hdu.header['EXTNAME'] = 'WCS-TABLE'
+
+    # --- Créer la liste d'extensions ---
+    hdul = fits.HDUList([hdu, wcstable_hdu])
+
+    # --- Écriture ---
+    hdul.writeto(filename, overwrite=True)
+    print(f"✅ Fichier sauvegardé : {filename}")

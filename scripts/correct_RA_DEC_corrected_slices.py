@@ -13,7 +13,7 @@ def extract_name_corr_filt(dir):
     return keywords[0], keywords[1]
 
 
-dir = '/home/nmonnier/Data/JWST/small_NGC/Fusion/'
+dir = '/home/nmonnier/Data/JWST/NGC_7023/Fusion/'
 # dir = '/home/nmonnier/Data/JWST/Point_source/Fusion/'
 raw_slices_dir = dir + 'Raw_slices/'
 corrected_slices_dir = dir + 'Corrected_slices/'
