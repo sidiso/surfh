@@ -182,7 +182,6 @@ class spectroSigRLSCT(LinOp):
             maps = jax_utils.lmm_cube2maps(blurred_t_cube, self.templates).reshape(self.ishape)
         else:
             maps = blurred_t_cube
-
         return maps
     
     def fwadj(self, point: array) -> array:
@@ -415,17 +414,15 @@ class spectroSigRLSCT(LinOp):
         """
         nslice = 50
         masks = list()
-        for i in range(4): # Considering 4 channels
-            ch = i*3
-            chan = self.channels[ch]
+        for ch_idx, chan in enumerate(self.channels): # Considering 4 channels
             global_img = np.zeros(self.imshape)
-            cum_grid = np.zeros((len(self.pointings[ch]), self.imshape[0], self.imshape[1]))
+            cum_grid = np.zeros((len(self.pointings[ch_idx]), self.imshape[0], self.imshape[1]))
 
             # Select data for specific wavelength
-            chan_data = all_data[self._idx[ch] : self._idx[ch + 1]]
+            chan_data = all_data[self._idx[ch_idx] : self._idx[ch_idx + 1]]
             data = chan_data.reshape(chan.oshape)[:,:,nslice,:].ravel()
 
-            for p_idx, pointing in enumerate(self.pointings[ch]):
+            for p_idx, pointing in enumerate(self.pointings[ch_idx]):
                 local_img = np.zeros(chan.local_im_shape)
                 for slit_idx in range(chan.instr.n_slit):
                     oversampled_sliced = np.repeat(
@@ -452,10 +449,7 @@ class spectroSigRLSCT(LinOp):
                 degridded = chan.gridding_t(np.array(sum_t_img, dtype=np.float64), pointing)[0]
                 global_img += degridded
                 cum_grid[p_idx] = degridded
-            valid_counts = np.sum(cum_grid > 100, axis=0)
-            sum_of_values = np.sum(cum_grid, axis=0)
-            weighted_mean = np.divide(sum_of_values, valid_counts, where=valid_counts != 0)
 
-            binary_mask = global_img > 50
+            binary_mask = global_img > 5
             masks.append(binary_mask)
         return masks

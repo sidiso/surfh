@@ -10,7 +10,7 @@ from astropy.coordinates import Angle
 from astropy.io import fits
 
 from surfh.Models import wavelength_mrs, instru, metadataMRS
-from surfh.Models import spectroModel
+from surfh.Models import spectroModel, MiriModel
 import matplotlib.pyplot as plt
 
 def get_axis(model):
@@ -144,7 +144,8 @@ def load_data(list_chan, save_filter_corrected_dir):
 # TODO: Change this function, almost useless now. alpha and beta axis are now created in the model creation
 def load_simulation_data(paths, list_chan):
     """Load simulation data."""
-    ref_wavel_axis = np.load(os.path.join(paths['template_dir'], 'wavel_axis_orion_1ABC_2ABC_3ABC_4ABC_SS4.npy')) # Reference wavelength for chan 1234-ABC with SS4
+    # ref_wavel_axis = np.load(os.path.join(paths['template_dir'], 'wavel_axis_orion_1ABC_2ABC_3ABC_4ABC_SS4.npy')) # Reference wavelength for chan 1234-ABC with SS4
+    ref_wavel_axis = np.load(os.path.join(paths['template_dir'], 'wavel_axis_NGC7023_1ABC_2ABC_3ABC_4ABC.npy')) # Reference wavelength for chan 1234-ABC 
     # templates = np.load(os.path.join(paths['template_dir'], 'nmf_SN2023fyq_1ABC_2ABC_3ABC_4ABC_6_templates_SS4.npy'))
     # wavel_axis = np.load(os.path.join(paths['template_dir'], 'wavel_axis_SN2023fyq_1ABC_2ABC_3ABC_4AB_SS4.npy'))
     # templates = np.load(os.path.join(paths['template_dir'], 'nmf_SN2023fyq_1ABC_2ABC_3ABC_4AB_6_templates_SS4.npy'))
@@ -152,19 +153,25 @@ def load_simulation_data(paths, list_chan):
     # templates = np.load(os.path.join(paths['template_dir'], 'nmf_NGC7023_1C_2ABC_3ABC_6_templates_SS4.npy'))
     # wavel_axis = np.load(os.path.join(paths['template_dir'], 'wavel_axis_NGC7023_1C_2ABC_3ABC_4AB_SS4.npy'))
     # templates = np.load(os.path.join(paths['template_dir'], 'nmf_NGC7023_1C_2ABC_3ABC_4AB_6_templates_SS4.npy'))
-    wavel_axis = np.load(os.path.join(paths['template_dir'], 'wavel_axis_NGC7023_1ABC_2ABC_3ABC_4AB_SS4.npy'))
-    templates = np.load(os.path.join(paths['template_dir'], 'nmf_NGC7023_1ABC_2ABC_3ABC_4AB_6_templates_SS4.npy'))
+    # wavel_axis = np.load(os.path.join(paths['template_dir'], 'wavel_axis_NGC7023_1ABC_2ABC_3ABC_4AB_SS4.npy'))
+    # templates = np.load(os.path.join(paths['template_dir'], 'nmf_NGC7023_1ABC_2ABC_3ABC_4AB_6_templates_SS4.npy'))
+    # wavel_axis = np.load(os.path.join(paths['template_dir'], 'wavel_axis_NGC7023_1ABC_2ABC_3ABC_4AB.npy'))
+    templates = np.load(os.path.join(paths['template_dir'], 'nmf_NGC7023_1ABC_2ABC_3ABC_4AB_6_templates.npy'))
+    wavel_axis = np.load(os.path.join(paths['template_dir'], 'wavel_axis_NGC7023_1ABC_2ABC_3ABC_4AB.npy'))
+    # templates = np.load(os.path.join(paths['template_dir'], 'nmf_NGC7023_1ABC_2ABC_3ABC_4AB_14_templates.npy'))
 
 
-    otf = np.load(os.path.join(paths['psf_dir'], 'psfs_pixscale0.1_npix_125_chan_1ABC_2ABC_3ABC_4ABC_SS4.npy'))
+    otf = np.load(os.path.join(paths['psf_dir'], 'psfs_pixscale0.1_npix_125_chan_1ABC_2ABC_3ABC_4ABC.npy'))
     imshape = (otf.shape[1], otf.shape[2])
 
     # Sort wavelegnth regarding the channel list
     indexes = np.where((ref_wavel_axis>wavelength_mrs.get_mrs_wavelength(list_chan[0])[0]) & (ref_wavel_axis<wavelength_mrs.get_mrs_wavelength(list_chan[-1])[-1]))[0]
+    print(f"Ref wavek shape is {ref_wavel_axis.shape}")
+    print(indexes[0], indexes[-1])
     if indexes[0] == 0:
         window_slice = slice(indexes[0], indexes[-1] +1, None) # If the first index is 0, take it
     else:
-        window_slice = slice(indexes[0]-1, indexes[-1] +1, None) # 
+        window_slice = slice(indexes[0]-1, indexes[-1] +2, None) # 
 
     print(f"Window slice is {window_slice}")
 
@@ -181,16 +188,54 @@ def load_simulation_data(paths, list_chan):
     return wavel_axis, templates, sotf
 
 
-def initialize_parameters(fusion_dir_path, step=0.1):
+def initialize_parameters(fusion_dir_path, step=0.1, filtered_data=True):
     """Initialize global parameters."""
+    if filtered_data:
+        data_path = os.path.join(fusion_dir_path, 'Filtered_slices/')
+    else:
+        data_path = os.path.join(fusion_dir_path, 'Corrected_slices/')
+    print("Data path is ", data_path)
     paths = {
         'psf_dir': os.path.join(fusion_dir_path, 'PSF/'),
         'template_dir': os.path.join(fusion_dir_path, 'Templates/'),
-        'save_filter_corrected_dir': os.path.join(fusion_dir_path, 'Filtered_slices/'),
+        'save_filter_corrected_dir': data_path,
         'result_path': os.path.join(fusion_dir_path, 'Results/'),
         'mask_path': os.path.join(fusion_dir_path, 'Masks/'),
-        'pce_path': os.path.join(fusion_dir_path, 'PCE/')
+        'pce_path': os.path.join(fusion_dir_path, 'PCE/'),
+        'miri_filter': os.path.join(fusion_dir_path, 'Templates/MIRIM/')
     }
     step_angle = Angle(step, u.arcsec).degree
 
     return paths, step_angle
+
+
+
+def create_miri_model(psfs_monoch, L_pce, lamb_cube, L_specs, shape_target, pixel_arcsec, precompute_H_freq):
+    return MiriModel.Mirim_Model_LMM(psfs_monoch, L_pce, lamb_cube, L_specs, shape_target, pixel_arcsec, precompute_H_freq)
+
+def load_miri_simulation_data(paths, list_filter, wavelength):
+    ref_list_filter = ['F560W', 'F770W', 'F1000W', 'F1130W', 'F1280W', 'F1500W', 'F1800W', 'F2100W', 'F2550W']
+    otf = np.load(os.path.join(paths['psf_dir'], 'mirim_psfs_pixscale0.1_npix_125.npy'))
+    imshape = (otf.shape[1], otf.shape[2])
+
+    # Select PSF regarding list_filter
+    print(f"len ref filter = {len(ref_list_filter)}")
+    print(f"len list_filter = {len(list_filter)}")
+    indexes = [i for i, val in enumerate(ref_list_filter) if val in list_filter]
+    otf = otf[:len(wavelength)]
+    sotf = udft.ir2fr(otf, imshape)
+
+    # Load PCE -- Don't deal with other multiple wavel now
+    list_pce = []
+    for file in sorted(os.listdir(os.path.join(paths['miri_filter']))) :
+        list_pce.append(np.load(os.path.join(paths['miri_filter'])+file)[0])
+    pce = np.array(list_pce)
+    pce = pce[indexes, :len(wavelength)]
+    # Try to load H_freq if exists 
+    try:
+        H_freq = np.load(os.path.join(paths['Templates'], 'H_freq.npy'))
+    except:
+        H_freq = None
+
+
+    return sotf, pce, H_freq

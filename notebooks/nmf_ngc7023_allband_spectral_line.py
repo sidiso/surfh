@@ -39,7 +39,7 @@ def interpolate_negatives(cube):
 
 
 
-hdul = fits.open('/home/nmonnier/Data/JWST/NGC_7023/Scan/ChannelCube_ch1-2-3-4-shortmediumlong_s3d.fits')
+hdul = fits.open('/home/nmonnier/Data/JWST/NGC_7023/Scan/NGC7023_ChannelCube_ch1-2-3-4-shortmediumlong_s3d.fits')
 data_cube = hdul[1].data
 cst_data = hdul[1].data
 hdr = hdul[1].header
@@ -111,6 +111,23 @@ masked_array[np.isnan(masked_array)] = 0
 masked_array_fitlered_data_cube = ndimage.median_filter(masked_array.copy(), size=15, axes=[0])
 
 masked_array_fitlered_data_cube_SS4 = masked_array_fitlered_data_cube
+
+spectral_line = masked_array - masked_array_fitlered_data_cube
+
+from astropy.stats import mad_std
+spectrum = np.nanmean(spectral_line, axis=(1, 2))
+
+noise = mad_std(spectrum)   # estimation du bruit
+from scipy.signal import find_peaks
+
+# seuil = k * bruit, par ex. k=3 ou 5
+peaks, properties = find_peaks(spectrum, height=13*noise, distance=5)
+plt.plot(wavel, spectrum, label="Spectre moyen")
+plt.plot(wavel[peaks], spectrum[peaks], "rx", label="Raies détectées")
+plt.legend()
+plt.show()
+# raise SystemExit
+
 # masked_array_fitlered_data_cube_SS4 = masked_array_fitlered_data_cube_SS4[:-25,:,:] # remove last 25 slices to match the wavel axis
 wavel_SS4 = wavel
 # wavel_SS4 = wavel_SS4[:-25] # remove last 25 slices to match the wavel axis
@@ -119,13 +136,13 @@ wavel_SS4 = wavel
 cube_vizualisation.plot_cube(masked_array_fitlered_data_cube_SS4, wavel_SS4)
 plt.show()
 masked_array_fitlered_data = rearrange(masked_array_fitlered_data_cube_SS4, 'L I J -> (I J) L') # from spectro data
-# plt.figure()
-# plt.title("Masked data mean spectra")
-# plt.plot(wavel, np.nanmean(masked_array, axis=(1,2)))
-# plt.figure()
-# plt.title("Filtered Masked data mean spectra")
-# plt.plot(wavel_SS4, np.nanmean(masked_array_fitlered_data_cube_SS4, axis=(1,2)))
-# plt.show()
+plt.figure()
+plt.title("Masked data mean spectra")
+plt.plot(wavel, np.nanmean(masked_array, axis=(1,2)))
+plt.figure()
+plt.title("Filtered Masked data mean spectra")
+plt.plot(wavel_SS4, np.nanmean(masked_array_fitlered_data_cube_SS4, axis=(1,2)))
+plt.show()
 
 
 # Range of components to test
@@ -136,33 +153,33 @@ reconstruction_errors = []
 mre_reconstruction_errors = []
 
 # Compute NMF for different numbers of components and calculate the reconstruction errors
-for n_components in component_range:
-    nmf = NMF(n_components=n_components, init='random', random_state=42)
-    W = nmf.fit_transform(masked_array_fitlered_data)  # W is the weight matrix
-    H = nmf.components_          # H is the feature matrix (components)
-    reconstructed = W @ H        # Reconstruct the original matrix
-    error = np.linalg.norm(masked_array_fitlered_data - reconstructed)  # Frobenius norm
-    mre_error = np.mean(np.divide((masked_array_fitlered_data-reconstructed), masked_array_fitlered_data, out=np.zeros_like(masked_array_fitlered_data), where=masked_array_fitlered_data!=0))
+# for n_components in component_range:
+#     nmf = NMF(n_components=n_components, init='random', random_state=42)
+#     W = nmf.fit_transform(masked_array_fitlered_data)  # W is the weight matrix
+#     H = nmf.components_          # H is the feature matrix (components)
+#     reconstructed = W @ H        # Reconstruct the original matrix
+#     error = np.linalg.norm(masked_array_fitlered_data - reconstructed)  # Frobenius norm
+#     mre_error = np.mean(np.divide((masked_array_fitlered_data-reconstructed), masked_array_fitlered_data, out=np.zeros_like(masked_array_fitlered_data), where=masked_array_fitlered_data!=0))
 
-    reconstruction_errors.append(error)
-    mre_reconstruction_errors.append(mre_error)
+#     reconstruction_errors.append(error)
+#     mre_reconstruction_errors.append(mre_error)
 
-# Plotting the reconstruction errors
-plt.figure(figsize=(10, 5))
-plt.plot(component_range, reconstruction_errors, marker='o')
-plt.title('Reconstruction Errors by Number of Components')
-plt.xlabel('Number of Components')
-plt.ylabel('Reconstruction Error')
-plt.grid(True)
+# # Plotting the reconstruction errors
+# plt.figure(figsize=(10, 5))
+# plt.plot(component_range, reconstruction_errors, marker='o')
+# plt.title('Reconstruction Errors by Number of Components')
+# plt.xlabel('Number of Components')
+# plt.ylabel('Reconstruction Error')
+# plt.grid(True)
 
-# Plotting the reconstruction errors
-plt.figure(figsize=(10, 5))
-plt.plot(component_range, mre_reconstruction_errors, marker='o')
-plt.title('Mean relative error Reconstruction Errors by Number of Components')
-plt.xlabel('Number of Components')
-plt.ylabel('MRE')
-plt.grid(True)
-plt.show()
+# # Plotting the reconstruction errors
+# plt.figure(figsize=(10, 5))
+# plt.plot(component_range, mre_reconstruction_errors, marker='o')
+# plt.title('Mean relative error Reconstruction Errors by Number of Components')
+# plt.xlabel('Number of Components')
+# plt.ylabel('MRE')
+# plt.grid(True)
+# plt.show()
 
 
 from sklearn.decomposition import NMF
@@ -176,6 +193,12 @@ nmf.fit(masked_array_fitlered_data)
 # Extract the components (eigenvectors)
 components = nmf.components_
 
+for peak in range(len(peaks)):
+    peak_line = np.zeros(components.shape[1])
+    peak_line[peaks[peak]] = spectrum[peaks[peak]]
+    components = np.vstack([components, peak_line])
+
+print(f"Components shape after adding spectral lines: {components.shape}")
 # plt.figure()
 # for i in range(components.shape[0]):
 #     plt.plot(wavel_SS4, components[i], label=i)
@@ -207,6 +230,6 @@ print(f"Wavel shape: {wavel_SS4.shape}")
 # np.save('/home/nmonnier/Data/JWST/NGC_7023/Fusion/Templates/wavel_axis_NGC7023_1C_2ABC_3ABC_4AB_SS4.npy', wavel_SS4)
 # np.save('/home/nmonnier/Data/JWST/NGC_7023/Fusion/Templates/nmf_NGC7023_1ABC_2ABC_3ABC_4AB_6_templates_SS4.npy', components)
 # np.save('/home/nmonnier/Data/JWST/NGC_7023/Fusion/Templates/wavel_axis_NGC7023_1ABC_2ABC_3ABC_4AB_SS4.npy', wavel_SS4)
-np.save('/home/nmonnier/Data/JWST/NGC_7023/Fusion/Templates/nmf_NGC7023_1ABC_2ABC_3ABC_4AB_6_templates.npy', components)
-np.save('/home/nmonnier/Data/JWST/NGC_7023/Fusion/Templates/wavel_axis_NGC7023_1ABC_2ABC_3ABC_4AB.npy', wavel_SS4)
+# np.save('/home/nmonnier/Data/JWST/NGC_7023/Fusion/Templates/nmf_NGC7023_1ABC_2ABC_3ABC_4AB_14_templates.npy', components)
+# np.save('/home/nmonnier/Data/JWST/NGC_7023/Fusion/Templates/wavel_axis_NGC7023_1ABC_2ABC_3ABC_4AB.npy', wavel_SS4)
 # print(wavel_SS4)

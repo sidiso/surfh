@@ -22,8 +22,9 @@ import logging as log
 @click.option('-nt', '--n_templates', default=4, type=int, help='Number of Templates.')
 @click.option('-sd', '--scale_data', default=False, type=bool, help='Scale data from Jy  to Jy/str.')
 @click.option('-m', '--method', default='lcg', type=str, help='Method used (default = lcg).')
+@click.option('-f', '--filtered_data', default=True, type=bool, help='Use filtered MRS data.')
 @click.option('-v', '--verbose', default=False, type=bool, help='Verbose.')
-def parse_options(fusion_dir, npix, hyper_parameter, niter, n_templates, scale_data, method, verbose):
+def parse_options(fusion_dir, npix, hyper_parameter, niter, n_templates, scale_data, method, filtered_data, verbose):
 
     print(f'Options selected are : ') 
     print(f'\t fusion_dir = {fusion_dir}')
@@ -33,6 +34,7 @@ def parse_options(fusion_dir, npix, hyper_parameter, niter, n_templates, scale_d
     print(f'\t nTemplates = {n_templates}')
     print(f'\t scale_data = {scale_data}')
     print(f'\t method = {method}')
+    print(f'\t filtered_data = {filtered_data}')
     print(f'\t verbose = {verbose}')
 
     if verbose:
@@ -43,7 +45,7 @@ def parse_options(fusion_dir, npix, hyper_parameter, niter, n_templates, scale_d
 
     log.info('Initialize basic path parameters')
     step = 0.1  # arcsec
-    paths, step_angle = model_creation.initialize_parameters(fusion_dir, step)
+    paths, step_angle = model_creation.initialize_parameters(fusion_dir, step, filtered_data)
 
 
     log.info('Load simulation data')
@@ -96,26 +98,53 @@ def parse_options(fusion_dir, npix, hyper_parameter, niter, n_templates, scale_d
 
     # plt.show()    
     
-    path_file = '/home/nmonnier/Data/JWST/NGC_7023/Fusion/'
-    res_dir = 'Results/lcg_MC_9_MO_4_Temp_6_nit_500_mu_5.00e+06_SD_True/'
-    wavelengths = np.load(path_file + res_dir + 'wavel.npy')
+    # path_file = '/home/nmonnier/Data/JWST/NGC_7023/Fusion/'
+    # res_dir = 'Results/lcg_MC_9_MO_4_Temp_6_nit_500_mu_5.00e+06_SD_True/'
+    # wavelengths = np.load(path_file + res_dir + 'wavel.npy')
 
-    metadata = {'PA_V3': data_dict['PA_V3']['1c'], 
-                'TARG_RA': data_dict['target']['1c'][0], 'TARG_DEC':data_dict['target']['1c'][1], 
-                'RA_V1': data_dict['targetV1']['1c'][0], 'DEC_V1': data_dict['targetV1']['1c'][1], 
-                'RA_REF': data_dict['targetREF']['1c'][0], 'DEC_REF': data_dict['targetREF']['1c'][1],
-                'ALPHA_AXIS':MRSModel.alpha_axis, 'BETA_AXIS':MRSModel.beta_axis, 'WAVELENGTH':wavelengths}
+    # metadata = {'PA_V3': data_dict['PA_V3']['1c'], 
+    #             'TARG_RA': data_dict['target']['1c'][0], 'TARG_DEC':data_dict['target']['1c'][1], 
+    #             'RA_V1': data_dict['targetV1']['1c'][0], 'DEC_V1': data_dict['targetV1']['1c'][1], 
+    #             'RA_REF': data_dict['targetREF']['1c'][0], 'DEC_REF': data_dict['targetREF']['1c'][1],
+    #             'ALPHA_AXIS':MRSModel.alpha_axis, 'BETA_AXIS':MRSModel.beta_axis, 'WAVELENGTH':wavelengths}
 
-    for key in metadata.keys():
-        print(f"{key}: {metadata[key]}")
-    data = np.load(path_file + res_dir + 'res_cube.npy')
+    # for key in metadata.keys():
+    #     print(f"{key}: {metadata[key]}")
+    # data = np.load(path_file + res_dir + 'res_cube.npy')
 
-    save_numpy_to_fits(data, metadata, path_file + res_dir + 'res_cube.fits')
-    raise ValueError("STOP")
+    # save_numpy_to_fits(data, metadata, path_file + res_dir + 'res_cube.fits')
+    # raise ValueError("STOP")
+
+    from scipy.ndimage import rotate
+    masks = MRSModel.make_mask(ndata)
+    masks = np.array(masks)
+    for i in range(masks.shape[0]):
+        masks[i] = rotate(np.flipud(np.fliplr(masks[i])), angle=data_dict['PA_V3']['1a']-360-8.2, reshape=False, order=0)
+        
+        
+
+    from astropy.io import fits
+    # --- Charger le FITS original ---
+    with fits.open('/home/nmonnier/Data/JWST/NGC_7023/Fusion/Results/lcg_MC_11_MO_4_Temp_14_nit_150_mu_5.00e+06_SD_True/res_cube_XX2.fits') as hdul:
+        hdul_copy = fits.HDUList([hdu.copy() for hdu in hdul])  # copie complète    
+        data = hdul_copy[0].data
+        plt.figure()
+        plt.imshow(data[0])
+        plt.figure()
+        plt.imshow(data[0]*masks[0])
+        plt.show()
+        # --- Créer une extension avec le masque ---
+        # Ici, on enregistre le cube de masques comme image FITS (ImageHDU)
+        mask_hdu = fits.ImageHDU(data=masks.astype(np.int16))  # int16 pour économiser de la place
+        mask_hdu.header['EXTNAME'] = 'MASKS'
+        hdul_copy.append(mask_hdu)
+        hdul_copy.writeto('/home/nmonnier/Data/JWST/NGC_7023/Fusion/Results/lcg_MC_11_MO_4_Temp_14_nit_150_mu_5.00e+06_SD_True/res_CubeMask.fits', overwrite=True)
+
+
 
 
     log.info(f'Start {method} algorithm')
-    reconstruction.reconstruction_method(MRSModel, ndata, templates, paths["result_path"], hyper_parameter, niter, method, scale_data)
+    # reconstruction.reconstruction_method(MRSModel, ndata, templates, paths["result_path"], hyper_parameter, niter, method, scale_data, data_dict)
 
 
 if __name__ == "__main__":
