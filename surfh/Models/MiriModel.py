@@ -56,19 +56,10 @@ class Mirim_Model_LMM(LinOp):
         # H_int = trapezoid(specs * psfs * pce, x=lamb_cube, axis=2)  # (9, 300, 250, 500)
         # TODO: new normalisation added here
         # pce_norms = np.sum(L_pce, axis=1)[:, np.newaxis, np.newaxis, np.newaxis]
-        print(f"L_pce shape = {L_pce.shape}")
-        print(f"lamb_cube shape = {lamb_cube.shape}")
-        print(f"specs shape = {specs.shape}")
-        print(f"psfs shape = {psfs.shape}")
-        print(f"pce shape = {pce.shape}")
-        
-        
+              
         if precompute_H_freq is None:
             pce_norms = trapezoid(L_pce * lamb_cube[np.newaxis, ...], x = lamb_cube, axis = 1)[:, np.newaxis, np.newaxis, np.newaxis]
-            print(f"pce_norms shape = {pce_norms.shape}")
             new_lamb_cube = lamb_cube[np.newaxis, np.newaxis, :, np.newaxis, np.newaxis]
-            print(f"new_lamb_cube shape = {new_lamb_cube.shape}")
-            print((specs * psfs).shape)
             H_int = trapezoid(specs * psfs * pce * new_lamb_cube, x=lamb_cube, axis=2) / pce_norms # (9, 5, 250, 500)
             
             H_freq = ir2fr(H_int, shape_target, real=True)

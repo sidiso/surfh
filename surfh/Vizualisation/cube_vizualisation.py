@@ -203,11 +203,29 @@ def plot_concatenated_cubes(cubes_list, wavelength_cubes_list):
 def plot_maps(estimated_maps):
     nrow = 2#estimated_maps.shape[0] // 2
     ncols = estimated_maps.shape[0] // 2
-    print(nrow)
-    fig, axes = plt.subplots(nrows=nrow, ncols=ncols, sharex = True, sharey = True)
+    plt.rcParams.update({
+        "font.family": "serif",
+        "font.serif": ["DejaVu Serif"],
+        "mathtext.fontset": "cm",
+        "axes.linewidth": 1,
+        "xtick.direction": "in",
+        "ytick.direction": "in",
+        "xtick.top": False,
+        "ytick.right": False,
+        "xtick.labelsize": 9,
+        "ytick.labelsize": 9
+    })
 
-    for i in range(nrow):
-        for j in range(ncols):
-            print(i,j)
-            m = axes[i,j].imshow(estimated_maps[i*ncols+j])
-            fig.colorbar(m, ax=axes[i,j])
+    fig, axes = plt.subplots(nrows=nrow, ncols=ncols, figsize=(10, 6), sharex=True, sharey=True)
+
+    for idx, ax in enumerate(axes.flat):
+        im = ax.imshow(estimated_maps[idx], cmap="viridis")
+        ax.set_title(f"Spectral Line Map {idx+1}", fontsize=11)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        cbar.ax.tick_params(labelsize=8)
+
+    plt.tight_layout()
+    # plt.savefig("/home/nmonnier/Presentations/20250916_INCLASS/NGC7023_MRS_continium_maps.png", dpi=300)
+    plt.show()

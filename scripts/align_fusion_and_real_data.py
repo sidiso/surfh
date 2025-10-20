@@ -128,6 +128,44 @@ norm_fusion = fusion_data_masked/np.max(fusion_data_masked)
 norm_mrs = mrs_padded/np.max(mrs_padded)
 
 
+def pad_image(image, target_shape, pad_value=0):
+    """Pad an image to the target shape with a specified pad value.
+
+    Parameters
+    ----------
+    image : np.ndarray
+        The input image to be padded.
+    target_shape : tuple
+        The desired shape of the output image (height, width).
+    pad_value : int, optional
+        The value to use for padding, by default 0.
+
+    Returns
+    -------
+    np.ndarray
+        The padded image.
+    """
+    pad_height = max(0, target_shape[0] - image.shape[0])
+    pad_width = max(0, target_shape[1] - image.shape[1])
+    
+    pad_top = pad_height // 2
+    pad_bottom = pad_height - pad_top
+    pad_left = pad_width // 2
+    pad_right = pad_width - pad_left
+    
+    padded_image = np.pad(image, 
+                        ((pad_top, pad_bottom), (pad_left, pad_right)), 
+                        mode='constant', 
+                        constant_values=pad_value)
+    
+    return padded_image
+
+def apply_alignment(img, angle, y_shift, x_shift):
+    """Apply rotation and shift to an image."""
+    img_rot = rotate(img, angle=angle, resize=False, order=3, preserve_range=True)
+    img_shift = shift(img_rot, shift=(y_shift, x_shift), order=3)
+    return img_shift
+
 def chi2(fusion_img, mrs_img, angle, y_shift, x_shift):
     fusion_img_rot = rotate(fusion_img, angle=angle, resize=False, order=3, preserve_range=True)  
     fusion_img_shift = shift(fusion_img_rot, shift=(y_shift, x_shift), order=3)  
@@ -164,3 +202,19 @@ mrs_padded_final = np.ascontiguousarray(mrs_padded.astype(np.float64))
 interactive_align(mrs_padded_final, img_final, np.ones_like(img))
 plt.imshow(img)
 plt.show()
+
+
+new_mrs_cube = np.zeros((mrs_data.shape[0], fusion_data.shape[1], fusion_data.shape[2]))
+target_shape = (fusion_data.shape[1], fusion_data.shape[2])
+for i in range(new_mrs_cube.shape[0]):
+    new_mrs_cube[i] = pad_image(np.ascontiguousarray(mrs_data[i].astype(np.float64)), target_shape, pad_value=0)
+
+
+# Apply alignment to all slices of the cube
+for i in range(fusion_data.data.shape[0]):
+    fusion_data[i] = apply_alignment(np.ascontiguousarray(fusion_data[i].astype(np.float64)), *result.x)
+
+
+plt.imshow(new_mrs_cube[6517], cmap='magma', origin='lower')
+plt.show()
+

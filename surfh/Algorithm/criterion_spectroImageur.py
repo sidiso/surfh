@@ -176,8 +176,14 @@ class QuadCriterion_spectroImageur:
                 callback = perf_crit_for_lcg
             )
         elif calc_crit and perf_crit != None:
-            print("Criterion to calculate AND performance criterion to calculate ?")
-            return None
+            print("criterion and gradient printed at each iteration!")
+            res_lcg = lcg(
+                imager_data_adeq + spectro_data_adeq + prior,
+                init,
+                tol=tolerance,
+                max_iter=maximum_iterations,
+                callback = print_last_grad_norm_and_crit
+            )
         elif calc_crit == False and perf_crit == None:
             res_lcg = lcg(
                 imager_data_adeq + spectro_data_adeq + prior,

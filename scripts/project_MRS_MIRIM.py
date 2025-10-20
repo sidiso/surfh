@@ -38,7 +38,6 @@ def find_shift(rotated, adj):
     return shift_y, shift_x
 
 
-
 def estimate_rotation_and_scale_via_logpolar(img1, img2):
     """
     img1 : référence (grande). img2 : target (zoomée/rotée).
@@ -275,7 +274,7 @@ from matplotlib.widgets import Slider, Button
 from skimage.transform import rotate
 from scipy.ndimage import shift
 
-def interactive_align(mirim_rescaled, adj):
+def interactive_align(mirim_rescaled, adj, mask):
     """
     Interface interactive avec sliders (rotation, shift X/Y, alpha)
     et un bouton pour interchanger les images (fond / overlay).
@@ -284,8 +283,8 @@ def interactive_align(mirim_rescaled, adj):
     plt.subplots_adjust(left=0.25, bottom=0.35)
 
     # Mode initial : adj en fond, mirim_rescaled superposé
-    base_img = ax.imshow(adj, cmap='viridis', origin='lower')
-    overlay_img = ax.imshow(mirim_rescaled, cmap='magma', alpha=0.5, origin='lower')
+    base_img = ax.imshow(adj, cmap='viridis')
+    overlay_img = ax.imshow(mirim_rescaled*mask, cmap='magma', alpha=0.5)
 
     # Sliders
     axcolor = 'lightgoldenrodyellow'
@@ -316,7 +315,7 @@ def interactive_align(mirim_rescaled, adj):
         rotated = rotate(mirim_rescaled, angle, resize=False, order=3, preserve_range=True)
         shifted = shift(rotated, shift=(dy, dx), order=3)
 
-        overlay_img.set_data(shifted)
+        overlay_img.set_data(shifted*mask)
         overlay_img.set_alpha(alpha)
         fig.canvas.draw_idle()
 
@@ -331,7 +330,7 @@ def interactive_align(mirim_rescaled, adj):
             toggle_state["swapped"] = False
         else:
             # mirim_rescaled en fond, adj en overlay
-            base_img.set_data(mirim_rescaled)
+            base_img.set_data(mirim_rescaled*mask)
             base_img.set_cmap('magma')
             base_img.set_alpha(1.0)
             overlay_img.set_data(adj)
@@ -361,7 +360,21 @@ def interactive_align(mirim_rescaled, adj):
 
 from skimage import transform
 from scipy.ndimage import shift
-def cross_corr(mirim_img, mrs_img, angle, x_shift, y_shift):
+
+def chi2(mirim_img, mrs_img, mask, angle, y_shift, x_shift):
+    mirim_img_rot = rotate(mirim_img, angle=angle, resize=False, order=3, preserve_range=True)  
+    mirim_img_shift = shift(mirim_img_rot, shift=(y_shift, x_shift), order=3)  
+    mirim_img_masked = mirim_img_shift * mask
+    mirim_img_masked = mirim_img_masked/np.max(mirim_img_masked)
+    return np.sum((mirim_img_masked - mrs_img)**2)
+
+def get_result_image(mirim_rescaled, mask, angle, y_shift, x_shift):
+    mirim_img_rot = rotate(mirim_rescaled, angle=angle, resize=False, order=3, preserve_range=True)
+    mirim_img_shift = shift(mirim_img_rot, shift=(y_shift, x_shift), order=3)
+    masked_mirim_img = mirim_img_shift * mask
+    return masked_mirim_img/np.max(masked_mirim_img)
+
+def cross_corr(mirim_img, mrs_img, angle, y_shift, x_shift):
     mirim_img = rotate(mirim_img, angle=angle)
     # mirim_img = np.roll(mirim_img, int(x_shift), axis=0)
     # mirim_img = np.roll(mirim_img, int(y_shift), axis=1)
@@ -369,7 +382,7 @@ def cross_corr(mirim_img, mrs_img, angle, x_shift, y_shift):
     # mirim_img_transformed = transform.warp(mirim_img, inverse_map=transformer.inverse)
     # plt.imshow(mirim_img_transformed)
     # plt.show()
-    mirim_img = shift(mirim_img, (x_shift, y_shift))
+    mirim_img = shift(mirim_img, (y_shift, x_shift))
     corr = np.sum(mirim_img*mrs_img)
     return (1/corr)*1e15
 
@@ -490,7 +503,8 @@ def parse_options(fusion_dir, npix, hyper_parameter, niter, n_templates, scale_d
     # plt.figure()
     # plt.imshow(integrated_cube)
     # plt.colorbar()
-    
+    # plt.show()
+
     from scipy.ndimage import rotate
 # 
 #     metadata = {'PA_V3': data_dict['PA_V3']['1c'], 
@@ -502,7 +516,7 @@ def parse_options(fusion_dir, npix, hyper_parameter, niter, n_templates, scale_d
 
     adj = adj0[100]
     # adj = rotate(np.flipud(np.fliplr(adj0[5])), angle=metadata['PA_V3']-360-8.2, reshape=False)
-    # fw = MRSModel.forward(adj0)
+    # fw = MRSModel.forward(adj0)shifted
     # adj1 = MRSModel.adjoint(fw)
 
 
@@ -518,7 +532,7 @@ def parse_options(fusion_dir, npix, hyper_parameter, niter, n_templates, scale_d
     # plt.imshow(mirim_rescaled_zoom)
     # plt.colorbar()
 
-    # interactive_align(mirim_rescaled_zoom, integrated_cube)
+    # interactive_align(mirim_rescaled_zoom, integrated_cube, masks[6])
     # plt.show()
     print(mirim_rescaled_zoom.shape)
 
@@ -529,63 +543,109 @@ def parse_options(fusion_dir, npix, hyper_parameter, niter, n_templates, scale_d
     res3 = cross_corr(mirim_rescaled_zoom, integrated_cube, -93*np.pi/180 , 2, -26)
     print(f"Res1 = {res1}, Res2 = {res2}, Res3 = {res3}")
 
-    fct_to_minimize = lambda x : cross_corr(mirim_rescaled_zoom, integrated_cube, *x)
-    np.save('/home/nmonnier/mirim_img.npy', mirim_rescaled_zoom)
-    np.save('/home/nmonnier/mrs_img.npy', integrated_cube)
-    result = scipy.optimize.minimize(fct_to_minimize, (0, 0, 0), method='BFGS', options={'disp':True})
+    norm_mirim = mirim_rescaled_zoom/np.max(mirim_rescaled_zoom)
+    norm_cube = integrated_cube/np.max(integrated_cube)
+
+    # plot norm mirim and nom cube on the same graph 
+    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+    im0 = ax[0].imshow(norm_mirim, cmap='viridis')
+    ax[0].set_title('MIRIM F1280W')
+    cbar0 = plt.colorbar(im0, ax=ax[0], orientation='vertical')
+    cbar0.set_label(hdul_mirim[1].header.get('BUNIT', 'Intensité'))
+    im1 = ax[1].imshow(norm_cube, cmap='viridis')
+    ax[1].set_title('Integrated MRS Cube')
+    cbar1 = plt.colorbar(im1, ax=ax[1], orientation='vertical')
+    cbar1.set_label('Intensité normalisée')
+
+
+
+    history = []
+    def callback(xk):
+        history.append(np.array(xk))
+        print("iter:", len(history), "x:", xk, "chi2:", fct_chi2(xk))
+
+    fct_chi2 = lambda x : chi2(norm_mirim, norm_cube, masks[6], angle=x[0], y_shift=x[1], x_shift=x[2])
+    result = scipy.optimize.minimize(
+                            fct_chi2, 
+                            (-90, -26, 3), 
+                            method='Nelder-Mead', 
+                            options={'disp': True, 'maxiter': 2000, 'maxfev': 5000, 'xatol':1e-3, 'fatol':1e-3},
+                            callback=callback,
+                            )
+
+
+    # np.save('/home/nmonnier/mask.npy', masks[6])
+    img = get_result_image(norm_mirim, masks[6], *result.x)
+    img2 = get_result_image(norm_mirim, masks[6], -90, 0, 0)
+
+    fig, ax2 = plt.subplots(1, 3, figsize=(10, 5))
+    im0 = ax2[0].imshow(img, cmap='viridis')
+    ax2[0].set_title('MIRIM F1280W')
+    cbar0 = plt.colorbar(im0, ax=ax2[0], orientation='vertical')
+    cbar0.set_label(hdul_mirim[1].header.get('BUNIT', 'Intensité'))
+
+    im1 = ax2[1].imshow(norm_cube, cmap='viridis')
+    ax2[1].set_title('Integrated MRS Cube')
+    cbar1 = plt.colorbar(im1, ax=ax2[1], orientation='vertical')
+    cbar1.set_label('Intensité normalisée')
+    
+    im2 = ax2[2].imshow(img-norm_cube, cmap='viridis')
+    ax2[2].set_title('Diff(MIRIM, MRS)')
+    cbar2 = plt.colorbar(im2, ax=ax2[2], orientation='vertical')
+    cbar2.set_label('Intensité normalisée')
+
+    plt.show()
+    # fct_to_minimize = lambda x : cross_corr(mirim_rescaled_zoom, integrated_cube, *x)
+    # result = scipy.optimize.minimize(fct_to_minimize, (0, 0, 0), method='BFGS', options={'disp':True})
 
     print(result)
 
 
-    
-    # rot_deg, scale_factor, error = estimate_rotation_and_scale_via_logpolar(mirim_rescaled_zoom, integrated_cube)
-    # print(f"Estimated rotation: {rot_deg:.2f} deg, scale factor: {scale_factor:.4f}, error: {error:.4e}")
-    # mirim_rescaled_zoom_rotated = rotate(mirim_rescaled_zoom, angle=-rot_deg, reshape=False)
 
-    # _, angle, shift_pix = align_images_no_rescale(mirim_rescaled_zoom, integrated_cube)
-    # print(f"Final alignment angle: {angle:.2f} deg, shift: {shift_pix}")
+    # # paramètres d’échantillonnage (à ajuster)
+    # angles = np.linspace(-80, -100, 21)  # 11 valeurs d’angle
+    # xs = np.linspace(-30, 5, 36)        # 11 valeurs de shift x
+    # ys = np.linspace(-30, 5, 36)        # 11 valeurs de shift y
 
-    # best_angle = find_best_rotation(mirim_rescaled_zoom, integrated_cube)
-    # print(f"Best rotation angle found: {best_angle:.2f} deg")
-    
+    # # grille pour stocker les chi2
+    # chi2_grid = np.zeros((len(angles), len(xs), len(ys)))
 
-    # rot_image, best_angle, best_shift = align_with_logpolar(mirim_rescaled_zoom, integrated_cube)
-    # print(f"Align with log-polar: angle {best_angle:.2f} deg, shift {best_shift}")
+    # # calcul du chi2 sur la grille
+    # for i,a in enumerate(angles):
+    #     for j,x in enumerate(xs):
+    #         for k,y in enumerate(ys):
+    #             chi2_grid[i,j,k] = fct_chi2([a, x, y])
 
-    # shift_y, shift_x = find_shift(rot_image, integrated_cube)
-    # aligned = rot_image[shift_y:shift_y, shift_x:shift_x]
+    # # ----------------------------------------------------
+    # # 🔹 1. Heatmaps (slices en angle)
+    # for i,a in enumerate(angles[::2]):  # 1 slice sur 2 pour ne pas surcharger
+    #     idx = np.where(angles==a)[0][0]
+    #     plt.figure()
+    #     plt.imshow(chi2_grid[idx,:,:], extent=[ys.min(), ys.max(), xs.min(), xs.max()],
+    #             origin="lower", aspect="auto")
+    #     plt.colorbar(label="chi²")
+    #     plt.title(f"chi²(x,y) pour angle={a:.1f}°")
+    #     plt.xlabel("y_shift")
+    #     plt.ylabel("x_shift")
+    #     plt.show()
 
+    # # ----------------------------------------------------
+    # # 🔹 2. Nuage de points 3D
+    # from mpl_toolkits.mplot3d import Axes3D
 
-    # fig, ax = plt.subplots(1, 6, figsize=(12, 6))
+    # A, X, Y = np.meshgrid(angles, xs, ys, indexing="ij")
+    # fig = plt.figure(figsize=(8,6))
+    # ax = fig.add_subplot(111, projection="3d")
 
-
-    # pce = np.load('/home/nmonnier/Data/JWST/Simulation/Orion/PCE/pce.npy')
-    # pce_1280 = pce[4
-    # im0 = ax[0].imshow(mirim_rescaled, cmap='viridis', norm=norm)
-    # ax[0].set_title('MIRIM F1280W')
-    # # Forcer les axes en degrés décimaux
-    # ax[0].set_ylabel("Déclinaison (deg)")
-    # cbar0 = plt.colorbar(im0, ax=ax[0], orientation='vertical')
-    # cbar0.set_label(hdul_mirim[1].header.get('BUNIT', 'Intensité'))    
-    # ax[1].imshow(mirim_rescaled_zoom, cmap='viridis')
-    # ax[1].set_title('Zoom')
-    # ax[2].imshow(adj, cmap='viridis')
-    # ax[2].set_title('Adjoint MRS Channel 1B Slice')
-    # ax[3].imshow(mirim_rescaled_zoom_rotated, cmap='viridis')
-    # ax[3].set_title(f'Zoom rot {rot_deg:.1f} deg')
-    # ax[4].imshow(rot_image, cmap='viridis')
-    # ax[4].set_title(f'Aligné (shift {shift_pix[0]:.1f}, {shift_pix[1]:.1f})')
-    # ax[5].imshow(aligned, cmap='viridis')
-    # ax[5].set_title('Décalé')
+    # # scatter avec couleur = chi2
+    # p = ax.scatter(A.flatten(), X.flatten(), Y.flatten(),
+    #             c=chi2_grid.flatten(), cmap="viridis", s=20)
+    # fig.colorbar(p, label="chi²")
+    # ax.set_xlabel("angle (°)")
+    # ax.set_ylabel("x_shift")
+    # ax.set_zlabel("y_shift")
     # plt.show()
-
-
-    # alpha_coord, beta_coord = model_creation.get_axis(MRSModel)
-    # extent = [alpha_coord.min(), alpha_coord.max(), beta_coord.min(), beta_coord.max()]
-    # plt.figure()
-    # plt.imshow(slice_0, cmap='viridis', alpha=0.5)
-    # plt.imshow(slice_1, cmap='viridis', extent=extent, alpha=0.5)
-    # plt.colorbar()
+    
 
     # cube_vizualisation.plot_cube(adj0, np.arange(adj0.shape[0]))
     # MRSModel.project_FOV()   

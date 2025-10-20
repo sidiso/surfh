@@ -453,3 +453,12 @@ class spectroSigRLSCT(LinOp):
             binary_mask = global_img > 5
             masks.append(binary_mask)
         return masks
+    
+
+    def get_list_of_data(self, all_data):
+        list_data = list()
+        for ch_idx, chan in enumerate(self.channels):
+            chan_data = all_data[self._idx[ch_idx] : self._idx[ch_idx + 1]]
+            data = chan_data.reshape(chan.oshape)
+            list_data.append(data)
+        return list_data

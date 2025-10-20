@@ -16,6 +16,9 @@ from surfh.Models import wavelength_mrs
 from surfh.Simulation import simulation_data
 from surfh.Vizualisation import cube_vizualisation
 from matplotlib.widgets import Slider
+from matplotlib.patches import Rectangle
+from matplotlib.patches import Polygon
+
 
 import numpy as np
 from scipy.ndimage import generic_filter
@@ -87,7 +90,6 @@ raw_data_cube = data_cube[:9935,:,:]
 
 coords = [(36,29), (74,29), (36,75), (74,75)]
 
-
 from scipy.ndimage import rotate
 
 angle = -37  # angle en degrés
@@ -103,6 +105,7 @@ for i in range(raw_data_cube.shape[0]):
 
 
 masked_array = rotated_cube[:, coords[0][1]:coords[2][1], coords[0][0]:coords[3][0]]
+spectrum_masked_array = np.nanmean(masked_array, axis=(1,2))
 # cube_vizualisation.plot_cube(masked_array, wavel)
 # plt.show()
 
@@ -117,32 +120,133 @@ spectral_line = masked_array - masked_array_fitlered_data_cube
 from astropy.stats import mad_std
 spectrum = np.nanmean(spectral_line, axis=(1, 2))
 
+
+
+# coords2 = [(36,29), (74,29), (36,75), (74,75)]
+coords2 = [(62, 17.5), (84, 46), (48, 72), (26.8, 43.4)]
+
+
+# # --- Paramètres de style (publication ready) ---
+# plt.rcParams.update({
+#     "font.family": "serif",
+#     "font.serif": ["Times New Roman"],
+#     "mathtext.fontset": "cm",
+#     "axes.linewidth": 1,
+#     "xtick.direction": "in",
+#     "ytick.direction": "in",
+#     "xtick.top": True,
+#     "ytick.right": True,
+#     "xtick.labelsize": 10,
+#     "ytick.labelsize": 10,
+# })
+
+# last_slice = raw_data_cube[-1, :, :]
+
+# # --- Définition de la zone d'intérêt ---
+# x_min, y_min = coords2[0]  # coin haut-gauche
+# x_max, y_max = coords2[-1]  # coin bas-droit
+# width = x_max - x_min
+# height = y_max - y_min
+
+# # --- Calcul du spectre moyen ---
+# # roi = raw_data_cube[:, y_min:y_max, x_min:x_max]
+# # spectrum = roi.mean(axis=(1, 2))
+
+# print("len(wavel) =", len(wavel))
+# print("len(spectrum) =", len(spectrum))
+
+
+# # --- Figure ---
+# fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
+
+# # 1. Image du dernier slice
+# im = ax1.imshow(last_slice, cmap="viridis", origin="lower")
+# # rect = Rectangle((x_min, y_min), width, height,
+# #                  linewidth=2, edgecolor='red', facecolor='none',
+# #                  label='Channel 1A FoV')
+# # ax1.add_patch(rect)
+# poly = Polygon(coords2, closed=True, 
+#                edgecolor="red", facecolor="none", linewidth=2,
+#                label='Channel 1A FoV')
+# ax1.add_patch(poly)
+# ax1.set_title(r"NGC7023 MRS FoV, $\lambda = 24.48$ (um)", fontsize=16)
+# ax1.set_xlabel("x (pixels)", fontsize=14)
+# ax1.set_ylabel("y (pixels)", fontsize=14)
+# ax1.legend(loc="upper right", fontsize=9, frameon=True)
+# cbar = fig.colorbar(im, ax=ax1, fraction=0.046, pad=0.04)
+# cbar.ax.tick_params(labelsize=9)
+
+# # 2. Spectre moyen
+# print(wavel)
+# ax2.plot(wavel, spectrum_masked_array, color="black", lw=1.2)
+# ax2.set_title("Mean spectrum", fontsize=16)
+# ax2.set_xlabel(r"$\lambda$ (um)", fontsize=14)
+# ax2.set_ylabel("Intensity (a.u.)", fontsize=14)
+# # Ajustements
+# plt.tight_layout()
+# plt.savefig("/home/nmonnier/Presentations/20250916_INCLASS/NGC7023_MRS_FoV_and_spectrum.png", dpi=300)
+# plt.show()
+
+# raise SystemExit
+
+
 noise = mad_std(spectrum)   # estimation du bruit
 from scipy.signal import find_peaks
 
 # seuil = k * bruit, par ex. k=3 ou 5
 peaks, properties = find_peaks(spectrum, height=13*noise, distance=5)
-plt.plot(wavel, spectrum, label="Spectre moyen")
-plt.plot(wavel[peaks], spectrum[peaks], "rx", label="Raies détectées")
-plt.legend()
-plt.show()
-# raise SystemExit
 
 # masked_array_fitlered_data_cube_SS4 = masked_array_fitlered_data_cube_SS4[:-25,:,:] # remove last 25 slices to match the wavel axis
 wavel_SS4 = wavel
 # wavel_SS4 = wavel_SS4[:-25] # remove last 25 slices to match the wavel axis
 
 
-cube_vizualisation.plot_cube(masked_array_fitlered_data_cube_SS4, wavel_SS4)
-plt.show()
+# cube_vizualisation.plot_cube(masked_array_fitlered_data_cube_SS4, wavel_SS4)
+# plt.show()
 masked_array_fitlered_data = rearrange(masked_array_fitlered_data_cube_SS4, 'L I J -> (I J) L') # from spectro data
-plt.figure()
-plt.title("Masked data mean spectra")
-plt.plot(wavel, np.nanmean(masked_array, axis=(1,2)))
-plt.figure()
-plt.title("Filtered Masked data mean spectra")
-plt.plot(wavel_SS4, np.nanmean(masked_array_fitlered_data_cube_SS4, axis=(1,2)))
-plt.show()
+
+# plt.rcParams.update({
+#     "font.family": "serif",
+#     "font.serif": ["DejaVu Serif"],
+#     "mathtext.fontset": "cm",
+#     "axes.linewidth": 1,
+#     "xtick.direction": "in",
+#     "ytick.direction": "in",
+#     "xtick.top": True,
+#     "ytick.right": True,
+#     "xtick.labelsize": 10,
+#     "ytick.labelsize": 10
+# })
+
+# # --- Plot du spectre avec les pics ---
+# plt.figure(figsize=(6,4))
+# plt.plot(wavel, spectrum, color="black", lw=1.5, label="Mean spectrum")
+# plt.plot(wavel[peaks], spectrum[peaks], "rx", label="Spectral lines")
+# plt.xlabel(r"Wavelength $\lambda$ (um)", fontsize=14)
+# plt.ylabel("Intensity (a.u.)", fontsize=14)
+# plt.title("Mean spectrum without continium", fontsize=16)
+# plt.legend(fontsize=9)
+# plt.tight_layout()
+# plt.savefig("/home/nmonnier/Presentations/20250916_INCLASS/NGC7023_mean_sectrum_without_continium.png", dpi=300)
+
+# # --- Plot du spectre moyen du masked_array ---
+# plt.figure(figsize=(6,4))
+# plt.plot(wavel, np.nanmean(masked_array, axis=(1,2)), color="black", lw=1.5)
+# plt.xlabel(r"Wavelength $\lambda$ (um)", fontsize=14)
+# plt.ylabel("Intensity (a.u.)", fontsize=14)
+# plt.title("Mean spectrum", fontsize=16)
+# plt.tight_layout()
+# plt.savefig("/home/nmonnier/Presentations/20250916_INCLASS/NGC7023_mean_sectrum.png", dpi=300)
+
+# # --- Plot du spectre moyen du masked_array filtré ---
+# plt.figure(figsize=(6,4))
+# plt.plot(wavel_SS4, np.nanmean(masked_array_fitlered_data_cube_SS4, axis=(1,2)), color="black", lw=1.5)
+# plt.xlabel(r"Wavelength $\lambda$ (nm)", fontsize=14)
+# plt.ylabel("Intensity (a.u.)", fontsize=14)
+# plt.title("Median filtered Mean spectrum ", fontsize=16)
+# plt.tight_layout()
+# plt.savefig("/home/nmonnier/Presentations/20250916_INCLASS/NGC7023_median_filtered_mean_sectrum.png", dpi=300)
+# plt.show()
 
 
 # Range of components to test
@@ -192,6 +296,36 @@ nmf.fit(masked_array_fitlered_data)
 
 # Extract the components (eigenvectors)
 components = nmf.components_
+
+n_components = components.shape[0]  # ici 6
+# plt.rcParams.update({
+#     "font.family": "serif",
+#     "font.serif": ["DejaVu Serif"],
+#     "mathtext.fontset": "cm",
+#     "axes.linewidth": 1,
+#     "xtick.direction": "in",
+#     "ytick.direction": "in",
+#     "xtick.top": True,
+#     "ytick.right": True,
+#     "xtick.labelsize": 10,
+#     "ytick.labelsize": 10
+# })
+
+# # --- Plot des composantes NMF ---
+# fig, axes = plt.subplots(n_components, 1, figsize=(6, 2*n_components), sharex=True)
+
+# for i in range(n_components):
+#     ax = axes[i]
+#     ax.plot(wavel_SS4, components[i], color='black', lw=1.5)
+#     ax.set_ylabel("Intensity (a.u.)", fontsize=10)
+#     ax.set_title(f"NMF Components {i+1}", fontsize=14)
+#     ax.grid(False)
+
+# axes[-1].set_xlabel(r"Wavelength $\lambda$ (nm)", fontsize=10)
+# plt.tight_layout()
+# plt.savefig("/home/nmonnier/Presentations/20250916_INCLASS/NGC7023_NMF_components.png", dpi=300)
+# plt.show()
+
 
 for peak in range(len(peaks)):
     peak_line = np.zeros(components.shape[1])
