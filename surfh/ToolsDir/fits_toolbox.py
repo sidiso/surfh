@@ -67,7 +67,7 @@ def get_data_from_fits(fits_path):
     return data
 
 
-def save_numpy_to_fits(data, metadata, filename):
+def save_numpy_to_fits(data, metadata, filename, masks):
     """
     Sauvegarde un cube numpy (nw, ny, nx) en FITS
     avec des coordonnées linéaires pour les 3 axes.
@@ -133,8 +133,8 @@ def save_numpy_to_fits(data, metadata, filename):
     # data[39] = rotate(np.flipud(np.fliplr(data[40])), angle=metadata['PA_V3']-360-8.2, reshape=False)
     # data[40] = rotate(np.flipud(np.fliplr(data[40])), angle=metadata['PA_V3']-360+8.2, reshape=False)
 
-    for i in range(data.shape[0]):
-        data[i] = rotate(np.flipud(np.fliplr(data[i])), angle=metadata['PA_V3']-360-8.2, reshape=False)
+    # for i in range(data.shape[0]):
+    #     data[i] = rotate(np.flipud(np.fliplr(data[i])), angle=metadata['PA_V3']-360-8.2, reshape=False)
 
 
     # --- Métadonnées générales ---
@@ -180,8 +180,19 @@ def save_numpy_to_fits(data, metadata, filename):
     wcstable_hdu = fits.BinTableHDU.from_columns([col])
     wcstable_hdu.header['EXTNAME'] = 'WCS-TABLE'
 
-    # --- Créer la liste d'extensions ---
-    hdul = fits.HDUList([hdu, wcstable_hdu])
+    if masks is not None:
+        masks = np.array(masks)
+        mask_hdu = fits.ImageHDU(data=masks.astype(np.uint8), name='MASKS')
+
+        # # --- Table MASKS-TABLE contenant les masques ---
+        # col_masks = fits.Column(name='masks', format=f'{masks.shape[0]}L', dim=f'({masks.shape[0]})', array=[masks])
+        # maskstable_hdu = fits.BinTableHDU.from_columns([col_masks])
+        # maskstable_hdu.header['EXTNAME'] = 'MASKS-TABLE'
+        # --- Créer la liste d'extensions ---
+        hdul = fits.HDUList([hdu, wcstable_hdu, mask_hdu])
+    else:
+        # --- Créer la liste d'extensions ---
+        hdul = fits.HDUList([hdu, wcstable_hdu])
 
     # --- Écriture ---
     hdul.writeto(filename, overwrite=True)

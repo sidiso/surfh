@@ -77,7 +77,7 @@ def reconstruction_method(MRSModel, ndata, templates, result_path, hyperParamete
         np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
         np.save(path / 'wavel.npy', MRSModel.wavelength_axis)
 
-def reconstruction_MRS_fusion(MRSModel, ndata, templates, config, scale_data, data_dict):
+def reconstruction_MRS_fusion(MRSModel, ndata, templates, config, scale_data, data_dict, masks=None):
     """
     Perform the reconstruction method and save results.
 
@@ -129,18 +129,17 @@ def reconstruction_MRS_fusion(MRSModel, ndata, templates, config, scale_data, da
     if templates is None:
         print("No templates")
         print(f"Results save in {path}")
-        # np.save(path / 'res_cube.npy', res_fusion.x)
-        save_numpy_to_fits(np.array(res_fusion.x), metadata, path /'res_cube.fits')
+        
+        save_numpy_to_fits(np.array(res_fusion.x), metadata, path /'res_cube.fits', masks)
         np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
     else:
         # Convert maps to cube
         y_cube = MRSModel.mapsToCube(res_fusion.x)
-
         # Save results
         print(f"Results save in {path}")
         np.save(path / 'res_x.npy', res_fusion.x)
-        # np.save(path / 'res_cube.npy', y_cube)
-        save_numpy_to_fits(np.array(y_cube), metadata, path/'res_cube.fits')
+        
+        save_numpy_to_fits(np.array(y_cube), metadata, path/'res_cube.fits', masks)
         np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
         np.save(path / 'wavel.npy', MRSModel.wavelength_axis)
 
