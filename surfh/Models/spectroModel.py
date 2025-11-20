@@ -405,7 +405,7 @@ class spectroSigRLSCT(LinOp):
         for ch_idx, chan in enumerate(self.channels):
             list_cube.append(chan.multi_dith_sliceToCube(all_data[self._idx[ch_idx] : self._idx[ch_idx + 1]],))
 
-        return np.vstack(list_cube)
+        return np.vstack(list_cube), list_cube
 
 
     def make_mask(self, all_data):

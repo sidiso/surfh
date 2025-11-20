@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 import scipy as sp
 from scipy import misc
-from surfh.Models import slicer
+from surfh.Models import slicer, metadataMRS
 from surfh.ToolsDir import jax_utils, python_utils, cython_utils, utils, nearest_neighbor_interpolation
 from astropy import units as u
 from astropy.coordinates import Angle
@@ -50,6 +50,10 @@ class Channel():
         self.local_alpha_axis = local_alpha_axis
         self.local_beta_axis = local_beta_axis
         
+        # TODO: Update Resolving power value regarding specific wavelength fot this band 
+        resolving_power = metadataMRS.build_MRS_resolving_power(chan=instr.name, resolving_path='/home/nmonnier/Data/JWST/NGC_7023/Fusion/Resolving_Power/', wavelength=self.global_wavelength_axis[self.wslice])
+        print("Checking things", resolving_power.shape)
+        self.instr.w_blur.resolving_power = resolving_power
 
         self.slicer = slicer.Slicer(self.instr, 
                                     wavelength_axis = self.global_wavelength_axis, #[self.wslice], 

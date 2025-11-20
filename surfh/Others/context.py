@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import yaml
 from typing import List
 from pathlib import Path
@@ -16,9 +16,22 @@ class ConfigurationPaths:
     wavelength_file: str
     reference_wavelength_file: str
 
+    resolving_path: str = field(default=None) # Ici pas besoin de mettre en dans l'appel de la classe, on le construit plus tard
+
+
     def resolve_paths(self) -> None:
         """Combine tous les chemins relatifs avec fusion_dir, en gérant PSF et Templates correctement."""
         base = Path(self.fusion_dir).expanduser().resolve()
+
+        # Create resolving_path if not defiened before
+        if self.resolving_path is None:
+            self.resolving_path = str(base / "Resolving_Power")
+        else:
+            rp = Path(self.resolving_path)
+            if not rp.is_absolute():
+                rp = base / rp
+            self.resolving_path = str(rp)
+
 
         for name in ["data_dir", "result_dir", "psf_dir", "template_dir"]:
             value = getattr(self, name)
@@ -59,6 +72,7 @@ class ReconstructionConfig:
 @dataclass
 class MRSConfig:
     list_channels: List[str]
+    inverse_rotation : bool
     scale_data: bool
     spectral_lines: bool
 

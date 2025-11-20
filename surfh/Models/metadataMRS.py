@@ -1,5 +1,21 @@
 
 import pysiaf
+import os
+import numpy as np
+
+def build_MRS_resolving_power(chan=None, resolving_path=None, wavelength=None):
+    """ Build Resolving power for specific band (and wavelength array) from sub-sampled resolving power. """
+    if resolving_path is None or chan is None:
+        raise RuntimeError("Error resolving path or chan is set to None !")
+    for file in os.listdir(resolving_path):
+        if chan.upper() in file:
+            data = np.loadtxt(resolving_path + file, delimiter=',')
+            SS_wavel = data[:,0]
+            SS_power = data[:,1]
+            resolving_power = np.interp(wavelength, SS_wavel, SS_power)
+            print("Done")
+    return resolving_power
+
 
 def get_MRS_rotation(chan=None):
     """Get the rotation angle for MRS channels."""

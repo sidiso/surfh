@@ -17,21 +17,50 @@ import matplotlib.pyplot as plt
 def get_axis(model):
     return model.alpha_axis, model.beta_axis
 
+def tmp_create_model(sotf, templates, wavel_axis, instruments, step_angle, data_dict, imshape, xshift=0, yshift=0, ch='4a'):
+    """Create the spectrograph model."""
+    main_pointing = instru.Coord(0, 0)
+    pointings = []
+
+    for idx, chan in enumerate(instruments.keys()):
+        if chan == ch:
+            x_shift_chan = xshift*step_angle
+            y_shift_chan = yshift*step_angle
+        else:
+            x_shift_chan = 0
+            y_shift_chan = 0
+
+        RA_CORR, DEC_CORR = metadataMRS.get_band_delta_pointing(chan)
+        pointing_chan = [main_pointing + instru.Coord( -RA_CORR - DITH_RA - x_shift_chan, -DEC_CORR + DITH_DEC + y_shift_chan) for (RA, DEC), (DITH_RA, DITH_DEC) in zip(data_dict['target'][chan], data_dict['dither'][chan])]
+        pointings.append(instru.CoordList(pointing_chan).pix(step_angle))
+
+
+    origin_alpha_axis = (np.arange(imshape[0]) * step_angle - np.mean(np.arange(imshape[0]) * step_angle))
+    origin_beta_axis = np.arange(imshape[1]) * step_angle - np.mean(np.arange(imshape[1]) * step_angle)
+
+    # TODO : Warning here Mean is 0 because the pointings are centered on 0,0
+    mean_alpha = np.mean([pointings[-1][dith].alpha for dith in range(4)])
+    mean_beta = np.mean([pointings[-1][dith].beta for dith in range(4)])
+    alpha_axis = origin_alpha_axis + mean_alpha
+    beta_axis = origin_beta_axis + mean_beta
+
+    return spectroModel.spectroSigRLSCT(
+        sotf=sotf,
+        templates=templates,
+        alpha_axis=alpha_axis,
+        beta_axis=beta_axis,
+        wavelength_axis=wavel_axis,
+        instrs=list(instruments.values()),
+        step_degree=step_angle, 
+        pointings=pointings)
+
+
 def create_model(sotf, templates, wavel_axis, instruments, step_angle, data_dict, imshape):
     """Create the spectrograph model."""
     main_pointing = instru.Coord(0, 0)
     pointings = []
-    # Delta offsets for each channel based on the pointing reference ch1
-    delta_pointing = {'1a':(0,0),
-                      '1a':(0.087/3600, 0.288/3600),
-                      '1a':(0.654/3600, 0.002/3600),
-                      '1a':(-0.644/3600, -0.261/3600)}
 
     for idx, chan in enumerate(instruments.keys()):
-        # DETLA_RA, DELTA_DEC = metadataMRS.get_chan_delta_pointing(chan)
-        # RA_CORR, DEC_CORR = metadataMRS.get_pointing_correction_SN2023fyq(chan)
-        # RA - DITH_RA seems so be the working solution here
-        # pointing_chan = [main_pointing + instru.Coord(-RA_CORR - DITH_RA + DETLA_RA, -DEC_CORR + DITH_DEC + DELTA_DEC) for (RA, DEC), (DITH_RA, DITH_DEC) in zip(data_dict['target'][chan], data_dict['dither'][chan])]
         RA_CORR, DEC_CORR = metadataMRS.get_band_delta_pointing(chan)
         pointing_chan = [main_pointing + instru.Coord( -RA_CORR - DITH_RA, -DEC_CORR + DITH_DEC) for (RA, DEC), (DITH_RA, DITH_DEC) in zip(data_dict['target'][chan], data_dict['dither'][chan])]
         pointings.append(instru.CoordList(pointing_chan).pix(step_angle))
@@ -56,7 +85,7 @@ def create_model(sotf, templates, wavel_axis, instruments, step_angle, data_dict
         step_degree=step_angle, 
         pointings=pointings)
 
-def create_instruments(data_dict, list_chan):
+def create_instruments(data_dict, config: Config):
     """Create instrument configurations for each channel."""
     instruments = {}
 
@@ -77,11 +106,13 @@ def create_instruments(data_dict, list_chan):
         '4c': (12, 1630, 1330, 0.273, 6.6/3600, 7.7/3600)
     }
 
+
+    signe_rotation = -1 if config.MRS.inverse_rotation else 1
     for chan, (n_slit, r_min, r_max, det_pix_size, fov_x, fov_y) in channel_specs.items():
-        if chan in list_chan:
-            spec_blur = instru.SpectralBlur(np.mean([r_min, r_max]))
+        if chan in config.MRS.list_channels:
+            spec_blur = instru.SpectralBlur(np.mean([r_min, r_max]), None)
             instruments[chan] = instru.IFU(
-                fov=instru.FOV(fov_x, fov_y, origin=instru.Coord(0, 0), angle=-data_dict['rotation'][chan]),
+                fov=instru.FOV(fov_x, fov_y, origin=instru.Coord(0, 0), angle= signe_rotation*data_dict['rotation'][chan]),
                 det_pix_size=det_pix_size,
                 n_slit=n_slit,
                 w_blur=spec_blur,

@@ -488,8 +488,9 @@ class LocalFOV(FOV):
 class SpectralBlur:
     """A spectral response"""
 
-    def __init__(self, grating_resolution: float):
+    def __init__(self, grating_resolution: float, resolving_power):
         self.grating_resolution = grating_resolution
+        self.resolving_power = resolving_power
 
         # the added margin serves for spectral PSF normalization. It is used in
         # private and is removed in the projected output
@@ -498,7 +499,7 @@ class SpectralBlur:
     @property
     def grating_len(self) -> float:
         """The gratings length from given resolution R=λ/Δλ"""
-        return 2 * 0.44245 / np.pi * self.grating_resolution
+        return 2 * 0.44245 / np.pi * self.resolving_power
 
     def psfs(
         self, out_axis: array, beta: array, wavelength: array, scale: float = 1, type: str = 'mrs'
@@ -547,15 +548,29 @@ class SpectralBlur:
             axis=0,
         ).reshape((1, -1, 1))
 
+        grating_len_for_norm = np.concatenate(
+            [
+                np.repeat(self.grating_len[0], self._n_margin - 1),
+                self.grating_len,
+                np.repeat(self.grating_len[-1], self._n_margin - 1),
+            ],
+            axis=0,
+        ).reshape(1,-1,1)
+
+        print("CF DEBUF Multiple debug")
+        print(f"Shape self.resolving_power", self.resolving_power.shape)
+        print(f"Shape wavelength", wavelength.shape)
+        print(f"Shape w_axis_for_norm", w_axis_for_norm.shape)
+        print(f"Shape grating_len_for_norm", grating_len_for_norm.shape)
         # Since we are doing normalization, factor is not necessary here but we
         # keep it to have a trace of theoretical continuous normalisation
         out = (
             np.pi
-            * self.grating_len
+            * grating_len_for_norm
             / w_axis_for_norm
             * np.sinc(
                 np.pi
-                * self.grating_len
+                * grating_len_for_norm
                 * ((out_axis - scale * beta) / w_axis_for_norm - 1)
             )
             ** 2
