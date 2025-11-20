@@ -72,7 +72,7 @@ def iterative_baseline_removal(y, lam=5e2, p=0.5, niter=10, ncycles=3, sigma=1.0
 # =========================================================
 # --- Peak Detection & Fitting ---
 # =========================================================
-def detect_and_fit_peaks(baseline_subtrated, mad, sigma=5, distance=5):
+def detect_and_fit_peaks(baseline_subtrated, mad, sigma=5, distance=5, wavelength=None):
     """Detect peaks and fit Gaussians."""
     peaks, _ = find_peaks(baseline_subtrated, height=sigma * mad, distance=distance)
     fitted_peaks = []
@@ -91,8 +91,16 @@ def detect_and_fit_peaks(baseline_subtrated, mad, sigma=5, distance=5):
         p0 = [y_window.max() - y_window.min(), pk, 1]
         try:
             popt, _ = curve_fit(gaussian, x_window, y_window, p0=p0)
-            fitted_peaks.append({'peak_index': pk, 'amplitude': popt[0],
-                                 'center': popt[1], 'sigma': popt[2]})
+            if wavelength is None:
+                fitted_peaks.append({'peak_index': pk, 'amplitude': popt[0],
+                                     'center': popt[1], 'sigma': popt[2]})
+            else:
+                i0 = int(np.floor(popt[1]))
+                i1 = int(np.ceil(popt[1]))
+                frac = popt[1] - i0
+                wavelength_center = wavelength[i0] * (1 - frac) + wavelength[i1] * frac
+                fitted_peaks.append({'peak_index': pk, 'amplitude': popt[0],
+                                     'center': popt[1], 'wavel_center': wavelength_center, 'sigma': popt[2]})
         except RuntimeError:
             pass
 
