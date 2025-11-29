@@ -89,10 +89,6 @@ def reconstruction_MRS_fusion(MRSModel, ndata, templates, config, scale_data, da
         result_path: Path to save results
         wavel_axis: Wavelength axis array
     """
-    # Hyperparameters
-    # hyperParameter = 5e3
-    # method = "lcg"
-    # niter = 50
     value_init = 0
     print(f"Mu = {config.reconstruction.mu}")
     print(f"Type of Mu = {type(config.reconstruction.mu)}")
@@ -102,7 +98,10 @@ def reconstruction_MRS_fusion(MRSModel, ndata, templates, config, scale_data, da
     else:
         shape_templates = templates.shape[0]
     result_dir = f'{config.reconstruction.method}_MC_{len(MRSModel.instrs)}_MO_4_Temp_{shape_templates}_nit_{str(config.reconstruction.max_iter)}_mu_{float(config.reconstruction.mu):.2e}_SD_{scale_data}/'
-    path = pathlib.Path(config.configuration.result_dir + result_dir)
+    print(f"Result path = {config.configuration.result_dir }")
+    print(f"Result dir = {result_dir }")
+
+    path = pathlib.Path(config.configuration.result_dir / result_dir)
     path.mkdir(parents=True, exist_ok=True)
 
     # QuadCriterion initialization
