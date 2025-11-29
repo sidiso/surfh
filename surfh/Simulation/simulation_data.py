@@ -8,6 +8,13 @@ from astropy.coordinates import Angle
 import udft
 
 
+def make_fake_band_dither_name(bands, ndither):
+    names = []
+    for band in bands:
+        for dither in range(ndither):
+            names.append(band + f'_{dither+1}')
+    return names
+
 
 def get_simulation_data(spatial_subsampling=4, 
                         margin=0, 

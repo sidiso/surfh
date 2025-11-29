@@ -12,6 +12,7 @@ from astropy.io import fits
 from surfh.Models import wavelength_mrs, instru, metadataMRS
 from surfh.Models import spectroModel, MiriModel
 from surfh.Others.context import Config
+from surfh.Simulation import simulation_data
 import matplotlib.pyplot as plt
 
 def get_axis(model):
@@ -54,17 +55,53 @@ def tmp_create_model(sotf, templates, wavel_axis, instruments, step_angle, data_
         step_degree=step_angle, 
         pointings=pointings)
 
-
-def create_model(sotf, templates, wavel_axis, instruments, step_angle, data_dict, imshape):
+def create_simulation_model(sotf, templates, wavel_axis, instruments, step_angle, data_dict, imshape, manual_alpha_shift=0, manual_beta_shift=0):
     """Create the spectrograph model."""
+    """
+    manual_alpha_shift : positif number --> shift to the top (When origin is lower in matplotlib)
+                       : negatif number --> shift to the bottom (When origin is lower in matplotlib)
+    manual_beta_shift  : positif number --> shift to the right (When origin is lower in matplotlib)
+                       : negatif number --> shift to the left (When origin is lower in matplotlib)
+    """
     main_pointing = instru.Coord(0, 0)
     pointings = []
 
     for idx, chan in enumerate(instruments.keys()):
         RA_CORR, DEC_CORR = metadataMRS.get_band_delta_pointing(chan)
-        pointing_chan = [main_pointing + instru.Coord( -RA_CORR - DITH_RA, -DEC_CORR + DITH_DEC) for (RA, DEC), (DITH_RA, DITH_DEC) in zip(data_dict['target'][chan], data_dict['dither'][chan])]
+        print(f"RA_CORR, DEC_CORR for chan {chan} = ", RA_CORR, DEC_CORR)
+        print("manual shifts are : ", manual_alpha_shift*step_angle, manual_beta_shift*step_angle)
+        pointing_chan = [main_pointing + instru.Coord( -RA_CORR - DITH_RA + manual_alpha_shift * step_angle, -DEC_CORR + DITH_DEC + manual_beta_shift * step_angle) for (RA, DEC), (DITH_RA, DITH_DEC) in zip(data_dict['target'][chan], data_dict['dither'][chan])]
         pointings.append(instru.CoordList(pointing_chan).pix(step_angle))
 
+    origin_alpha_axis = (np.arange(imshape[0]) * step_angle - np.mean(np.arange(imshape[0]) * step_angle))
+    origin_beta_axis = np.arange(imshape[1]) * step_angle - np.mean(np.arange(imshape[1]) * step_angle)
+
+    # TODO : Warning here Mean is 0 because the pointings are centered on 0,0
+    mean_alpha = 0#np.mean([pointings[-1][dith].alpha for dith in range(4)])
+    mean_beta = 0#np.mean([pointings[-1][dith].beta for dith in range(4)])
+    alpha_axis = origin_alpha_axis + mean_alpha
+    beta_axis = origin_beta_axis + mean_beta
+
+    return spectroModel.spectroSigRLSCT(
+        sotf=sotf,
+        templates=templates,
+        alpha_axis=alpha_axis,
+        beta_axis=beta_axis,
+        wavelength_axis=wavel_axis,
+        instrs=list(instruments.values()),
+        step_degree=step_angle, 
+        pointings=pointings)
+
+
+
+def create_model(sotf, templates, wavel_axis, instruments, step_angle, data_dict, imshape):
+    """Create the spectrograph model."""
+    main_pointing = instru.Coord(0, 0)
+    pointings = []
+    for idx, chan in enumerate(instruments.keys()):
+        RA_CORR, DEC_CORR = metadataMRS.get_band_delta_pointing(chan)
+        pointing_chan = [main_pointing + instru.Coord( -RA_CORR - DITH_RA, -DEC_CORR + DITH_DEC) for (RA, DEC), (DITH_RA, DITH_DEC) in zip(data_dict['target'][chan], data_dict['dither'][chan])]
+        pointings.append(instru.CoordList(pointing_chan).pix(step_angle))
 
     origin_alpha_axis = (np.arange(imshape[0]) * step_angle - np.mean(np.arange(imshape[0]) * step_angle))
     origin_beta_axis = np.arange(imshape[1]) * step_angle - np.mean(np.arange(imshape[1]) * step_angle)
@@ -132,6 +169,42 @@ def load_data_mirim(list_filter, mirim_data_path):
                     print(f"Loading data for filter {filter} from file {file}")
                     data = hdul[0].data
                     data_dict['data'][filter] = [data]
+    return data_dict
+
+def load_simulated_mrs_data(config: Config):
+    data_dict = {'data': {}, 'target': {}, 'targetV1' :{}, 'targetREF': {}, 'dither': {}, 'rotation': {}, 'PA_V3': {}}
+
+    for chan in config.MRS.list_channels:
+        data_dict['data'][chan] = []
+        data_dict['target'][chan] = []
+        data_dict['targetV1'][chan] = []
+        data_dict['targetREF'][chan] = []
+        data_dict['dither'][chan] = []
+        data_dict['rotation'][chan] = 0.
+
+    print("Order of channels loading : ")
+    sim_bands = simulation_data.make_fake_band_dither_name(config.MRS.list_channels, ndither=4)
+    print("DEBUG Simbands = ", sim_bands)
+    for band_dith_name in sim_bands:
+        chan = band_dith_name.split('_')[0]
+        dith = band_dith_name.split('_')[1]
+        PA_V3 = metadataMRS.get_MRS_rotation(chan) 
+        TARG_RA = 0  # Adjust RA to match the expected range
+        TARG_DEC = 0   # Adjust DEC to match the expected range
+        DITHER_RA, DITHER_DEC = metadataMRS.get_dithering_example(chan, int(dith))
+        print("DEBUG DITHER RA DEC ARE : ", DITHER_RA, DITHER_DEC)
+    
+        RA_V1 = 0
+        DEC_V1 = 0
+        RA_REF = 0
+        DEC_REF = 0
+
+        data_dict['target'][chan].append((TARG_RA, TARG_DEC))
+        data_dict['targetV1'][chan]= (RA_V1, DEC_V1)
+        data_dict['targetREF'][chan] = (RA_REF, DEC_REF)
+        data_dict['dither'][chan].append((DITHER_RA, DITHER_DEC))
+        data_dict['rotation'][chan] = metadataMRS.get_MRS_rotation(chan)
+        data_dict['PA_V3'][chan] = PA_V3
     return data_dict
 
 def load_mrs_data(config: Config):
