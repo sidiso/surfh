@@ -19,7 +19,7 @@ def apply_mask(data, masks, wavelengths):
         w_stop = np.where(wavelengths < ch_limit[i])[0][-1] +1
         slice_mask = slice(w_start, w_stop)
         data[slice_mask,:,:] = data[slice_mask,:,:]*masks[i]
-        np.where(data == 0, np.nan, data)
+        data = np.where(data == 0, np.nan, data)
 
 
 
@@ -92,9 +92,9 @@ axs[0].grid(True, linestyle="--", alpha=0.4)
 # ---------------------------------------------------
 # 2) PANEL DU BAS : Signal moyen des deux cubes
 # ---------------------------------------------------
-axs[1].plot(wavelength, mean_masked_res_cube,
+axs[1].plot(wavelength[:-50], mean_masked_res_cube[:-50],
             label="Reference cube", lw=1.3)
-axs[1].plot(wavelength, mean_masked_ref_cube,
+axs[1].plot(wavelength[:-50], mean_masked_ref_cube[:-50],
             label="Reconstructed cube", lw=1.3)
 
 axs[1].set_xlabel(r"Wavelength ($\mu$m)")

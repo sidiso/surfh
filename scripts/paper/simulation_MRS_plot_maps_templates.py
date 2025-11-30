@@ -36,7 +36,7 @@ fig = plt.figure(figsize=(11, 5))
 # ---------------------------------------------------------
 for i in range(n):
     ax = fig.add_subplot(2, n, i+1)
-    im = ax.imshow(maps4[i], origin="lower", cmap="inferno")
+    im = ax.imshow(maps4[i], origin="lower", cmap="viridis")
     ax.set_title(f"Map {i+1}")
     ax.set_xticks([])
     ax.set_yticks([])
@@ -67,7 +67,7 @@ ax_spec.legend(frameon=True, fontsize=9, ncol=2)
 ax_spec.grid(True, linestyle="--", alpha=0.4)  # grille pour lecture facile
 
 plt.tight_layout()
-plt.savefig('/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/Plots/simulation_ground_truth.png', dpi=300)
-plt.savefig('/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/Plots/simulation_ground_truth.pdf')
+# plt.savefig('/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/Plots/simulation_ground_truth.png', dpi=300)
+# plt.savefig('/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/Plots/simulation_ground_truth.pdf')
 plt.show()
 

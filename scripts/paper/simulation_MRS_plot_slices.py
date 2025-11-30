@@ -60,15 +60,19 @@ def parse_options(config_file):
     cube = np.load('/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/Templates/fusion_mrs_simulated_cube.npy')
     wavelengeth_cube = wavel_axis
     slice_1a, _ = MRSModel.plot_slice(ndata, 0, 100, dither=[0])
+    slice_1a[slice_1a < 1] = np.nan
     wavel_1a_slice = get_mrs_wavelength('1a')[100]
 
     slice_2b, _ = MRSModel.plot_slice(ndata, 4, 100, dither=[0])
+    slice_2b[slice_2b < 1] = np.nan
     wavel_2b_slice = get_mrs_wavelength('2b')[100]
 
     slice_3b, _ = MRSModel.plot_slice(ndata, 7, 100, dither=[0])
+    slice_3b[slice_3b < 1] = np.nan
     wavel_3b_slice = get_mrs_wavelength('3b')[100]
 
     slice_4b, _ = MRSModel.plot_slice(ndata, 10, 100, dither=[0])
+    slice_4b[slice_4b < 1] = np.nan
     wavel_4b_slice = get_mrs_wavelength('4b')[100]
 
 
@@ -94,42 +98,37 @@ def parse_options(config_file):
                             gridspec_kw={'hspace': 0.05, 'wspace': 0.15})
 
     for i, (slc, wav, lab) in enumerate(zip(slices, wavelengths, labels)):
-
         idx = find_nearest_index(w_axis, wav)
         cube_slice = cube[idx]
 
-        vmin = min(np.min(slc), np.min(cube_slice))
-        vmax = max(np.max(slc), np.max(cube_slice))
+        vmin = min(np.nanmin(slc), np.nanmin(cube_slice))
+        vmax = max(np.nanmax(slc), np.nanmax(cube_slice))
 
-        # --------------------------
-        # TOP : CUBE SIMULE + CBAR
-        # --------------------------
+        # Masque du FoV (True sur la zone valide)
+        mask = ~np.isnan(slc)
+
+        # ---------- TOP ----------
         ax_top = axs[0, i]
-        im_top = ax_top.imshow(cube_slice, origin='lower', cmap='inferno',
+        im_top = ax_top.imshow(cube_slice, origin='lower', cmap='viridis',
                             vmin=vmin, vmax=vmax)
+        ax_top.contour(mask, levels=[0.5], colors='red', linewidths=0.8)  # <-- ADD
         ax_top.set_title(rf"($\lambda = {wav:.3f}\,\mu m$)")
-
         ax_top.set_xticks([]); ax_top.set_yticks([])
 
-        # Attacher une colorbar COLLÉE à l’image
         div_top = make_axes_locatable(ax_top)
-        cax_top = div_top.append_axes("right", size="2%", pad=0.05)  # pad=0 → collée
-        cbar_top = fig.colorbar(im_top, cax=cax_top, orientation="vertical")
-        cbar_top.ax.tick_params(labelsize=7)
+        cax_top = div_top.append_axes("right", size="2%", pad=0.05)
+        fig.colorbar(im_top, cax=cax_top)
 
-        # --------------------------
-        # BOTTOM : RECONSTRUCTION
-        # --------------------------
+        # ---------- BOTTOM ----------
         ax_bottom = axs[1, i]
-        im_bottom = ax_bottom.imshow(slc, origin='lower', cmap='inferno',
+        im_bottom = ax_bottom.imshow(slc, origin='lower', cmap='viridis',
                                     vmin=vmin, vmax=vmax)
-        # ax_bottom.set_title("Reconstruction")
+        ax_bottom.contour(mask, levels=[0.5], colors='white', linewidths=0.6)  # <-- ADD
         ax_bottom.set_xticks([]); ax_bottom.set_yticks([])
 
         div_bottom = make_axes_locatable(ax_bottom)
         cax_bottom = div_bottom.append_axes("right", size="2%", pad=0.05)
-        cbar_bottom = fig.colorbar(im_bottom, cax=cax_bottom, orientation="vertical")
-        cbar_bottom.ax.tick_params(labelsize=7)
+        fig.colorbar(im_bottom, cax=cax_bottom)
     # plt.savefig('/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/Plots/simulation_mrs_slices.png', dpi=300)
     # plt.savefig('/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/Plots/simulation_mrs_slices.pdf')
     plt.show()
