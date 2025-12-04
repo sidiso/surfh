@@ -277,27 +277,34 @@ def initialize_fusion_parameters(config):
 def create_miri_model(psfs_monoch, L_pce, lamb_cube, L_specs, shape_target, pixel_arcsec, precompute_H_freq):
     return MiriModel.Mirim_Model_LMM(psfs_monoch, L_pce, lamb_cube, L_specs, shape_target, pixel_arcsec, precompute_H_freq)
 
-def load_miri_simulation_data(paths, list_filter, wavelength):
+def load_miri_simulation_data(config: Config):
     ref_list_filter = ['F0560W', 'F0770W', 'F1000W', 'F1130W', 'F1280W', 'F1500W', 'F1800W', 'F2100W', 'F2550W']
-    otf = np.load(os.path.join(paths['psf_dir'], 'mirim_psfs_pixscale0.1_npix_125.npy'))
+
+    wavelength = np.load(config.configuration.wavelength_file)
+    templates = np.load(config.configuration.templates_file)
+
+    otf = np.load(config.configuration.mrs_psf_file)
     imshape = (otf.shape[1], otf.shape[2])
 
     # Select PSF regarding list_filter
-    indexes = [i for i, val in enumerate(ref_list_filter) if val in list_filter]
+    indexes = [i for i, val in enumerate(ref_list_filter) if val in config.MIRIM.list_filters]
     otf = otf[:len(wavelength)]
-    sotf = udft.ir2fr(otf, imshape)
+    # sotf = udft.ir2fr(otf, imshape)
 
     # Load PCE -- Don't deal with other multiple wavel now
     list_pce = []
-    for file in sorted(os.listdir(os.path.join(paths['miri_filter']))) :
+    for file in sorted(os.listdir(config.configuration.pce_dir)) :
         print(f'Load PCE file for from file {file} ')
-        list_pce.append(np.load(os.path.join(paths['miri_filter'])+file)[0])
+        list_pce.append(np.load(config.configuration.pce_dir/file)[0])
     pce = np.array(list_pce)
+    print(f'indexes = {indexes}')
     pce = pce[indexes, :len(wavelength)]
+    print("pce.shape = ", pce.shape)
     # Try to load H_freq if exists 
     try:
-        H_freq = np.load(os.path.join(paths['template_dir'], 'H_freq.npy'))
+        H_freq = np.load(config.configuration.template_dir/config.MIRIM.H_freq)
     except:
+        print(f"WARNING : No H_freq file found at {config.configuration.template_dir/ 'H_freq.npy'}, proceed without H_freq precomputation")
         H_freq = None
 
-    return sotf, pce, H_freq
+    return otf, pce, H_freq, wavelength, templates

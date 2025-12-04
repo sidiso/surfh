@@ -37,7 +37,6 @@ wavelength = np.load(templates_dir + 'wavel_axis_NGC7023_1ABC_2ABC_3ABC_4AB.npy'
 # Select PSF regarding list_filter
 indexes = [i for i, val in enumerate(ref_list_filter) if val in list_filter]
 otf = otf[:len(wavelength)]
-sotf = udft.ir2fr(otf, imshape)
 
 # Load PCE -- Don't deal with other multiple wavel now
 list_pce = []
@@ -53,7 +52,7 @@ print("pce.shape = ", pce.shape)
 templates = np.load(templates_dir + 'simulation_templates.npy')
 print("templates.shape = ", templates.shape)
 
-MIRIModel = model_creation.create_miri_model(sotf, pce, wavelength, templates, imshape, step, None)
+MIRIModel = model_creation.create_miri_model(otf, pce, wavelength, templates, imshape, step, None)
 
 hfreq = MIRIModel.H_freq
 
