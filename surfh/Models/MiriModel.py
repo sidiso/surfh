@@ -13,6 +13,7 @@ from udft import irdftn, rdft2, ir2fr
 
 from aljabr import LinOp
 
+from surfh.ToolsDir import jax_utils
 # imager model for fusion with spectro using decimation di and dj
 
 # PSFs are full and partitionned to allow the direct sum with the spectro hessian
@@ -47,6 +48,9 @@ class Mirim_Model_LMM(LinOp):
         n_spec, n_lamb = L_specs.shape
         self.n_spec = n_spec
         self.shape_target = shape_target
+        self.L_specs = L_specs
+        self.psfs_monoch = psfs_monoch
+        self.lamb_cube = lamb_cube
 
         specs = L_specs[np.newaxis, :, :, np.newaxis, np.newaxis]  # (1, 5, 300, 1, 1)
         psfs = psfs_monoch[np.newaxis, np.newaxis, ...]  # (1, 1, 300, 250, 500)
@@ -60,7 +64,7 @@ class Mirim_Model_LMM(LinOp):
         if precompute_H_freq is None:
             pce_norms = trapezoid(L_pce * lamb_cube[np.newaxis, ...], x = lamb_cube, axis = 1)[:, np.newaxis, np.newaxis, np.newaxis]
             new_lamb_cube = lamb_cube[np.newaxis, np.newaxis, :, np.newaxis, np.newaxis]
-            H_int = trapezoid(specs * psfs * pce * new_lamb_cube, x=lamb_cube, axis=2) / pce_norms # (9, 5, 250, 500)
+            H_int = trapezoid(specs * pce * psfs * new_lamb_cube, x=lamb_cube, axis=2) / pce_norms # (9, 5, 250, 500)
             
             H_freq = ir2fr(H_int, shape_target, real=True)
         else:
@@ -81,6 +85,17 @@ class Mirim_Model_LMM(LinOp):
 
     def forward(self, x):  # shape of x: (5, 250, 500), costs 2
         return np.real(irdftn(np.sum(self.H_freq * rdft2(x)[np.newaxis, ...], axis=1), shape = self.shape_target))
+    
+    def test_forward(self, x):
+        cube = jax_utils.lmm_maps2cube(x, self.L_specs)
+        blurred_cube = jax_utils.idft(jax_utils.dft(cube) * self.psfs_monoch, (self.ishape[1], self.ishape[2]))
+
+        y = np.zeros((self.n_bands, self.ishape[1], self.ishape[2]))
+        for i in range(self.n_bands):
+            tmp = blurred_cube*self.L_pce[i, :, np.newaxis, np.newaxis]
+            print("shape ", self.L_pce[i, :, np.newaxis, np.newaxis].shape)
+            y[i] = trapezoid(tmp, x=self.lamb_cube, axis=0)
+        return y
 
     def adjoint(self, y):  # shape of y: (9, 250, 500)
         return np.real(irdftn(np.sum(np.conj(self.H_freq) * rdft2(y)[:, np.newaxis, ...], axis=0), shape = self.shape_target))
@@ -88,6 +103,9 @@ class Mirim_Model_LMM(LinOp):
     def fwadj(self, point):
         """Apply `Aᴴ·A` operator."""
         return self.adjoint(self.forward(point))
+
+    def mapsToCube(self, maps):
+        return jax_utils.lmm_maps2cube(maps, self.L_specs)
 
     # microJansky/arcsec^2 to microJansky/arcsec^2
     def unit_conversion(self, flux, lamb, pixel_arcsec):
