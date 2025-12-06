@@ -7,6 +7,7 @@ import scipy as sp
 from scipy import misc
 from surfh.Models import slicer, metadataMRS
 from surfh.ToolsDir import jax_utils, python_utils, cython_utils, utils, nearest_neighbor_interpolation
+from surfh.Others import interpolation
 from astropy import units as u
 from astropy.coordinates import Angle
 from numpy.random import standard_normal as randn 
@@ -22,6 +23,15 @@ import jax
 from jax import numpy as jnp
 from functools import partial
 from scipy.interpolate import griddata
+
+from line_profiler import profile
+
+from numba import njit, prange
+
+import time
+
+
+
 
 
 class Channel():
@@ -116,11 +126,41 @@ class Channel():
         # self.nmask = np.zeros((len(self.pointings), self.imshape[0], self.imshape[1]))
         # self.precompute_mask()
 
-        # self.list_gridding_indexes = []
-        # self.precompute_griding_indexes()
+        self.list_gridding_indexes = []
+        for p_idx, pointing in enumerate(self.pointings):
+            local_alpha_coord, local_beta_coord = (
+                self.instr.fov + pointing
+            ).local2global(self.local_alpha_axis, self.local_beta_axis)
 
-        # self.list_gridding_t_indexes = []
-        # self.precompute_griding_t_indexes()
+            coords = np.vstack([
+                local_alpha_coord.ravel(),
+                local_beta_coord.ravel()
+            ]).T
+
+            i0,i1,j0,j1,wa0,wa1,wb0,wb1 = interpolation.precompute_gridding_indices(
+                self.alpha_axis,
+                self.beta_axis,
+                coords[:,0],
+                coords[:,1]
+            )
+            self.list_gridding_indexes.append((i0,i1,j0,j1,wa0,wa1,wb0,wb1))
+
+
+        self.list_gridding_t_indexes = []
+        for p_idx, pointing in enumerate(self.pointings):
+            alpha_coord, beta_coord = (self.instr.fov + pointing).global2local(
+                    self.alpha_axis, self.beta_axis
+            )
+
+            coords = np.vstack([alpha_coord.ravel(), beta_coord.ravel()]).T
+            i0, i1, j0, j1, wa0, wa1, wb0, wb1 = interpolation.precompute_gridding_t_indices(
+                                                                self.local_alpha_axis,
+                                                                self.local_beta_axis,
+                                                                coords[:, 0],
+                                                                coords[:, 1]
+                                                                )
+            self.list_gridding_t_indexes.append((i0, i1, j0, j1, wa0, wa1, wb0, wb1))
+
 
 
 
@@ -160,7 +200,7 @@ class Channel():
         return wpsf
 
 
-    def gridding(self, blurred_cube: array, pointing: instru.Coord) -> array:
+    def old_gridding(self, blurred_cube: array, pointing: instru.Coord) -> array:
 
         local_alpha_coord, local_beta_coord = (self.instr.fov + pointing).local2global(
                                                         self.local_alpha_axis, self.local_beta_axis
@@ -172,17 +212,37 @@ class Channel():
                                             ]
                                             ).T 
         # S
-        gridded = cython_utils.interpn_cube2local(np.arange(blurred_cube.shape[0]).astype(np.float64), 
-                                                   self.alpha_axis, 
-                                                   self.beta_axis, 
-                                                   np.array(blurred_cube).astype(np.float64), 
-                                                   optimized_local_coords, 
-                                                   (blurred_cube.shape[0], len(self.local_alpha_axis), len(self.local_beta_axis)))
-        
+        start = time.time()
+        for i in range(10):
+            gridded = cython_utils.interpn_cube2local(np.arange(blurred_cube.shape[0]).astype(np.float64), 
+                                                    self.alpha_axis, 
+                                                    self.beta_axis, 
+                                                    np.array(blurred_cube).astype(np.float64), 
+                                                    optimized_local_coords, 
+                                                    (blurred_cube.shape[0], len(self.local_alpha_axis), len(self.local_beta_axis)))
+        end = time.time()
+        print(f"Old Gridding Total time is : {end-start}, or per function : {(end-start)/10}")
+    
+        return gridded
+    
+    def gridding(self, blurred_cube: array, p_idx: int) -> array:
+        i0, i1, j0, j1, wa0, wa1, wb0, wb1 = self.list_gridding_indexes[p_idx]
+
+        gridded = interpolation.gridding_cube(
+            np.array(blurred_cube).astype(np.float64),
+            i0,i1,j0,j1,
+            wa0,wa1,wb0,wb1
+        )
+        gridded = gridded.reshape(
+            blurred_cube.shape[0],
+            self.local_alpha_axis.size,
+            self.local_beta_axis.size
+            )
         return gridded
 
 
-    def gridding_t(self, local_cube: array, pointing: instru.Coord) -> array:
+
+    def old_gridding_t(self, local_cube: array, pointing: instru.Coord) -> array:
 
         alpha_coord, beta_coord = (self.instr.fov + pointing).global2local(
                 self.alpha_axis, self.beta_axis
@@ -194,14 +254,29 @@ class Channel():
                     beta_coord.ravel()
                 ]
                 ).T
-
         global_cube = cython_utils.interpn_local2cube(np.arange(local_cube.shape[0]), 
                                                 self.local_alpha_axis.ravel(), 
                                                 self.local_beta_axis.ravel(), 
                                                 np.array(local_cube, dtype=np.float64), 
                                                 optimized_global_coords, 
                                                 (len(np.arange(local_cube.shape[0])), len(self.alpha_axis), len(self.beta_axis)))
+        print(f"local_cube shape = {local_cube.shape}")
+        print(f"Global cube shape = {global_cube.shape}")    
         return global_cube
+
+
+    def gridding_t(self, local_cube: array, p_idx: int) -> array:
+
+        i0, i1, j0, j1, wa0, wa1, wb0, wb1 = self.list_gridding_t_indexes[p_idx]
+
+        global_cube = interpolation.gridding_t_cube(
+            local_cube,
+            i0, i1, j0, j1, wa0, wa1, wb0, wb1
+        )     
+
+        return global_cube.reshape(-1, self.imshape[0], self.imshape[1])
+
+
 
     def test_project_mrsFov_to_specroFoV(self, MRSdata, pointing: instru.Coord):
         alpha_grid, beta_grid = np.meshgrid(self.alpha_axis, self.beta_axis, indexing='ij')
@@ -319,12 +394,13 @@ class Channel():
                                                                 len(self.beta_axis))
         return degridded
 
-    
+    @profile
     def forward(self, blurred_cube):
         chan_out = np.zeros(self.oshape)
         for p_idx, pointing in enumerate(self.pointings):
-            # gridded = self.NN_gridding(blurred_cube[self.wslice], self.list_gridding_indexes[p_idx]) 
-            gridded = self.gridding(blurred_cube[self.wslice], pointing) 
+            # print(f"Instr {self.instr.name}, pointing {p_idx}")
+            gridded = self.gridding(blurred_cube[self.wslice], p_idx) 
+
             sum_cube = jax_utils.idft(
                 jax_utils.dft_mult(gridded, self._otf_sr*self.decalf),
                 self.local_im_shape,
@@ -338,7 +414,7 @@ class Channel():
 
         return chan_out.ravel()
 
-    
+    @profile
     def adjoint(self, inarray: np.ndarray) -> np.ndarray:
 
         inter_cube = np.zeros((self.wslice.stop-self.wslice.start, len(self.alpha_axis), len(self.beta_axis)))
@@ -366,7 +442,8 @@ class Channel():
             sum_t_cube = jax_utils.idft(jax_utils.dft(local_cube) * self._otf_sr.conj()*self.decalf.conj(), 
                                         self.local_im_shape)
 
-            degridded = self.gridding_t(np.array(sum_t_cube, dtype=np.float64), pointing)
+            degridded = self.gridding_t(np.array(sum_t_cube, dtype=np.float64), p_idx)
+
             inter_cube += degridded
 
         return inter_cube
@@ -404,7 +481,7 @@ class Channel():
         sum_t_cube = np.array(sum_t_cube, dtype=np.float64)
         #sum_t_cube[:,0,:] = 0
 
-        degridded = self.gridding_t(np.array(sum_t_cube, dtype=np.float64), self.pointings[0])
+        degridded = self.gridding_t(np.array(sum_t_cube, dtype=np.float64), 0)
         inter_cube[self.wslice, ...] += degridded
         return inter_cube
 
@@ -477,7 +554,7 @@ class Channel():
             sum_t_img = np.array(sum_t_img)
             sum_t_img[sum_t_img<1] = 0
 
-            degridded = self.gridding_t(np.array(sum_t_img, dtype=np.float64), pointing)
+            degridded = self.gridding_t(np.array(sum_t_img, dtype=np.float64), p_idx)
             global_img += degridded
 
             cg2.append(np.ma.masked_less(degridded, 1))
@@ -529,7 +606,7 @@ class Channel():
             sum_t_cube = np.array(sum_t_cube, dtype=np.float64)
             #sum_t_cube[:,0,:] = 0
 
-            degridded = self.gridding_t(np.array(sum_t_cube, dtype=np.float64), pointing)
+            degridded = self.gridding_t(np.array(sum_t_cube, dtype=np.float64), p_idx)
             inter_cube[self.wslice, ...] += degridded
         return inter_cube
 
