@@ -7,8 +7,9 @@ from numpy import ndarray as array
 
 from surfh.Models import instru
 from surfh.ToolsDir import cython_2D_interpolation, matrix_op, jax_utils
+from surfh.Others import slicing
 
-
+from line_profiler import profile
 # TODO Jax version : precompute slices 
 # TODO Fix last colunm of beta not taking into account
 class Slicer():
@@ -30,6 +31,12 @@ class Slicer():
         self.local_beta_axis = local_beta_axis
         self.srf = srf
         self.slices_shape = (self.instr.n_slit, ceil(self.npix_slit_alpha_width / self.srf))
+
+        self.slit_flat_i = []
+        self.slit_flat_j = []
+        self.slit_flat_w = []
+        self.slit_size = []
+        self.precompute_slices_weights()
 
 
     @property
@@ -61,6 +68,7 @@ class Slicer():
             floor(-self.slit_alpha_width / 2 / step)
         )
 
+    @profile
     def slicing(self, gridded_cube: array, slit_idx: int) -> array:
         """Return a weighted slice of gridded. `slit_idx` start at 0."""
         slices = self.get_slit_slices(slit_idx=slit_idx)
@@ -68,7 +76,7 @@ class Slicer():
         return gridded_cube[:, slices[0], slices[1]] * weights
 
     # TODO Faut-il mettre les `weights` ici aussi ?
-    
+    @profile
     def slicing_t(
         self,
         slit: array,
@@ -79,9 +87,44 @@ class Slicer():
         out = np.zeros(local_shape)
         slices = self.get_slit_slices(slit_idx)
         weights = self.get_slit_weights(slit_idx, slices)
+        # print("Weights = ", weights)
+        # print(slices[0], slices[1])
         tmp = slit * weights
         out[:, slices[0], slices[1]] = tmp
+        # if slit.shape[0] == 646:
+        #     print("slit.shape:", slit.shape)
+        #     print("slit.strides:", slit.strides)
+        #     print("slit.flags:", slit.flags)
+
+        #     print("weights.shape:", weights.shape)
+        #     print("weights.strides:", weights.strides)
+        #     print("weights.flags:", weights.flags)
+
+        #     print("out_orig[:, slices[0], slices[1]].shape:", tmp.shape)
+
+
         return out
+    
+    def new_slicing_t(self, local_cube, slit, slit_idx):
+        slicing.apply_slit_slice(local_cube,
+                        slit.reshape(slit.shape[0], -1),
+                        self.slit_flat_w[slit_idx],
+                        self.slit_flat_i[slit_idx],
+                        self.slit_flat_j[slit_idx])
+
+    def slicing_t_fast_debug(self, local_cube, slit, slit_idx):
+        slices = self.get_slit_slices(slit_idx)
+        weights = self.get_slit_weights(slit_idx, slices)
+
+        # multiplication
+        tmp = slit * weights
+        # extrait les slices
+        ii = np.arange(slices[0].start, slices[0].stop)
+        jj = np.arange(slices[1].start, slices[1].stop)
+        # écriture dans le cube
+        local_cube[:, ii[:, None], jj[None, :]] += tmp
+
+        return local_cube
 
 
     def slit_local_fov(self, slit_idx: int):
@@ -242,3 +285,47 @@ class Slicer():
             ), f"Weight of last beta observed pixel in slit must be in [0, 1] ({wght:.2f})"
 
         return weights
+    
+    def precompute_slices_weights(self):
+        self.precomputed = []
+        for slit_idx in range(self.slices_shape[0]):
+            slices = self.get_slit_slices(slit_idx)
+            weights = self.get_slit_weights(slit_idx, slices)
+            ii = np.arange(slices[0].start, slices[0].stop)
+            jj = np.arange(slices[1].start, slices[1].stop)
+            self.precomputed.append((ii, jj, weights))
+
+def test_slicing_equivalence(slicer, slit, slit_idx, local_imshape):
+    """
+    slicer : ton objet Slicer
+    slit   : le buffer 'blurred_t_sliced' exactement comme dans ton pipeline
+    """
+    # Taille locale
+    L = slit.shape[0]
+    local_shape = (L, local_imshape[0], local_imshape[1])
+
+    # Ancienne version
+    out_ref = slicer.slicing_t(slit, slit_idx, local_shape)
+
+    # Nouvelle version
+    local_cube = np.zeros(local_shape, dtype=np.float64)
+    # slicer.slicing_t_fast_debug(local_cube, slit, slit_idx, None)
+    ii, jj, weights = slicer.precomputed[slit_idx]
+    slicing.slicing_t_numba(local_cube, slit, ii, jj, weights)
+
+
+    # Comparaison
+    diff = local_cube - out_ref
+    maxabs = np.max(np.abs(diff))
+    print(f"Test for Slit idx {slit_idx}")
+    print("max abs diff:", maxabs)
+
+    if maxabs > 1e-12:
+        idx = np.unravel_index(np.argmax(np.abs(diff)), diff.shape)
+        l,i,j = idx
+        print("First mismatch at (l,i,j) =", idx)
+        print("ref value:", out_ref[l,i,j])
+        print("new value:", local_cube[l,i,j])
+        print("difference:", diff[l,i,j])
+
+    return maxabs, out_ref, local_cube

@@ -7,7 +7,7 @@ import scipy as sp
 from scipy import misc
 from surfh.Models import slicer, metadataMRS
 from surfh.ToolsDir import jax_utils, python_utils, cython_utils, utils, nearest_neighbor_interpolation
-from surfh.Others import interpolation
+from surfh.Others import interpolation, slicing
 from astropy import units as u
 from astropy.coordinates import Angle
 from numpy.random import standard_normal as randn 
@@ -433,11 +433,11 @@ class Channel():
                         axis=2,
                     )
                 blurred_t_sliced = np.zeros(self.slicer.get_slit_shape_t())
-                blurred_t_sliced[:,: self.oshape[3] * self.srf : self.srf,:] = jax_utils.wblur_t(oversampled_sliced, self.wpsf.conj())
-                tmp = self.slicer.slicing_t(blurred_t_sliced, slit_idx, (self.wslice.stop-self.wslice.start,
-                                                                        self.local_im_shape[0],
-                                                                        self.local_im_shape[1]))
-                local_cube += tmp
+                out = jax_utils.wblur_t(oversampled_sliced, self.wpsf.conj())
+                blurred_t_sliced[:,: self.oshape[3] * self.srf : self.srf,:] = np.asarray(out)
+
+                ii, jj, weights = self.slicer.precomputed[slit_idx]
+                slicing.slicing_t_numba(local_cube, blurred_t_sliced, ii, jj, weights)
 
             sum_t_cube = jax_utils.idft(jax_utils.dft(local_cube) * self._otf_sr.conj()*self.decalf.conj(), 
                                         self.local_im_shape)
