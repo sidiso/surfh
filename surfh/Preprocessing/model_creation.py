@@ -159,13 +159,13 @@ def create_instruments(data_dict, config: Config):
             )
     return instruments
 
-def load_data_mirim(list_filter, mirim_data_path):
+def load_data_mirim(config: Config):
     """Load MIRI MRS data for the specified filters."""
     data_dict = {'data': {}}
-    for file in sorted(os.listdir(mirim_data_path)):
-        for filter in list_filter:
+    for file in sorted(os.listdir(config.configuration.mirim_data_dir)):
+        for filter in config.MIRIM.list_filters:
             if filter in file:
-                with fits.open(os.path.join(mirim_data_path, file)) as hdul:
+                with fits.open(config.configuration.mirim_data_dir/file) as hdul:
                     print(f"Loading data for filter {filter} from file {file}")
                     data = hdul[0].data
                     data_dict['data'][filter] = [data]

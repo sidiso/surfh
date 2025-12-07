@@ -266,3 +266,103 @@ def wblur_t(arr, wpsf):
                     result[l, a, b] += arr[l_p, a, b] * wpsf[l_p, l, b]
     
     return result
+
+
+import numpy as np
+from numba import njit, prange
+@njit(parallel=True)
+def wblur_t_numba(arr, wpsf):
+    Lp, alpha, beta = arr.shape
+    L = wpsf.shape[1]
+    out = np.zeros((L, alpha, beta), dtype=np.float64)
+
+    for l in prange(L):           # boucle sur lambda
+        for lp in range(Lp):      # boucle sur lambda'
+            for i in range(alpha):
+                for j in range(beta):
+                    out[l, i, j] += arr[lp, i, j] * wpsf[lp, l, j]
+    return out
+
+@njit(parallel=True, fastmath=True)
+def wblur_t_numba_opti(arr, wpsf):
+    """
+    arr : [λ', α, β]
+    wpsf: [λ', λ, β]
+    output: [λ, α, β]
+    """
+    Lp, alpha, beta = arr.shape
+    L = wpsf.shape[1]
+    out = np.zeros((L, alpha, beta), dtype=np.float64)
+
+    # boucle sur la longueur de sortie λ
+    for l in prange(L):
+        for lp in range(Lp):
+            for i in range(alpha):
+                for j in range(beta):
+                    out[l, i, j] += arr[lp, i, j] * wpsf[lp, l, j]
+
+    return out
+
+
+@njit(parallel=True, fastmath=True)
+def wblur_t_numba_super_opti(arr, wpsf, out):
+    Lp, alpha, beta = arr.shape
+    L = wpsf.shape[1]
+
+    for l in prange(L):
+        for lp in range(Lp):
+            a = arr[lp]        # (alpha, beta)
+            w = wpsf[lp, l]    # (beta,)
+            for i in range(alpha):
+                ai = a[i]
+                for j in range(beta):
+                    out[l, i, j] += ai[j] * w[j]
+
+def wblur_blas(arr, wpsf, out=None):
+    """
+    arr  : (Lp, alpha, beta)
+    wpsf : (Lp, L,     beta)
+    out  : (L,  alpha, beta)
+    """
+    Lp, alpha, beta = arr.shape
+    L = wpsf.shape[1]
+
+    if out is None:
+        out = np.empty((L, alpha, beta), dtype=arr.dtype)
+
+    # vue matricielle pour BLAS
+    for j in range(beta):
+        # A = (L, Lp) ; B = (Lp, alpha)
+        A = wpsf[:, :, j].T     # BLAS sees (L, Lp)
+        B = arr[:, :, j]        # (Lp, alpha)
+
+        # BLAS GEMM : C = A @ B
+        out[:, :, j] = A @ B    # calls DGEMM
+
+    return out
+
+
+def wblur_blas_opt(arr, wpsf, out=None):
+    """
+    arr  : (Lp, alpha, beta)
+    wpsf : (Lp, L,     beta)
+    out  : (L,  alpha, beta)
+    beta  = 2
+    """
+    # ⚠ Forcer contigu
+    Lp, alpha, beta = arr.shape
+    L = wpsf.shape[1]
+
+    # On fait un GEMM pour chaque valeur de beta
+    for j in range(beta):
+        # A = (L, Lp), B = (Lp, alpha) → C = (L, alpha)
+        out[:, :, j] = wpsf[:, :, j].T @ arr[:, :, j]
+
+
+@njit(parallel=True, fastmath=True)
+def add_cube(inter_cube, degridded):
+    L, A, B = inter_cube.shape
+    for l in prange(L):
+        for i in range(A):
+            for j in range(B):
+                inter_cube[l, i, j] += degridded[l, i, j]

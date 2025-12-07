@@ -197,3 +197,85 @@ def save_numpy_to_fits(data, metadata, filename, masks):
     # --- Écriture ---
     hdul.writeto(filename, overwrite=True)
     print(f"✅ Fichier sauvegardé : {filename}")
+
+
+def save_mirim_to_fits(data, filename, masks=None):
+    """
+    Sauvegarde un cube numpy (nw, ny, nx) en FITS
+    avec des coordonnées linéaires pour les 3 axes.
+    """
+
+    unit_alpha = 'deg'
+    unit_beta = 'deg'
+    unit_wavelength = 'um'
+
+    alpha_axis  = np.arange(data.shape[1]) #metadata['ALPHA_AXIS']
+    beta_axis   = np.arange(data.shape[2]) # metadata['BETA_AXIS']
+    wavelength  = np.arange(data.shape[0])
+
+    alpha_axis += 0 # metadata['RA_REF']
+    beta_axis  += 0 # metadata['DEC_REF']
+
+    hdu = fits.PrimaryHDU(data=data)
+    header = hdu.header
+
+    # --- Métadonnées générales ---
+    header['AUTHOR']   = 'Nicolas Monnier'
+    header['NWAVEL']   = data.shape[0]   # Nombre de points spectraux
+    header['NAXIS1']   = data.shape[2]   # taille en alpha
+    header['NAXIS2']   = data.shape[1]   # taille en beta
+
+    header['PA_V3']    = 0 #metadata['PA_V3']    # Position Angle (V3) in degrees
+    header['TARG_RA']  = 0 #metadata['TARG_RA']   # Target Right Ascension (in degrees)
+    header['TARG_DEC'] = 0 #metadata['TARG_DEC']  # Target Declination (in degrees)
+    header['RA_V1']    = 0 #metadata['RA_V1']   # Target RA in V1 frame (in degrees)
+    header['DEC_V1']   = 0 #metadata['DEC_V1']  # Target DEC in V1 frame (in degrees)
+    header['RA_REF']   = 0 #metadata['RA_REF']   # Reference RA (in degrees)
+    header['DEC_REF']  = 0 #metadata['DEC_REF']  # Reference DEC (in degrees)
+
+    # --- Axe spatial X (alpha) ---
+    da = np.mean(np.diff(alpha_axis))
+    header['CTYPE1'] = 'ALPHA'
+    header['CUNIT1'] = unit_alpha
+    header['CRVAL1'] = alpha_axis[0]
+    header['CDELT1'] = da
+    header['CRPIX1'] = 1
+
+    # --- Axe spatial Y (beta) ---
+    db = np.mean(np.diff(beta_axis))
+    header['CTYPE2'] = 'BETA'
+    header['CUNIT2'] = unit_beta
+    header['CRVAL2'] = beta_axis[0]
+    header['CDELT2'] = db
+    header['CRPIX2'] = 1
+
+    # --- Axe spectral (approx linéaire) ---
+    dw = np.mean(np.diff(wavelength))
+    header['CTYPE3'] = 'WAVE'
+    header['CUNIT3'] = unit_wavelength
+    header['CRVAL3'] = wavelength[0]
+    header['CDELT3'] = dw
+    header['CRPIX3'] = 1
+
+    # --- Table WCS-TABLE contenant le vecteur des longueurs d’onde ---
+    col = fits.Column(name='wavelength', format=f'{len(wavelength)}E', dim=f'({len(wavelength)})', array=[wavelength])
+    wcstable_hdu = fits.BinTableHDU.from_columns([col])
+    wcstable_hdu.header['EXTNAME'] = 'WCS-TABLE'
+
+    if masks is not None:
+        masks = np.array(masks)
+        mask_hdu = fits.ImageHDU(data=masks.astype(np.uint8), name='MASKS')
+
+        # # --- Table MASKS-TABLE contenant les masques ---
+        # col_masks = fits.Column(name='masks', format=f'{masks.shape[0]}L', dim=f'({masks.shape[0]})', array=[masks])
+        # maskstable_hdu = fits.BinTableHDU.from_columns([col_masks])
+        # maskstable_hdu.header['EXTNAME'] = 'MASKS-TABLE'
+        # --- Créer la liste d'extensions ---
+        hdul = fits.HDUList([hdu, wcstable_hdu, mask_hdu])
+    else:
+        # --- Créer la liste d'extensions ---
+        hdul = fits.HDUList([hdu, wcstable_hdu])
+
+    # --- Écriture ---
+    hdul.writeto(filename, overwrite=True)
+    print(f"✅ Fichier sauvegardé : {filename}")

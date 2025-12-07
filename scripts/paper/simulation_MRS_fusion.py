@@ -49,12 +49,20 @@ def parse_options(config_file):
 
     # Make masks
     masks = MRSModel.make_mask(ndata)
+    # adj = MRSModel.adjoint(ndata)
 
-    log.info(f'Start {config.reconstruction.method} algorithm')
+    # ref_adj = np.load('Reference_adjoint.npy')
+    # fw = MRSModel.forward(ref_adj)
+
+    # ref_fw = np.load("reference_forward.npy")
+    # print("Is ref and the other close ?", np.allclose(fw, ref_fw))
+    # raise RuntimeError
+
+    log.info(f'Start {config.reconstruction.method} algorithm') 
     reconstruction.reconstruction_MRS_fusion(MRSModel, ndata, templates, config, True, data_dict, masks=masks)
 
 
 
     
-if __name__ == "__main__":
+if __name__ == "__main__":  
     parse_options()

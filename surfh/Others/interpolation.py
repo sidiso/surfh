@@ -174,6 +174,26 @@ def gridding_slices(slice2d, i0, i1, j0, j1, wa0, wa1, wb0, wb1):
 
     return out
 
+
+@njit(fastmath=True)
+def gridding_slices(slice2d, i0, i1, j0, j1, wa0, wa1, wb0, wb1, out):
+    npts = len(i0)
+    # out = np.empty(npts, dtype=np.float64)
+
+    for k in range(npts):
+        f00 = slice2d[i0[k], j0[k]]
+        f01 = slice2d[i0[k], j1[k]]
+        f10 = slice2d[i1[k], j0[k]]
+        f11 = slice2d[i1[k], j1[k]]
+
+        out[k] = (
+            wa0[k] * (wb0[k] * f00 + wb1[k] * f01)
+          + wa1[k] * (wb0[k] * f10 + wb1[k] * f11)
+        )
+
+    # return out
+
+
 @njit(parallel=True, fastmath=True)
 def gridding_cube(cube, 
                               i0, i1, j0, j1,
@@ -184,10 +204,11 @@ def gridding_cube(cube,
     out = np.empty((nl, npts), dtype=np.float64)
 
     for z in prange(nl):  # parallelisation sur les longueurs d’onde
-        out[z] = gridding_slices(
+        gridding_slices(
             cube[z],
             i0, i1, j0, j1,
-            wa0, wa1, wb0, wb1
+            wa0, wa1, wb0, wb1,
+            out[z]
         )
 
     return out

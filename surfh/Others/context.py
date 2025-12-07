@@ -7,7 +7,7 @@ from pathlib import Path
 @dataclass
 class ConfigurationPaths:
     fusion_dir: str
-    data_dir: str
+    mrs_data_dir: str
     result_dir: str
     psf_dir: str
     mrs_psf_file : str
@@ -16,6 +16,7 @@ class ConfigurationPaths:
     wavelength_file: str
     reference_wavelength_file: str
     resolving_path: str = field(default=None) # Ici pas besoin de mettre en dans l'appel de la classe, on le construit plus tard
+    mirim_data_dir: Optional[str] = field(default=None)
     pce_dir: Optional[str] = field(default=None)
     mirim_psf_file : Optional[str] = field(default=None)
 
@@ -34,9 +35,9 @@ class ConfigurationPaths:
             self.resolving_path = str(rp)
 
 
-        for name in ["data_dir", "result_dir", "psf_dir", "template_dir"]:
-            if name is not None:
-                value = getattr(self, name)
+        for name in ["mrs_data_dir", "result_dir", "psf_dir", "template_dir", "mirim_data_dir"]:
+            value = getattr(self, name)
+            if value is not None:
                 p = Path(value)
                 if not p.is_absolute():
                     p = base / p
@@ -55,10 +56,11 @@ class ConfigurationPaths:
 
         for name in ["templates_file", "wavelength_file", "reference_wavelength_file", "pce_dir"]:
             value = getattr(self, name)
-            f = Path(value)
-            if not f.is_absolute():
-                f = Path(self.template_dir) / f
-            setattr(self, name, Path(f))
+            if value is not None:
+                f = Path(value)
+                if not f.is_absolute():
+                    f = Path(self.template_dir) / f
+                setattr(self, name, Path(f))
 
         self.fusion_dir = str(base)
 
@@ -122,11 +124,12 @@ class Config:
     def validate_paths(self) -> None:
         """Valide l’existence des répertoires et fichiers configurés."""
         for name, value in vars(self.configuration).items():
-            p = Path(value)
-            print(f"Vérification de {name} : {p}")
-            if name.endswith("_dir"):
-                if not p.is_dir():
-                    print(f"⚠️  Dossier manquant : {p}")
-            elif name.endswith("_file"):
-                if not p.is_file():
-                    print(f"⚠️  Fichier manquant : {p}")
+            if value is not None:
+                p = Path(value)
+                print(f"Vérification de {name} : {p}")
+                if name.endswith("_dir"):
+                    if not p.is_dir():
+                        print(f"⚠️  Dossier manquant : {p}")
+                elif name.endswith("_file"):
+                    if not p.is_file():
+                        print(f"⚠️  Fichier manquant : {p}")

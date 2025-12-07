@@ -23,6 +23,8 @@ from numpy import ndarray as array
 import jax
 from functools import partial
 
+from line_profiler import profile
+
 """
 Multi-Observation Multi Channel for the spectro model :
 
@@ -156,6 +158,7 @@ class spectroSigRLSCT(LinOp):
                     )  
         return wpsf
 
+    @profile
     def forward(self, maps):
         # T
         if self.lmm:
@@ -170,7 +173,7 @@ class spectroSigRLSCT(LinOp):
             out[self._idx[ch_idx] : self._idx[ch_idx + 1]] = chan.forward(blurred_cube)
         return out
    
-
+    @profile
     def adjoint(self, inarray: np.ndarray) -> np.ndarray:
         global_cube = np.zeros(self.cube_shape)
         for ch_idx, chan in enumerate(self.channels):
@@ -235,7 +238,7 @@ class spectroSigRLSCT(LinOp):
         return normalized_data
         
 
-    def plot_slice(self, all_data, n_chan, nslice):
+    def plot_slice(self, all_data, n_chan, nslice, dither=[0,1,2,3]):
 
         # Get shape of specific IFU band
         chan = self.channels[n_chan]
@@ -250,6 +253,8 @@ class spectroSigRLSCT(LinOp):
         data = chan_data.reshape(chan.oshape)[:,:,nslice,:].ravel()
 
         for p_idx, pointing in enumerate(self.pointings[n_chan]):
+            if p_idx not in dither:
+                break
             local_img = np.zeros(chan.local_im_shape)
             for slit_idx in range(chan.instr.n_slit):
                 oversampled_sliced = np.repeat(
@@ -446,7 +451,7 @@ class spectroSigRLSCT(LinOp):
                 # sum_t_img[:,5] = sum_t_img[:,6]
                 # sum_t_img[:,153] = sum_t_img[:,152]
 
-                degridded = chan.gridding_t(np.array(sum_t_img, dtype=np.float64), pointing)[0]
+                degridded = chan.old_gridding_t(np.array(sum_t_img, dtype=np.float64), pointing)[0]
                 global_img += degridded
                 cum_grid[p_idx] = degridded
 
@@ -462,3 +467,7 @@ class spectroSigRLSCT(LinOp):
             data = chan_data.reshape(chan.oshape)
             list_data.append(data)
         return list_data
+    
+
+    def print_MRS_Model_info(self):
+        print(f"Bands for MRS Model : {[instr for it, (srf, instr) in enumerate(zip(self.srfs, self.instrs))]}")
