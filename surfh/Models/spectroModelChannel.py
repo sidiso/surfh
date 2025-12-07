@@ -402,8 +402,8 @@ class Channel():
                 jax_utils.dft_mult(gridded, self._otf_sr*self.decalf),
                 self.local_im_shape,
             )
-                
-            sliced_stack = np.stack([self.slicer.slicing(sum_cube, slit_idx) for slit_idx in range(self.instr.n_slit)], axis=0)
+
+            sliced_stack = np.stack([slicing.slicing_numba(np.asarray(sum_cube), *self.slicer.precomputed[slit_idx]) for slit_idx in range(self.instr.n_slit)], axis=0)
 
             sliced_dev = jax.device_put(sliced_stack)
             wpsf_dev = jax.device_put(self.wpsf)

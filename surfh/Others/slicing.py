@@ -37,3 +37,41 @@ def slicing_t_numba(local_cube, slit, ii, jj, weights):
             for j_idx in range(len(jj)):
                 j = jj[j_idx]
                 local_cube[l, i, j] += slit[l, i_idx, j_idx] * weights[0, i_idx, j_idx]
+
+
+
+@njit(parallel=True)
+def slicing_numba(gridded_cube, ii, jj, weights):
+    """
+    gridded_cube : (L, H, W)
+    ii, jj       : (N,) indices
+    weights      : (L, N)
+    return       : (L, N)
+    """
+    L = gridded_cube.shape[0]
+    Ni = ii.shape[0]
+    Nj = jj.shape[0]
+
+    out = np.zeros((L, Ni, Nj), dtype=gridded_cube.dtype)    
+    
+    for l in prange(L):              # parallèle sur lambda
+        for k in range(Ni):          # index dans ii
+            i = ii[k]
+            for m in range(Nj):      # index dans jj
+                j = jj[m]
+                out[l, k, m] = gridded_cube[l, i, j] * weights[0, k, m]                
+    return out
+
+@njit(parallel=True)
+def slicing_numba_prealloc(gridded_cube, ii, jj, weights, out):
+    """
+    out : (L, N) array déjà alloué
+    """
+    L = gridded_cube.shape[0]
+    N = ii.shape[0]
+
+    for l in prange(L):
+        for k in range(N):
+            out[l, k] = gridded_cube[l, ii[k], jj[k]] * weights[0, l, k]
+
+    return out
