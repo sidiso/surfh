@@ -126,6 +126,7 @@ class Channel():
 
         # self.nmask = np.zeros((len(self.pointings), self.imshape[0], self.imshape[1]))
         # self.precompute_mask()
+        self.make_mask()
 
         self.list_gridding_indexes = []
         for p_idx, pointing in enumerate(self.pointings):
@@ -213,17 +214,13 @@ class Channel():
                                             ]
                                             ).T 
         # S
-        start = time.time()
-        for i in range(10):
-            gridded = cython_utils.interpn_cube2local(np.arange(blurred_cube.shape[0]).astype(np.float64), 
-                                                    self.alpha_axis, 
-                                                    self.beta_axis, 
-                                                    np.array(blurred_cube).astype(np.float64), 
-                                                    optimized_local_coords, 
-                                                    (blurred_cube.shape[0], len(self.local_alpha_axis), len(self.local_beta_axis)))
-        end = time.time()
-        print(f"Old Gridding Total time is : {end-start}, or per function : {(end-start)/10}")
-    
+        gridded = cython_utils.interpn_cube2local(np.arange(blurred_cube.shape[0]).astype(np.float64), 
+                                                self.alpha_axis, 
+                                                self.beta_axis, 
+                                                np.array(blurred_cube).astype(np.float64), 
+                                                optimized_local_coords, 
+                                                (blurred_cube.shape[0], len(self.local_alpha_axis), len(self.local_beta_axis)))
+
         return gridded
     
     def gridding(self, blurred_cube: array, p_idx: int) -> array:
@@ -261,8 +258,6 @@ class Channel():
                                                 np.array(local_cube, dtype=np.float64), 
                                                 optimized_global_coords, 
                                                 (len(np.arange(local_cube.shape[0])), len(self.alpha_axis), len(self.beta_axis)))
-        print(f"local_cube shape = {local_cube.shape}")
-        print(f"Global cube shape = {global_cube.shape}")    
         return global_cube
 
 
@@ -398,6 +393,7 @@ class Channel():
     @profile
     def forward(self, blurred_cube):
         chan_out = np.zeros(self.oshape)
+        # test_chan_out = np.zeros(self.oshape)
         for p_idx, pointing in enumerate(self.pointings):
             # print(f"Instr {self.instr.name}, pointing {p_idx}")
             gridded = self.gridding(blurred_cube[self.wslice], p_idx) 
@@ -406,12 +402,15 @@ class Channel():
                 jax_utils.dft_mult(gridded, self._otf_sr*self.decalf),
                 self.local_im_shape,
             )
-            for slit_idx in range(self.instr.n_slit):
-                #L
-                sliced = self.slicer.slicing(sum_cube, slit_idx)
-                # SigR
-                # blurred_sliced_subsampled = jax_utils.wblur_subSampling(sliced, self.wpsf)[:, : self.oshape[3] * self.srf : self.srf]
-                chan_out[p_idx, slit_idx] = jax_utils.wblur_subSampling(sliced, self.wpsf)[:, : self.oshape[3] * self.srf : self.srf]
+                
+            sliced_stack = np.stack([self.slicer.slicing(sum_cube, slit_idx) for slit_idx in range(self.instr.n_slit)], axis=0)
+
+            sliced_dev = jax.device_put(sliced_stack)
+            wpsf_dev = jax.device_put(self.wpsf)
+            blurred_batch_dev = jax_utils.batched_wblur(sliced_dev, wpsf_dev)
+
+            blurred_batch = np.asarray(jax.device_get(blurred_batch_dev))
+            chan_out[p_idx] = blurred_batch[:,:, : self.oshape[3] * self.srf : self.srf]
 
         return chan_out.ravel()
 
@@ -423,6 +422,7 @@ class Channel():
             local_cube = np.zeros((self.wslice.stop-self.wslice.start,
                                    self.local_im_shape[0],
                                    self.local_im_shape[1]))
+
             num_slits = self.instr.n_slit
             blurred_t_sliced = np.zeros((num_slits, *self.slicer.get_slit_shape_t()), dtype=np.float64)
 
@@ -458,7 +458,7 @@ class Channel():
             # inter_cube += degridded
             matrix_op.add_cube(inter_cube, degridded)
 
-        return inter_cube
+        return inter_cube*self.chan_mask[np.newaxis,...]
 
     def sliceToCube(self, data):
         inter_cube = np.zeros((len(self.global_wavelength_axis), len(self.alpha_axis), len(self.beta_axis)))
@@ -624,49 +624,40 @@ class Channel():
 
 
 
-    def precompute_mask(self):
-        cube_rin = np.ones((len(self.global_wavelength_axis), len(self.alpha_axis), len(self.beta_axis)))
+    def make_mask(self):
+        """
+        Make one mask per channel.
+        """
+        nslice = 50
+        global_img = np.zeros(self.imshape)
+        cum_grid = np.zeros((len(self.pointings), self.imshape[0], self.imshape[1]))
+
+        # Select data for specific wavelength
+        data = np.ones((self.oshape[0], self.oshape[1], 1, self.oshape[3])).ravel() * 1000
+
         for p_idx, pointing in enumerate(self.pointings):
+            local_img = np.zeros(self.local_im_shape)
+            for slit_idx in range(self.instr.n_slit):
+                oversampled_sliced = np.repeat(
+                        np.expand_dims(
+                            np.reshape(data, 
+                                    self.slices_shape)[p_idx, slit_idx],
+                            axis=1,
+                        ),
+                        self.slicer.npix_slit_beta_width,
+                        axis=1,
+                    )/(self.slicer.npix_slit_beta_width * self.srf)
+                blurred_t_sliced = np.zeros((1, self.slicer.get_slit_shape_t()[1], self.slicer.get_slit_shape_t()[2]))
+                blurred_t_sliced[0,: self.slices_shape[2] * self.srf : self.srf,:] = oversampled_sliced
+                local_img += self.slicer.slicing_t(blurred_t_sliced, slit_idx, (1, self.local_im_shape[0],self.local_im_shape[1]))[0]
+                
+            sum_t_img = jax_utils.idft(jax_utils.dft(local_img) * self._otf_sr.conj()*self.decalf.conj(), 
+                                        self.local_im_shape)
 
-            local_alpha_coord, local_beta_coord = (self.instr.fov + pointing).local2global(
-                                                            self.local_alpha_axis, self.local_beta_axis
-                                                            )
+            degridded = self.old_gridding_t(np.array(sum_t_img, dtype=np.float64), pointing)[0]
+            global_img += degridded
+            cum_grid[p_idx] = degridded
 
-            test_cube_alpha_axis = np.tile(self.alpha_axis, len(self.alpha_axis))
-            test_cube_beta_axis= np.repeat(self.beta_axis, len(self.beta_axis)) 
-            # S
-            wavel_idx = np.arange(self.wslice.stop - self.wslice.start)
-            indexes = nearest_neighbor_interpolation.griddata((test_cube_alpha_axis.ravel(), test_cube_beta_axis.ravel()), 
-                                                            cube_rin[0].ravel(), 
-                                                            (local_alpha_coord, local_beta_coord))
-            wavel_indexes = np.tile(indexes, 
-                                    (len(wavel_idx),1)).reshape(len(wavel_idx), len(indexes)) + ((wavel_idx[...,np.newaxis])*cube_rin[0].size )
-            gridded = cube_rin[self.wslice].ravel()[wavel_indexes].reshape(len(wavel_idx), local_alpha_coord.shape[0], local_alpha_coord.shape[1])
-
-
-            indexes_t = nearest_neighbor_interpolation.griddata((local_alpha_coord.ravel(), local_beta_coord.ravel()),
-                                                                gridded[0].ravel(), 
-                                                                (test_cube_alpha_axis.reshape(self.imshape[0],self.imshape[1]), test_cube_beta_axis.reshape(self.imshape[0], self.imshape[1])))
-            wavel_indexes_t = np.tile(indexes_t, 
-                                    (len(wavel_idx),1)).reshape(len(wavel_idx), len(indexes_t)) + ((wavel_idx[...,np.newaxis])*local_alpha_coord.shape[0]* local_alpha_coord.shape[1] )
-            
-            degridded = gridded.ravel()[wavel_indexes_t].reshape(gridded.shape[0], len(self.alpha_axis), len(self.beta_axis))
-
-
-            mask = np.zeros_like(degridded[0])
-            mask.ravel()[indexes] = 1
-            nmask = np.zeros_like(mask)
-            for i in range(1,cube_rin.shape[1]-1):
-                for j in range(1, cube_rin.shape[2]-1):
-                    if mask[i,j] == 1:
-                        nmask[i,j] = 1
-                    else:
-                        if mask[i-1, j-1] == 1 or mask[i, j-1] == 1 \
-                            or mask[i+1, j-1] == 1 or mask[i-1, j] == 1\
-                            or mask[i-1, j+1] == 1 or mask[i+1, j+1] == 1\
-                            or mask[i, j+1] == 1 or mask[i+1, j] == 1:
-                            nmask[i,j] = 1        
-            
-                            
-            self.nmask[p_idx] = nmask
+        binary_mask = global_img > 5
+        self.chan_mask = binary_mask
 
