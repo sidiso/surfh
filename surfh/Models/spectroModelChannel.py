@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import scipy as sp
 from scipy import misc
 from surfh.Models import slicer, metadataMRS
-from surfh.ToolsDir import jax_utils, python_utils, cython_utils, utils, nearest_neighbor_interpolation
+from surfh.ToolsDir import jax_utils, python_utils, cython_utils, utils, nearest_neighbor_interpolation, matrix_op
 from surfh.Others import interpolation, slicing
 from astropy import units as u
 from astropy.coordinates import Angle
@@ -103,6 +103,7 @@ class Channel():
                 instr=self.instr,
                 wslice=self.wslice
                 )
+        self.wpsf = np.ascontiguousarray(self.wpsf)
         
         self.wpsf_dirac = self._wpsf_dirac(length=self.slicer.npix_slit_beta_width,
                 step=self.beta_step,
@@ -422,29 +423,40 @@ class Channel():
             local_cube = np.zeros((self.wslice.stop-self.wslice.start,
                                    self.local_im_shape[0],
                                    self.local_im_shape[1]))
-            for slit_idx in range(self.instr.n_slit):
-                oversampled_sliced = np.repeat(
-                        np.expand_dims(
-                            np.reshape(inarray, 
-                                       self.oshape)[p_idx, slit_idx],
-                            axis=2,
-                        ),
-                        self.slicer.npix_slit_beta_width,
-                        axis=2,
-                    )
-                blurred_t_sliced = np.zeros(self.slicer.get_slit_shape_t())
-                out = jax_utils.wblur_t(oversampled_sliced, self.wpsf.conj())
-                blurred_t_sliced[:,: self.oshape[3] * self.srf : self.srf,:] = np.asarray(out)
+            num_slits = self.instr.n_slit
+            blurred_t_sliced = np.zeros((num_slits, *self.slicer.get_slit_shape_t()), dtype=np.float64)
 
+            # --- Boucle JAX ---
+            jax_results = []
+            for slit_idx in range(num_slits):
+                oversampled_sliced = np.repeat(
+                    np.expand_dims(np.reshape(inarray, self.oshape)[p_idx, slit_idx], axis=2),
+                    self.slicer.npix_slit_beta_width,
+                    axis=2,
+                )
+                # Calcul JAX, pas encore converti en NumPy
+                jax_out = jax_utils.wblur_t(oversampled_sliced, self.wpsf.conj())
+                jax_results.append(jax_out)
+
+            # --- Conversion NumPy en un seul bloc ---
+            for idx, jax_out in enumerate(jax_results):
+                # blurred_t_sliced[idx, :, :, :] = np.asarray(jax.device_get(jax_out))
+                blurred_t_sliced[idx, :,: self.oshape[3] * self.srf : self.srf,:] = np.asarray(jax.device_get(jax_out))
+
+            # --- Ensuite appel slicing_t_numba ou autre avec blurred_t_sliced déjà rempli ---
+            for slit_idx in range(num_slits):
                 ii, jj, weights = self.slicer.precomputed[slit_idx]
-                slicing.slicing_t_numba(local_cube, blurred_t_sliced, ii, jj, weights)
+                slicing.slicing_t_numba(local_cube, blurred_t_sliced[slit_idx], ii, jj, weights)
+
+
 
             sum_t_cube = jax_utils.idft(jax_utils.dft(local_cube) * self._otf_sr.conj()*self.decalf.conj(), 
                                         self.local_im_shape)
 
             degridded = self.gridding_t(np.array(sum_t_cube, dtype=np.float64), p_idx)
 
-            inter_cube += degridded
+            # inter_cube += degridded
+            matrix_op.add_cube(inter_cube, degridded)
 
         return inter_cube
 
