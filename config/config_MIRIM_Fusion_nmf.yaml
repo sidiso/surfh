@@ -1,23 +1,28 @@
 configuration: 
-  fusion_dir: '/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/'  # Main Fusion directory, containt all sub-directories
+  fusion_dir: '/home/nmonnier/Data/JWST/NGC_7023/Fusion/'  # Main Fusion directory, containt all sub-directories
   mrs_data_dir: 'Corrected_slices/'  # directory containing the corrected/Filtered slice data
+  mirim_data_dir: 'Corrected_MIRIM/'  # directory containing the corrected/Filtered MIRI filter data
   result_dir: 'Results/'  # directory to save the results
   psf_dir: 'PSF/'  # directory containing the PSF data
   mrs_psf_file : 'psfs_pixscale0.1_npix_125_chan_1ABC_2ABC_3ABC_4ABC.npy'
-  mirim_psf_file : 'mirim_psfs_pixscale0.1_npix_125.npy'
   template_dir: 'Templates/'  # directory containing the spectral templates
-  templates_file: 'simulation_templates.npy'  # spectral templates file
+  templates_file: 'nmf_NGC7023_1ABC_2ABC_3ABC_4AB_14_templates.npy'  # spectral templates file
   wavelength_file: 'wavel_axis_NGC7023_1ABC_2ABC_3ABC_4AB.npy'  # wavelength axis file
+  pce_dir: 'MIRIM/' # Directory containing the MIRIM filter PCEs (inside de fusion_dir) 
   reference_wavelength_file: 'wavel_axis_NGC7023_1ABC_2ABC_3ABC_4ABC.npy'  # Wavelength axis for reference cube 
+  mirim_psf_file : 'mirim_psfs_pixscale0.1_npix_125.npy'
 cube:
   npix : 125 # number of pixels in each spatial dimension 
   pixel_resolution: 0.1  # arcsec
 reconstruction:
   method : 'lcg'  # reconstruction method: 'lcg' or 'mmmg'
-  max_iter : 25  # maximum number of iterations
-  mu : 1e5  # regularization parameter
+  max_iter : 500  # maximum number of iterations
+  mu : 1e1  # regularization parameter
 MRS:
   list_channels: ['1a', '1b', '1c', '2a', '2b', '2c', '3a', '3b', '3c', '4a', '4b']  # list of channels to use
   inverse_rotation : True
   scale_data: True  # Convert data from Jy to Jy/str
   spectral_lines: True  # Enable spectral line processing
+MIRIM:
+  list_filters: ['F0560W', 'F0770W', 'F1000W', 'F1130W', 'F1280W', 'F1500W', 'F1800W', 'F2100W']  # list of MIRI filters to use WARNING think to add 0 before 560 and 770 filters
+  H_freq: 'real_hfreq.npy'
