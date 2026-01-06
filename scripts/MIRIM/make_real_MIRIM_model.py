@@ -15,7 +15,7 @@ from surfh.ToolsDir import reconstruction
 from surfh.Vizualisation import cube_vizualisation
 
 
-npix = 654
+npix = 584
 SS = 4
 
 fusion_dir = '/home/nmonnier/Data/JWST/NGC_7023/Fusion/'
@@ -30,16 +30,38 @@ step = 0.1  # arcsec
 step_angle = step_angle = Angle(step, u.arcsec).degree
 
 ref_list_filter = ['F0560W', 'F0770W', 'F1000W', 'F1130W', 'F1280W', 'F1500W', 'F1800W', 'F2100W', 'F2550W']
-otf = np.load(os.path.join(psf_dir, 'mirim_psfs_pixscale0.11091747765212819_npix_654_2602_slices.npy'))
+otf = np.load(os.path.join(psf_dir, 'mirim_psfs_pixscale0.11091747765212819_npix_584_2602_slices.npy'))
 imshape = (otf.shape[1], otf.shape[2])
 
+ref_wavelength = np.load(templates_dir + 'wavel_axis_NGC7023_1ABC_2ABC_3ABC_4ABC.npy')
 wavelength = np.load(templates_dir + 'wavelength/ch1a_to_ch4b_wavel_axis_with_spectral_line.npy')
+
+print(np.digitize(np.setdiff1d(wavelength,ref_wavelength), ref_wavelength))
+sp_indexes = np.digitize(np.setdiff1d(wavelength,ref_wavelength), wavelength)
+
+
+
 wavelength = wavelength[::SS]
-otf = otf[::SS]
+otf = otf[:len(wavelength)]
+
+templates = np.load(templates_dir + 'NMF/ch1a_to_ch4b_6_nmf_components_and_10_spectral_lines.npy')
+
+
+SS_templates = np.zeros((templates.shape[0], len(wavelength)))
+for i in range(templates.shape[0]):
+    if i < 6:
+        SS_templates[i] = templates[i, ::SS]
+    idx = np.where(templates[i] != 0)[0]
+    for k in idx:
+        k_ss = k // SS
+        if k_ss < SS_templates.shape[1]:
+            SS_templates[i, k_ss] += templates[i, k]
+
+
+
 
 # Select PSF regarding list_filter
 indexes = [i for i, val in enumerate(ref_list_filter) if val in list_filter]
-otf = otf[:len(wavelength)]
 
 # Load PCE -- Don't deal with other multiple wavel now
 list_pce = []
@@ -53,10 +75,12 @@ pce = pce[indexes, :len(wavelength)]
 
 print("pce.shape = ", pce.shape)
 
-templates = np.load(templates_dir + 'NMF/ch1a_to_ch4b_6_nmf_components_and_10_spectral_lines.npy')
-templates = templates[:, ::SS]
 
-MIRIModel = model_creation.create_miri_model(otf, pce, wavelength, templates, imshape, step, None)
+# np.save(templates_dir + 'NMF/ch1a_to_ch4b_6_nmf_components_and_10_spectral_lines_SS4.npy', SS_templates)
+# np.save(templates_dir + 'wavelength/ch1a_to_ch4b_wavel_axis_with_spectral_line_SS4.npy', wavelength)
+
+
+MIRIModel = model_creation.create_miri_model(otf, pce, wavelength, SS_templates, imshape, step, None)
 
 hfreq = MIRIModel.H_freq
 
