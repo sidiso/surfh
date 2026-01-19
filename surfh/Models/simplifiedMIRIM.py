@@ -86,7 +86,7 @@ from surfh.Signalprocessing.utilities import partitioning_einops2
 # PSFs are full and partitionned to allow the direct sum with the spectro hessian
 class Mirim_Model_For_Fusion(LinOp):
     def __init__(
-        self, psfs_monoch, L_pce, lamb_cube, L_specs, shape_target, di, dj, pixel_arcsec=0.111, H_int = None
+        self, psfs_monoch, L_pce, lamb_cube, L_specs, shape_target, di, dj, pixel_arcsec=0.111, precomputed_H_int = None, low_mem=True
     ):
         assert psfs_monoch.shape[1] <= shape_target[0] # otherwise ir2fr impossible
         assert psfs_monoch.shape[2] <= shape_target[1]
@@ -104,11 +104,63 @@ class Mirim_Model_For_Fusion(LinOp):
         # H_int = trapezoid(specs * psfs * pce, x=lamb_cube, axis=2)  # (9, 300, 250, 500)
         # TODO: new normalisation added here
         # pce_norms = np.sum(L_pce, axis=1)[:, np.newaxis, np.newaxis, np.newaxis]
-        if H_int is None:
-            pce_norms = trapezoid(L_pce * lamb_cube[np.newaxis, ...], x = lamb_cube, axis = 1)[:, np.newaxis, np.newaxis, np.newaxis]
-            new_lamb_cube = lamb_cube[np.newaxis, np.newaxis, :, np.newaxis, np.newaxis]
-            H_int = trapezoid(specs * psfs * pce * new_lamb_cube, x=lamb_cube, axis=2) / pce_norms 
+        if not low_mem: 
+            if precomputed_H_int is None:
+                pce_norms = trapezoid(L_pce * lamb_cube[np.newaxis, ...], x = lamb_cube, axis = 1)[:, np.newaxis, np.newaxis, np.newaxis]
+                new_lamb_cube = lamb_cube[np.newaxis, np.newaxis, :, np.newaxis, np.newaxis]
+                H_int = trapezoid(specs * psfs * pce * new_lamb_cube, x=lamb_cube, axis=2) / pce_norms 
+            else:
+                H_int = precomputed_H_int
+        else:
+            if precomputed_H_int is None:
+                # -----------------------------
+                # Poids du trapèze (spectral)
+                # -----------------------------
+                dl = np.diff(lamb_cube)
+                trap_weights = np.empty_like(lamb_cube)
+                trap_weights[1:-1] = 0.5 * (dl[:-1] + dl[1:])
+                trap_weights[0]    = 0.5 * dl[0]
+                trap_weights[-1]   = 0.5 * dl[-1]
 
+                # -----------------------------
+                # Normalisation PCE (physique)
+                # -----------------------------
+                # ∫ PCE(λ) * λ dλ
+                pce_norms = trapezoid(
+                    L_pce * lamb_cube[np.newaxis, :],
+                    x=lamb_cube,
+                    axis=1
+                )[:, None, None, None]   # (9,1,1,1)
+
+                # -----------------------------
+                # Poids spectraux
+                # -----------------------------
+                # weights[p,s,l] = PCE[p,l] * Spec[s,l] * λ[l] * w[l]
+                weights = (
+                    L_pce[:, None, :] *
+                    L_specs[None, :, :] *
+                    lamb_cube[None, None, :] *
+                    trap_weights[None, None, :]
+                )  # (9, n_spec, L)
+
+                # -----------------------------
+                # Intégration spectrale
+                # -----------------------------
+                # contraction sur l'axe λ
+                H_int = np.tensordot(
+                    weights,             # (9, n_spec, L)
+                    psfs_monoch,         # (L, I, J)
+                    axes=([2], [0])
+                )  # (9, n_spec, I, J)
+
+                # -----------------------------
+                # Normalisation finale
+                # -----------------------------
+                H_int /= pce_norms    
+            else:
+                H_int = precomputed_H_int    
+
+        self.H_int = H_int  # (9, 5, 250, 500)
         H_freq_full = ir2fr(H_int, shape_target, real=False)  # (9, 300, 250, 500)
         self.H_freq_full = H_freq_full
         
