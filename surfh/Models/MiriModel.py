@@ -19,7 +19,7 @@ from surfh.ToolsDir import jax_utils
 # PSFs are full and partitionned to allow the direct sum with the spectro hessian
 class Mirim_Model_LMM(LinOp):
     def __init__(
-        self, psfs_monoch, L_pce, lamb_cube, L_specs, shape_target, pixel_arcsec=0.111, precompute_H_freq=None
+        self, psfs_monoch, L_pce, lamb_cube, L_specs, shape_target, pixel_arcsec=0.111, precompute_H_freq=None, low_mem=True
     ):
         """
 
@@ -60,17 +60,73 @@ class Mirim_Model_LMM(LinOp):
         # H_int = trapezoid(specs * psfs * pce, x=lamb_cube, axis=2)  # (9, 300, 250, 500)
         # TODO: new normalisation added here
         # pce_norms = np.sum(L_pce, axis=1)[:, np.newaxis, np.newaxis, np.newaxis]
-              
-        if precompute_H_freq is None:
-            pce_norms = trapezoid(L_pce * lamb_cube[np.newaxis, ...], x = lamb_cube, axis = 1)[:, np.newaxis, np.newaxis, np.newaxis]
-            new_lamb_cube = lamb_cube[np.newaxis, np.newaxis, :, np.newaxis, np.newaxis]
-            H_int = trapezoid(specs * pce * psfs * new_lamb_cube, x=lamb_cube, axis=2) / pce_norms # (9, 5, 250, 500)
-            
-            H_freq = ir2fr(H_int, shape_target, real=True)
+
+        if not low_mem:      
+            if precompute_H_freq is None:
+                pce_norms = trapezoid(L_pce * lamb_cube[np.newaxis, ...], x = lamb_cube, axis = 1)[:, np.newaxis, np.newaxis, np.newaxis]
+                new_lamb_cube = lamb_cube[np.newaxis, np.newaxis, :, np.newaxis, np.newaxis]
+                H_int = trapezoid(specs * pce * psfs * new_lamb_cube, x=lamb_cube, axis=2) / pce_norms # (9, 5, 250, 500)
+                
+                H_freq = ir2fr(H_int, shape_target, real=True)
+            else:
+                H_freq = precompute_H_freq
+            self.H_freq = H_freq
         else:
-            H_freq = precompute_H_freq
-        self.H_freq = H_freq
-        
+            if precompute_H_freq is None:
+                # -----------------------------
+                # Poids du trapèze (spectral)
+                # -----------------------------
+                dl = np.diff(lamb_cube)
+                trap_weights = np.empty_like(lamb_cube)
+                trap_weights[1:-1] = 0.5 * (dl[:-1] + dl[1:])
+                trap_weights[0]    = 0.5 * dl[0]
+                trap_weights[-1]   = 0.5 * dl[-1]
+
+                # -----------------------------
+                # Normalisation PCE (physique)
+                # -----------------------------
+                # ∫ PCE(λ) * λ dλ
+                pce_norms = trapezoid(
+                    L_pce * lamb_cube[np.newaxis, :],
+                    x=lamb_cube,
+                    axis=1
+                )[:, None, None, None]   # (9,1,1,1)
+
+                # -----------------------------
+                # Poids spectraux
+                # -----------------------------
+                # weights[p,s,l] = PCE[p,l] * Spec[s,l] * λ[l] * w[l]
+                weights = (
+                    L_pce[:, None, :] *
+                    self.L_specs[None, :, :] *
+                    lamb_cube[None, None, :] *
+                    trap_weights[None, None, :]
+                )  # (9, n_spec, L)
+
+                # -----------------------------
+                # Intégration spectrale
+                # -----------------------------
+                # contraction sur l'axe λ
+                H_int = np.tensordot(
+                    weights,             # (9, n_spec, L)
+                    psfs_monoch,         # (L, I, J)
+                    axes=([2], [0])
+                )  # (9, n_spec, I, J)
+
+                # -----------------------------
+                # Normalisation finale
+                # -----------------------------
+                H_int /= pce_norms
+
+                # -----------------------------
+                # Passage en domaine fréquentiel
+                # -----------------------------
+                H_freq = ir2fr(H_int, shape_target, real=True)
+            else:
+                H_freq = precompute_H_freq
+
+            self.H_freq = H_freq
+
         n_bands, _ = L_pce.shape
         self.n_bands = n_bands
         
@@ -105,7 +161,34 @@ class Mirim_Model_LMM(LinOp):
         return self.adjoint(self.forward(point))
 
     def mapsToCube(self, maps):
-        return jax_utils.lmm_maps2cube(maps, self.L_specs)
+        from jax import numpy as jnp
+        self.L_specs = self.L_specs[:, ::4]
+
+        print(f"SHape maps in mapsToCube: {maps.shape}")
+        print(f"Shape L_specs in mapsToCube: {self.L_specs.shape}")
+        if maps.shape[1]<200:
+            return jax_utils.lmm_maps2cube(maps, self.L_specs)
+        else:
+            batch_size = 50  # ajustable
+            n_spec, H, W = maps.shape
+            n_lamb = self.L_specs.shape[1]
+
+            # sécurité
+            assert n_spec == self.L_specs.shape[0], \
+                f"maps.shape[0]={n_spec} doit être égal à L_specs.shape[0]={self.L_specs.shape[0]}"
+
+            cube = np.zeros((n_lamb, H, W), dtype=maps.dtype)
+
+            # traitement par batch
+            for start in range(0, n_lamb, batch_size):
+                end = min(start + batch_size, n_lamb)
+                # slice batch spectral
+                L_batch = self.L_specs[:, start:end]  # (n_spec, batch)
+                # contraction : tensordot sur l'axe n_spec
+                cube[start:end] = np.tensordot(L_batch, maps, axes=([0],[0]))  # (batch, H, W)
+
+            return cube
+        
 
     # microJansky/arcsec^2 to microJansky/arcsec^2
     def unit_conversion(self, flux, lamb, pixel_arcsec):

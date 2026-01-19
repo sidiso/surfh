@@ -50,7 +50,7 @@ def parse_options(config_file):
 
     print(f"Shape Hfreq = {H_freq.shape}")
     print(f"Shape y_mirim = {y_mirim.shape}")
-
+    print(f"Mirim PCE = {miri_pce.shape}")
 
     log.info(f'Start {config.reconstruction.method} algorithm')
     x_maps, x_cube = reconstruction.reconstruction_MIRIM_fusion(MIRIModel, y_mirim, templates, config, True)

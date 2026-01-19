@@ -41,6 +41,7 @@ def parse_options(config_file):
 
     log.info('Create intruments and spectro models')
     MIRIModel = model_creation.create_miri_model(miri_soft, miri_pce, wavel_axis, templates, imshape, step, H_freq)
+    print(f"MIRI PCE shape = {miri_pce.shape}")
 
     data_mirim = model_creation.load_data_mirim(config)
     list_y_mirim = list()
@@ -50,8 +51,10 @@ def parse_options(config_file):
 
 
     log.info(f'Load MIRIM Fusion results')
-    path_results = '/home/nmonnier/Data/JWST/NGC_7023/Fusion/Results/MIRIM_lcg_Temp_16_nit_300_mu_1.00e+01_SD_True/'
+    path_results = '/home/nmonnier/Data/JWST/NGC_7023/Fusion/Results/MIRIM_lcg_Temp_22_nit_301_mu_1.00e+01_SD_True/'
     x_maps = np.load(os.path.join(path_results, 'res_x.npy'))
+    hdul = fits.open(os.path.join(path_results, 'res_cube.fits'))
+    cube = hdul[0].data 
     xy_mirim = MIRIModel.forward(x_maps)
 
     # For each filter, plot data, xy_mirim and residuals where shape of these are (n_filters, npix, npix)
@@ -61,6 +64,11 @@ def parse_options(config_file):
         y_data = y_mirim[i, slice_x, slice_y]
         y_model = xy_mirim[i, slice_x, slice_y]
         residuals = y_data - y_model
+
+        pce = miri_pce[i]
+        # deconv_filter is the sum of the the PCE multiplyby the cube built from maps and templates at each wavelength
+
+        deconv_filter = np.sum(cube * pce[:, np.newaxis, np.newaxis], axis=0)
 
         # Mask pixels around the highest value in residuals because they are bas pixels
         max_pos = np.unravel_index(np.argmax(np.abs(residuals)), residuals.shape)
@@ -72,18 +80,27 @@ def parse_options(config_file):
 
 
 
-        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-        im0 = axes[0].imshow(y_data, origin='lower', cmap='viridis')
-        axes[0].set_title(f'Data - Filter {filt}')
-        plt.colorbar(im0, ax=axes[0], fraction=0.046, pad=0.04)
+        fig, axes = plt.subplots(2, 3, figsize=(15, 5))
+        im0 = axes[0, 0].imshow(y_data, origin='lower', cmap='viridis')
+        axes[0, 0].set_title(f'Raw Data - Filter {filt}')
+        plt.colorbar(im0, ax=axes[0, 0], fraction=0.046, pad=0.04)
 
-        im1 = axes[1].imshow(y_model, origin='lower', cmap='viridis')
-        axes[1].set_title(f'Model - Filter {filt}')
-        plt.colorbar(im1, ax=axes[1], fraction=0.046, pad=0.04)
+        im1 = axes[0, 1].imshow(y_model, origin='lower', cmap='viridis')
+        axes[0, 1].set_title(f'Model - Filter {filt}')
+        plt.colorbar(im1, ax=axes[0, 1], fraction=0.046, pad=0.04)
 
-        im2 = axes[2].imshow(residuals, origin='lower', cmap='RdBu_r')
-        axes[2].set_title(f'Residuals - Filter {filt}')
-        plt.colorbar(im2, ax=axes[2], fraction=0.046, pad=0.04)
+        im2 = axes[0, 2].imshow(residuals, origin='lower', cmap='RdBu_r')
+        axes[0, 2].set_title(f'Residuals - Filter {filt}')
+        plt.colorbar(im2, ax=axes[0, 2], fraction=0.046, pad=0.04)
+
+        im3 = axes[1, 0].imshow(y_data, origin='lower', cmap='viridis')
+        axes[1, 0].set_title(f'Raw Data - Filter {filt}')
+        plt.colorbar(im3, ax=axes[1, 0], fraction=0.046, pad=0.04)
+
+        im4 = axes[1, 1].imshow(deconv_filter, origin='lower', cmap='viridis')
+        axes[1, 1].set_title(f'Model - Filter {filt}')
+        plt.colorbar(im4, ax=axes[1, 1], fraction=0.046, pad=0.04)
+
 
         plt.tight_layout()
         plt.show()

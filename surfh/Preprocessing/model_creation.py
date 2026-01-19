@@ -162,12 +162,17 @@ def create_instruments(data_dict, config: Config):
 def load_data_mirim(config: Config):
     """Load MIRI MRS data for the specified filters."""
     data_dict = {'data': {}}
+    print(f"Loaf files from directory : {config.configuration.mirim_data_dir}")
     for file in sorted(os.listdir(config.configuration.mirim_data_dir)):
         for filter in config.MIRIM.list_filters:
             if filter in file:
                 with fits.open(config.configuration.mirim_data_dir/file) as hdul:
                     print(f"Loading data for filter {filter} from file {file}")
                     data = hdul[0].data
+                    if data is None:
+                        data = hdul[1].data
+                    if data is None:
+                        raise ValueError(f"No data found in FITS file {file}")
                     data_dict['data'][filter] = [data]
     return data_dict
 
@@ -220,11 +225,11 @@ def load_mrs_data(config: Config):
         data_dict['rotation'][chan] = 0.
 
     print("Order of channels loading : ")
-    for file in sorted(os.listdir(config.configuration.data_dir)):
+    for file in sorted(os.listdir(config.configuration.mrs_data_dir)):
         for chan in config.MRS.list_channels:
             if chan in file:
-                with fits.open(os.path.join(config.configuration.data_dir, file)) as hdul:
-                    print(f"Loading !! data for channel {chan} from file {config.configuration.data_dir}/{file}")
+                with fits.open(os.path.join(config.configuration.mrs_data_dir, file)) as hdul:
+                    print(f"Loading !! data for channel {chan} from file {config.configuration.mrs_data_dir}/{file}")
                     header = hdul[0].header
                     PA_V3 = header['PA_V3']
                     TARG_RA = header['TARG_RA']  # Adjust RA to match the expected range

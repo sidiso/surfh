@@ -44,12 +44,12 @@ sp_indexes = np.digitize(np.setdiff1d(wavelength,ref_wavelength), wavelength)
 wavelength = wavelength[::SS]
 otf = otf[:len(wavelength)]
 
-templates = np.load(templates_dir + 'NMF/ch1a_to_ch4b_6_nmf_components_and_10_spectral_lines.npy')
+templates = np.load(templates_dir + 'NMF/full_scan_ch1a_to_ch4b_12_nmf_components_and_10_spectral_lines.npy')
 
 
 SS_templates = np.zeros((templates.shape[0], len(wavelength)))
 for i in range(templates.shape[0]):
-    if i < 6:
+    if i < 12:
         SS_templates[i] = templates[i, ::SS]
     idx = np.where(templates[i] != 0)[0]
     for k in idx:
@@ -76,7 +76,7 @@ pce = pce[indexes, :len(wavelength)]
 print("pce.shape = ", pce.shape)
 
 
-# np.save(templates_dir + 'NMF/ch1a_to_ch4b_6_nmf_components_and_10_spectral_lines_SS4.npy', SS_templates)
+np.save(templates_dir + 'NMF/full_scan_ch1a_to_ch4b_12_nmf_components_and_10_spectral_lines_SS4.npy', SS_templates)
 # np.save(templates_dir + 'wavelength/ch1a_to_ch4b_wavel_axis_with_spectral_line_SS4.npy', wavelength)
 
 
@@ -84,4 +84,4 @@ MIRIModel = model_creation.create_miri_model(otf, pce, wavelength, SS_templates,
 
 hfreq = MIRIModel.H_freq
 
-np.save(templates_dir + 'mirim_fusion_hfreq.npy', hfreq)
+np.save(templates_dir + 'mirim_fusion_full_scan_hfreq.npy', hfreq)
