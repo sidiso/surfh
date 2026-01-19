@@ -64,62 +64,116 @@ def parse_options(config_file):
     xy_slice = xy_mirim[slice_idx, crop:-crop, crop:-crop]
     diff_mirim_slice = y_slice - xy_slice
 
-    # Compute vmin/vmax for the first line
-    vmin1 = min(reconstructed_slice.min(), reconstructed_slice.min())
-    vmax1 = max(reconstructed_slice.max(), reconstructed_slice.max())
+    # # Compute vmin/vmax for the first line
+    # vmin1 = min(reconstructed_slice.min(), reconstructed_slice.min())
+    # vmax1 = max(reconstructed_slice.max(), reconstructed_slice.max())
 
-    # Compute vmin/vmax for the second line
-    vmin2 = min(y_slice.min(), xy_slice.min())
-    vmax2 = max(y_slice.max(), xy_slice.max())
+    # # Compute vmin/vmax for the second line
+    # vmin2 = min(y_slice.min(), xy_slice.min())
+    # vmax2 = max(y_slice.max(), xy_slice.max())
 
-    # Create figure: 2 lines, 3 columns
-    fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+    # # Create figure: 2 lines, 3 columns
+    # fig, axes = plt.subplots(2, 3, figsize=(15, 10))
 
-    # ======== FIRST ROW (Cube slices) ========
+    # # ======== FIRST ROW (Cube slices) ========
 
-    im0 = axes[0, 0].imshow(reconstructed_slice, vmin=vmin1, vmax=vmax1, cmap='viridis')
-    axes[0, 0].set_title(fr'Original Slice (cropped) at $\lambda$={wavel_axis[index_wavel]} ')
-    plt.colorbar(im0, ax=axes[0, 0], fraction=0.046, pad=0.04)
+    # im0 = axes[0, 0].imshow(reconstructed_slice, vmin=vmin1, vmax=vmax1, cmap='viridis')
+    # axes[0, 0].set_title(fr'Original Slice (cropped) at $\lambda$={wavel_axis[index_wavel]} ')
+    # plt.colorbar(im0, ax=axes[0, 0], fraction=0.046, pad=0.04)
 
-    im1 = axes[0, 1].imshow(reconstructed_slice, vmin=vmin1, vmax=vmax1, cmap='viridis')
-    axes[0, 1].set_title(fr'Reconstructed Slice (cropped) at $\lambda$={wavel_axis[index_wavel]}')
-    plt.colorbar(im1, ax=axes[0, 1], fraction=0.046, pad=0.04)
+    # im1 = axes[0, 1].imshow(reconstructed_slice, vmin=vmin1, vmax=vmax1, cmap='viridis')
+    # axes[0, 1].set_title(fr'Reconstructed Slice (cropped) at $\lambda$={wavel_axis[index_wavel]}')
+    # plt.colorbar(im1, ax=axes[0, 1], fraction=0.046, pad=0.04)
 
-    im2 = axes[0, 2].imshow(difference_slice, cmap='bwr')
-    axes[0, 2].set_title('Difference Slice (cropped)')
-    plt.colorbar(im2, ax=axes[0, 2], fraction=0.046, pad=0.04)
+    # im2 = axes[0, 2].imshow(difference_slice, cmap='bwr')
+    # axes[0, 2].set_title('Difference Slice (cropped)')
+    # plt.colorbar(im2, ax=axes[0, 2], fraction=0.046, pad=0.04)
 
-    # ======== SECOND ROW (y_mirim and xy_mirim) ========
+    # # ======== SECOND ROW (y_mirim and xy_mirim) ========
 
-    im3 = axes[1, 0].imshow(y_slice, vmin=vmin2, vmax=vmax2, cmap='viridis')
-    axes[1, 0].set_title(f'y_mirim (cropped) for filter {config.MIRIM.list_filters[slice_idx]}')
-    plt.colorbar(im3, ax=axes[1, 0], fraction=0.046, pad=0.04)
+    # im3 = axes[1, 0].imshow(y_slice, vmin=vmin2, vmax=vmax2, cmap='viridis')
+    # axes[1, 0].set_title(f'y_mirim (cropped) for filter {config.MIRIM.list_filters[slice_idx]}')
+    # plt.colorbar(im3, ax=axes[1, 0], fraction=0.046, pad=0.04)
 
-    im4 = axes[1, 1].imshow(xy_slice, vmin=vmin2, vmax=vmax2, cmap='viridis')
-    axes[1, 1].set_title(f'xy_mirim (cropped) for filter {config.MIRIM.list_filters[slice_idx]}')
-    plt.colorbar(im4, ax=axes[1, 1], fraction=0.046, pad=0.04)
+    # im4 = axes[1, 1].imshow(xy_slice, vmin=vmin2, vmax=vmax2, cmap='viridis')
+    # axes[1, 1].set_title(f'xy_mirim (cropped) for filter {config.MIRIM.list_filters[slice_idx]}')
+    # plt.colorbar(im4, ax=axes[1, 1], fraction=0.046, pad=0.04)
 
-    im5 = axes[1, 2].imshow(diff_mirim_slice, cmap='bwr')
-    axes[1, 2].set_title(f'Difference (y - xy) (cropped) for filter {config.MIRIM.list_filters[slice_idx]}')
-    plt.colorbar(im5, ax=axes[1, 2], fraction=0.046, pad=0.04)
+    # im5 = axes[1, 2].imshow(diff_mirim_slice, cmap='bwr')
+    # axes[1, 2].set_title(f'Difference (y - xy) (cropped) for filter {config.MIRIM.list_filters[slice_idx]}')
+    # plt.colorbar(im5, ax=axes[1, 2], fraction=0.046, pad=0.04)
 
-    plt.tight_layout()
-    plt.show()
+    # plt.tight_layout()
+    # plt.show()
 
-    # Plot All filters. First Raw is original filters, Second Raw is xy filters and third row is the difference
-        # Create figure: 2 lines, 3 columns
-    fig, axes = plt.subplots(3, 8, figsize=(15, 10))
-    for idx, filter in enumerate(config.MIRIM.list_filters):
-        y_slice = y_mirim[idx, crop:-crop, crop:-crop]
-        xy_slice = xy_mirim[idx, crop:-crop, crop:-crop]
-        diff_mirim_slice = y_slice - xy_slice
+    # # Plot All filters. First Raw is original filters, Second Raw is xy filters and third row is the difference
+    #     # Create figure: 2 lines, 3 columns
+    # fig, axes = plt.subplots(3, 8, figsize=(15, 10))
+    # for idx, filter in enumerate(config.MIRIM.list_filters):
+    #     y_slice = y_mirim[idx, crop:-crop, crop:-crop]
+    #     xy_slice = xy_mirim[idx, crop:-crop, crop:-crop]
+    #     diff_mirim_slice = y_slice - xy_slice
 
-        axes[0, idx].imshow(y_slice, cmap='viridis')
-        axes[1, idx].imshow(xy_slice, cmap='viridis')
-        axes[2, idx].imshow(diff_mirim_slice, cmap='viridis')
-    plt.tight_layout()
-    plt.show()
+    #     axes[0, idx].imshow(y_slice, cmap='viridis')
+    #     axes[1, idx].imshow(xy_slice, cmap='viridis')
+    #     axes[2, idx].imshow(diff_mirim_slice, cmap='viridis')
+    # plt.tight_layout()
+    # plt.show()
     
+
+
+    crop = 4
+
+    # --- Définir la correspondance filtre -> index spectral du cube ---
+    # Exemple : le modèle MIRI utilise souvent un mapping connu :
+    # filter_to_wavel_idx = config.MIRIM.filter_to_wave_index  # dict {filter_name: index_wavel}
+
+    filtrer_wavel = [5.6, 7.7, 10., 11.3, 12.8, 15.0, 18.0, 21.0]
+
+    # --- Création des figures ---
+    n_filters = len(config.MIRIM.list_filters)
+
+
+    for i, filt in enumerate(config.MIRIM.list_filters):
+        fig, axes = plt.subplots(1, 4, figsize=(16, 3*n_filters))
+        # --- Extraction Y et XY ---
+        y_slice  = y_mirim[i, crop:-crop, crop:-crop]
+        xy_slice = xy_mirim[i, crop:-crop, crop:-crop]
+        diff     = y_slice - xy_slice
+
+        # --- Trouver index spectral du cube ---
+        λ_idx = np.argmin(np.abs(wavel_axis - filtrer_wavel[i]))
+        cube_slice = x_cube[λ_idx, crop:-crop, crop:-crop]
+
+        # --- Normalisation commune Y/XY ---
+        vmin = min(y_slice.min(), xy_slice.min())
+        vmax = max(y_slice.max(), xy_slice.max())
+
+        # --- Plot des 4 images ---
+        ax0 = axes[0]
+        im0 = ax0.imshow(y_slice, vmin=vmin, vmax=vmax, cmap='viridis')
+        ax0.set_title(f"Original : {filt}")
+        fig.colorbar(im0, ax=ax0, fraction=0.046, pad=0.04)
+
+        ax1 = axes[1]
+        im1 = ax1.imshow(cube_slice, cmap='viridis')
+        ax1.set_title(f"Reconstruction Cube\nλ  = {wavel_axis[λ_idx]}")
+        fig.colorbar(im1, ax=ax1, fraction=0.046, pad=0.04)
+
+        ax2 = axes[2]
+        im2 = ax2.imshow(xy_slice, vmin=vmin, vmax=vmax, cmap='viridis')
+        ax2.set_title(f"Instrument Model : {filt}")
+        fig.colorbar(im2, ax=ax2, fraction=0.046, pad=0.04)
+
+        ax3 = axes[3]
+        im3 = ax3.imshow(diff, cmap="bwr")
+        ax3.set_title(f"Différence (Y - XY)\n{filt}")
+        fig.colorbar(im3, ax=ax3, fraction=0.046, pad=0.04)
+
+        plt.tight_layout()
+        plt.show()
+
+
 
 
 

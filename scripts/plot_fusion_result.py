@@ -2,7 +2,7 @@ import numpy as np
 from surfh.Vizualisation import cube_vizualisation
 import matplotlib.pyplot as plt
 
-path = '/home/nmonnier/Data/JWST/NGC_7023/Fusion/Resultslcg_MC_11_MO_4_Temp_16_nit_204_mu_5.00e+06_SD_True/'
+path = '/home/nmonnier/Data/JWST/NGC_7023/Fusion/Results/MIRIM_lcg_Temp_16_nit_300_mu_1.00e+01_SD_True/'
 
 # wavel = np.load(path + 'wavel.npy')
 x = np.load(path + 'res_x.npy')

@@ -6,6 +6,7 @@ from rich import print
 
 from surfh.Preprocessing import model_creation
 from surfh.ToolsDir import reconstruction
+from surfh.Others import context
 from surfh.Vizualisation import cube_vizualisation
 from surfh.ToolsDir.fits_toolbox import save_numpy_to_fits
 
@@ -15,91 +16,54 @@ import logging as log
 
 
 @click.command()
-@click.option('-fd', '--fusion_dir', default='/home/nmonnier/Data/JWST/NGC_7023/Fusion/', type=str, help='Fusion directory')
-@click.option('-np', '--npix', default=125, type=int, help='Number of pixels')
-@click.option('-hp', '--hyper_parameter', default=1., type=float, help='Hyperparameter value')
-@click.option('-ni', '--niter', default=5, type=int, help='Number of iteration.')
-@click.option('-nt', '--n_templates', default=4, type=int, help='Number of Templates.')
-@click.option('-sd', '--scale_data', default=False, type=bool, help='Scale data from Jy  to Jy/str.')
-@click.option('-m', '--method', default='lcg', type=str, help='Method used (default = lcg).')
-@click.option('-f', '--filtered_data', default=True, type=bool, help='Use filtered MRS data.')
-@click.option('-v', '--verbose', default=False, type=bool, help='Verbose.')
-def parse_options(fusion_dir, npix, hyper_parameter, niter, n_templates, scale_data, method, filtered_data, verbose):
+@click.option('-c', '--config_file', default='/home/nmonnier/Projects/JWST/MRS/surfh/config/config_MRS_MIRIM_Fusion_nmf.yaml', type=str, help='Configuration file.')
+def parse_options(config_file):
 
-    print(f'Options selected are : ') 
-    print(f'\t fusion_dir = {fusion_dir}')
-    print(f'\t npix = {npix}')
-    print(f'\t hyper_parameter = {hyper_parameter}')
-    print(f'\t niter = {niter}')
-    print(f'\t nTemplates = {n_templates}')
-    print(f'\t scale_data = {scale_data}')
-    print(f'\t method = {method}')
-    print(f'\t filtered_data = {filtered_data}')
-    print(f'\t verbose = {verbose}')
+    verbose =True
+    config = context.Config.from_yaml(config_file)
+    config.validate_paths()
 
     if verbose:
         log.basicConfig(format="%(levelname)s: %(message)s", level=log.INFO)
 
-    list_chan = ['1a', '1b', '1c', '2a', '2b', '2c', '3a', '3b', '3c', '4a', '4b']
-    list_filter = ['F0560W', 'F0770W', 'F1000W', 'F1130W', 'F1280W', 'F1500W', 'F1800W', 'F2100W']
-    imshape = (npix, npix)
+    imshape = (config.cube.npix, config.cube.npix)
 
     log.info('Initialize basic path parameters')
-    step = 0.1  # arcsec
-    paths, step_angle = model_creation.initialize_parameters(fusion_dir, step, filtered_data)
-
+    step = 0.1
+    step_angle = model_creation.initialize_fusion_parameters(config)
 
     log.info('Load simulation data')
-    wavel_axis, templates, sotf = model_creation.load_simulation_data(paths, list_chan)
-    miri_soft, miri_pce, H_freq = model_creation.load_miri_simulation_data(paths, list_filter, wavel_axis)
+    wavel_axis, templates, sotf = model_creation.load_mrs_simulation_data(config)
+    miri_soft, miri_pce, H_freq, wavel_axis, templates = model_creation.load_miri_simulation_data(config)
 
+    log.info('Load MRS data')
+    dict_mrs = model_creation.load_mrs_data(config)
+    dict_mirim = model_creation.load_data_mirim(config)
 
-    log.info('Load MIRIM and MRS data')
-    data_dict = model_creation.load_data(list_chan, paths["save_filter_corrected_dir"])
-    data_mirim = model_creation.load_data_mirim(list_filter, paths["miri_data"])
-
-
-    log.info('Cerate intruments for spectro and imager   models')
-    instruments = model_creation.create_instruments(data_dict, list_chan) # Warning Here : Rotation is set as -rotation_angle
-    MRSModel = model_creation.create_model(sotf, templates, wavel_axis, instruments, step_angle, data_dict, imshape)
+    log.info('Create intruments and spectro models')
+    instruments = model_creation.create_instruments(dict_mrs, config) # Warning Here : Rotation is set as -rotation_angle
+    MRSModel = model_creation.tmp_create_model(sotf, templates, wavel_axis, instruments, step_angle, dict_mrs, imshape, xshift=1, yshift=-1)
     MIRIModel = model_creation.create_miri_model(miri_soft, miri_pce, wavel_axis, templates, imshape, step, H_freq)
 
-
     data = list()
-    for chan in list_chan:
-        data.append(np.array(data_dict['data'][chan]).ravel())
-    ndata = np.concatenate(data)
+    for chan in config.MRS.list_channels:
+        data.append(np.array(dict_mrs['data'][chan]).ravel())
+    y_mrs = np.concatenate(data)
 
-    data_miri = list()
-    for filt in list_filter:
-        data_miri.append(np.array(data_mirim['data'][filt]))
-    ndata_mirim = np.concatenate(data_miri)
-    print(f"ndata_mirim shape = {ndata_mirim.shape}")
-    print(f"miri model ishape = {MIRIModel.ishape}, Miri model oshape = {MIRIModel.oshape}")
+    list_y_mirim = list()
+    for filt in config.MIRIM.list_filters:
+        list_y_mirim.append(np.array(dict_mirim['data'][filt]))
+    y_mirim = np.concatenate(list_y_mirim)
 
-    if scale_data:
+    if True:
         log.info('Data scaling enable')
-        ndata = MRSModel.real_data_janskySR_to_jansky(ndata)
+        y_mrs = MRSModel.real_data_janskySR_to_jansky(y_mrs)
 
-    log.info(f'Start {method} algorithm')
-    # maps = np.load('/home/nmonnier/Data/JWST/NGC_7023/Fusion/Results/lcg_MC_11_MO_4_Temp_14_nit_150_mu_5.00e+06_SD_True/res_x.npy')
-    # cube = MRSModel.mapsToCube(maps)
-    # adj = MIRIModel.adjoint(ndata_mirim)
-    # fw = MIRIModel.forward(adj)
-    # print(adj.shape)
-    # plt.figure()
-    # plt.imshow(cube[2500])
-    # plt.colorbar()
-    # plt.figure()
-    # plt.imshow(fw[2])
-    # plt.colorbar()
-    # plt.show()
-    # for i in range(8):
-    #     plt.figure()
-    #     plt.imshow(ndata_mirim[i])
-    #     plt.colorbar()
-    # plt.show()
-    reconstruction.reconstruction_MIRIM_MRS_method(MRSModel, MIRIModel, ndata, ndata_mirim, templates, paths["result_path"], hyper_parameter, niter, method, scale_data, data_dict)
+    # Make masks
+    masks = MRSModel.make_mask(y_mrs)
+
+    log.info(f'Start {config.reconstruction.method} algorithm')
+    reconstruction.reconstruction_MIRIM_MRS_method(MRSModel, y_mrs, MIRIModel, y_mirim, templates, config, True, dict_mrs, masks=masks)
 
 
 if __name__ == "__main__":

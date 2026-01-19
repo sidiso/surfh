@@ -62,7 +62,7 @@ oversample = 1
 # Pixel scale
 pixelscale = 0.1 # valeur choisie pour le cas de test
 # Size of PSF in pixel (here 501x501)
-nb_pixels=125
+nb_pixels=212
 fov_arcsec = pixelscale * nb_pixels
 
 norm = 'last'
