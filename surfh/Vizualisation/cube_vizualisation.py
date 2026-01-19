@@ -2,10 +2,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 
-def plot_cube(cube, wavelength_cube):
+def plot_cube(cube, wavelength_cube=None, title=None):
     import numpy as np
     import matplotlib.pyplot as plt
     from matplotlib.widgets import Slider
+
+    if wavelength_cube is None:
+        wavelength_cube = np.arange(cube.shape[0])
 
     if cube.shape[0] != 4:
         idx = np.where(np.sum(cube, axis=(1, 2)) != 0)[0]
@@ -23,8 +26,10 @@ def plot_cube(cube, wavelength_cube):
 
     # Display the initial slice
     slice_plot = ax.imshow(cube[initial_lambda, :, :], cmap='viridis')
-    ax.set_title(f'Lambda slice: {wavelength_cube[initial_lambda]}')
-
+    if title is None:
+        ax.set_title(f'Lambda slice: {wavelength_cube[initial_lambda]}')
+    else:
+        ax.set_title(title + f' - Lambda slice: {wavelength_cube[initial_lambda]}')
     # Add a colorbar
     cbar = plt.colorbar(slice_plot, ax=ax)
 
@@ -49,7 +54,10 @@ def plot_cube(cube, wavelength_cube):
         cbar.draw_all()
 
         # Update the title
-        ax.set_title(f'Lambda slice: {wavelength_cube[lambda_index]}')
+        if title is None:
+            ax.set_title(f'Lambda slice: {wavelength_cube[lambda_index]}')
+        else:
+            ax.set_title(title + f' - Lambda slice: {wavelength_cube[lambda_index]}')
 
         # Redraw the canvas
         fig.canvas.draw_idle()
@@ -228,4 +236,130 @@ def plot_maps(estimated_maps):
 
     plt.tight_layout()
     # plt.savefig("/home/nmonnier/Presentations/20250916_INCLASS/NGC7023_MRS_continium_maps.png", dpi=300)
+    plt.show()
+
+
+
+def plot_on_the_fly_cube_from_maps(maps, L_specs, wavelength_cube=None):
+    """
+    Visualisation interactive d'un cube spectral sans le construire en mémoire.
+
+    maps: np.array, shape (n_spec, H, W)
+    L_specs: np.array, shape (n_spec, n_lambda)
+    wavelength_cube: np.array, shape (n_lambda), optionnel
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from matplotlib.widgets import Slider
+
+    n_spec, H, W = maps.shape
+    _, n_lambda = L_specs.shape
+
+    assert L_specs.shape[0] == n_spec, \
+        "Incohérence: maps.shape[0] != L_specs.shape[0]"
+
+    if wavelength_cube is None:
+        wavelength_cube = np.arange(n_lambda)
+
+    # ---------- fonction slice à la volée ----------
+    def compute_slice(i):
+        # contraction (n_spec, H, W) · (n_spec,)
+        return np.tensordot(L_specs[:, i], maps, axes=(0, 0))  # (H, W)
+
+    # ---------- slice initiale ----------
+    initial_lambda = 0
+    slice0 = compute_slice(initial_lambda)
+
+    # ---------- figure ----------
+    fig, ax = plt.subplots()
+    plt.subplots_adjust(left=0.1, bottom=0.25)
+
+    im = ax.imshow(slice0, cmap='viridis')
+    ax.set_title(f'Lambda slice: {wavelength_cube[initial_lambda]}')
+    cbar = plt.colorbar(im, ax=ax)
+
+    # ---------- slider ----------
+    ax_slider = plt.axes([0.1, 0.1, 0.8, 0.05], facecolor='lightgoldenrodyellow')
+    slider = Slider(
+        ax_slider,
+        'Lambda',
+        0,
+        n_lambda - 1,
+        valinit=initial_lambda,
+        valstep=1
+    )
+
+    # ---------- update ----------
+    def update(val):
+        i = int(slider.val)
+        new_slice = compute_slice(i)
+
+        im.set_data(new_slice)
+
+        vmin, vmax = np.nanmin(new_slice), np.nanmax(new_slice)
+        im.set_clim(vmin, vmax)
+        cbar.mappable.set_clim(vmin, vmax)
+        cbar.draw_all()
+
+        ax.set_title(f'Lambda slice: {wavelength_cube[i]}')
+        fig.canvas.draw_idle()
+
+    slider.on_changed(update)
+    plt.show()
+
+
+def plot_mirim_comparison(y_mirim, xy_mirim, titles=None):
+    """
+    Plot comparaison MIRIM:
+      - données
+      - modèle
+      - résidu
+
+    Colorbar sur TOUS les plots.
+    """
+    assert y_mirim.shape == xy_mirim.shape
+    n_img, H, W = y_mirim.shape
+
+    if titles is None:
+        titles = [f'Image {i}' for i in range(n_img)]
+
+    fig, axes = plt.subplots(
+        3, n_img,
+        figsize=(3.2 * n_img, 8),
+        constrained_layout=True
+    )
+
+    for i in range(n_img):
+        data = y_mirim[i]
+        model = xy_mirim[i]
+        resid = data - model
+
+        # échelle commune data / modèle
+        vmin = np.nanpercentile(data, 1)
+        vmax = np.nanpercentile(data, 99)
+
+        # échelle symétrique pour le résidu
+        rmax = np.nanmax(np.abs(resid))
+
+        # --- données ---
+        im0 = axes[0, i].imshow(data, cmap='viridis', vmin=vmin, vmax=vmax)
+        axes[0, i].set_title(titles[i])
+        axes[0, i].axis('off')
+        plt.colorbar(im0, ax=axes[0, i], fraction=0.046, pad=0.04)
+
+        # --- modèle ---
+        im1 = axes[1, i].imshow(model, cmap='viridis', vmin=vmin, vmax=vmax)
+        axes[1, i].axis('off')
+        plt.colorbar(im1, ax=axes[1, i], fraction=0.046, pad=0.04)
+
+        # --- résidu ---
+        im2 = axes[2, i].imshow(np.log10(resid[10:-50, 10:-10]), cmap='viridis')#, vmin=-rmax, vmax=rmax)
+        axes[2, i].axis('off')
+        plt.colorbar(im2, ax=axes[2, i], fraction=0.046, pad=0.04)
+
+    # labels lignes
+    axes[0, 0].set_ylabel("Données", fontsize=12)
+    axes[1, 0].set_ylabel("Modèle", fontsize=12)
+    axes[2, 0].set_ylabel("Résidu", fontsize=12)
+
     plt.show()

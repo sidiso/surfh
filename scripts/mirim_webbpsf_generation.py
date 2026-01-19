@@ -58,12 +58,21 @@ def compute_monochromatic_psfs2(wave_filter, oversample=4, pixelscale=0.11, fov_
 # wavel_axis = spectrums.wavelength
 # wavel_axis = wavel_axis[::4] # SS 
 wavel_axis = np.load('/home/nmonnier/Data/JWST/NGC_7023/Fusion/Templates/wavel_axis_NGC7023_1ABC_2ABC_3ABC_4ABC.npy')
+wavel_axis = wavel_axis[::4]
 
 oversample = 1
 # Pixel scale
-pixelscale = 0.1 # valeur choisie pour le cas de test
+
+mirim_data_dir = '/home/nmonnier/Data/JWST/NGC_7023/Fusion/Raw_MIRIM/'
+filter_img = mirim_data_dir + 'Level3_F1000W_i2d_aligned.fits'
+with fits.open(filter_img) as hdul:
+    header = hdul[1].header
+    pixel_scale_deg = header['CDELT1']
+pixelscale = abs(pixel_scale_deg * 3600)
+# pixelscale = 0.1 # valeur choisie pour le cas de test
 # Size of PSF in pixel (here 501x501)
-nb_pixels=125
+nb_pixels = 584
+# nb_pixels=125
 fov_arcsec = pixelscale * nb_pixels
 
 norm = 'last'
@@ -91,5 +100,5 @@ psfs_monoch_array = np.array(PSF)
 
 
 file_path = "/home/nmonnier/Data/JWST/NGC_7023/Fusion/PSF/"
-file_name = f"mirim_psfs_pixscale{pixelscale}_npix_{nb_pixels}.npy"
+file_name = f"mirim_psfs_pixscale{pixelscale}_npix_{nb_pixels}_{len(wavel_axis)}_slices.npy"
 np.save(file_path + file_name, psfs_monoch_array)

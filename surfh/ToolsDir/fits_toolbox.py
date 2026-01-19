@@ -77,65 +77,14 @@ def save_numpy_to_fits(data, metadata, filename, masks):
     unit_beta = 'deg'
     unit_wavelength = 'um'
 
-    alpha_axis  = metadata['ALPHA_AXIS']
-    beta_axis   = metadata['BETA_AXIS']
-    wavelength  = metadata['WAVELENGTH']
+    alpha_axis  = metadata.get('ALPHA_AXIS', np.arange(data.shape[2]))
+    beta_axis   = metadata.get('BETA_AXIS', np.arange(data.shape[1]))
+    wavelength  = metadata.get('WAVELENGTH', np.arange(data.shape[0]))
 
-    alpha_axis += metadata['RA_REF']
-    beta_axis  += metadata['DEC_REF']
-
+    alpha_axis += metadata.get('RA_REF', 0)
+    beta_axis  += metadata.get('DEC_REF', 0)
     hdu = fits.PrimaryHDU(data=data)
     header = hdu.header
-
-    # data[0] = rotate(data[0], angle=metadata['PA_V3'], reshape=False)
-    # data[1] = rotate(data[3], angle=-metadata['PA_V3'], reshape=False)
-    # data[2] = rotate(data[1], angle=180-metadata['PA_V3'], reshape=False)
-    # data[3] = rotate(data[2], angle=180-(90-metadata['PA_V3']), reshape=False)    
-    # data[4] = rotate(data[4], angle=-(180-metadata['PA_V3']), reshape=False)
-    # data[5] = rotate(data[5], angle=-(180-(90-metadata['PA_V3'])), reshape=False) 
-    # data[6] = rotate(data[0], angle=-metadata['PA_V3'], reshape=False)
-    # data[7]  = rotate(data[2], metadata['PA_V3']-360, reshape=False)
-    # data[8]  = rotate(data[0], angle=metadata['PA_V3']-360-8.2, reshape=False)
-    # data[9] = rotate(data[2], angle=metadata['PA_V3']-360+8.2, reshape=False)
-    # data[10]  = rotate(data[1], angle=360-metadata['PA_V3'], reshape=False)
-    # data[11] = rotate(data[2], angle=360-metadata['PA_V3']+8.2, reshape=False)
-    # data[12] = rotate(data[1], angle=360-metadata['PA_V3']-8.2, reshape=False)
-    # data[13] = rotate(data[0], angle=metadata['PA_V3']-180, reshape=False)
-    # data[14] = np.fliplr(data[40])
-
-
-    # data[15] = rotate(np.fliplr(data[40]), angle=metadata['PA_V3'], reshape=False)
-    # data[16] = rotate(np.fliplr(data[40]), angle=-metadata['PA_V3'], reshape=False)
-    # data[17] = rotate(np.fliplr(data[40]), angle=360-metadata['PA_V3'], reshape=False)
-    # data[18] = rotate(np.fliplr(data[40]), angle=360-metadata['PA_V3']-8.2, reshape=False)    
-    # data[19] = rotate(np.fliplr(data[40]), angle=360-metadata['PA_V3']+8.2, reshape=False)
-    # data[20] = rotate(np.fliplr(data[40]), angle=metadata['PA_V3']-360, reshape=False)
-    # data[21] = rotate(np.fliplr(data[40]), angle=metadata['PA_V3']-360-8.2, reshape=False)
-    # data[22] = rotate(np.fliplr(data[40]), angle=metadata['PA_V3']-360+8.2, reshape=False)
-    
-    # data[23] = np.flipud(data[40])
-    # data[24] = rotate(np.flipud(data[40]), angle=metadata['PA_V3'], reshape=False)
-    # data[25] = rotate(np.flipud(data[40]), angle=-metadata['PA_V3'], reshape=False)
-    # data[26] = rotate(np.flipud(data[40]), angle=360-metadata['PA_V3'], reshape=False)
-    # data[27] = rotate(np.flipud(data[40]), angle=360-metadata['PA_V3']-8.2, reshape=False)    
-    # data[28] = rotate(np.flipud(data[40]), angle=360-metadata['PA_V3']+8.2, reshape=False)
-    # data[29] = rotate(np.flipud(data[40]), angle=metadata['PA_V3']-360, reshape=False)
-    # data[30] = rotate(np.flipud(data[40]), angle=metadata['PA_V3']-360-8.2, reshape=False)
-    # data[31] = rotate(np.flipud(data[40]), angle=metadata['PA_V3']-360+8.2, reshape=False)
-
-    # data[32] = np.flipud(np.fliplr(data[40]))
-    # data[33] = rotate(np.flipud(np.fliplr(data[40])), angle=metadata['PA_V3'], reshape=False)
-    # data[34] = rotate(np.flipud(np.fliplr(data[40])), angle=-metadata['PA_V3'], reshape=False)
-    # data[35] = rotate(np.flipud(np.fliplr(data[40])), angle=360-metadata['PA_V3'], reshape=False)
-    # data[36] = rotate(np.flipud(np.fliplr(data[40])), angle=360-metadata['PA_V3']-8.2, reshape=False)    
-    # data[37] = rotate(np.flipud(np.fliplr(data[40])), angle=360-metadata['PA_V3']+8.2, reshape=False)
-    # data[38] = rotate(np.flipud(np.fliplr(data[40])), angle=metadata['PA_V3']-360, reshape=False)
-    # data[39] = rotate(np.flipud(np.fliplr(data[40])), angle=metadata['PA_V3']-360-8.2, reshape=False)
-    # data[40] = rotate(np.flipud(np.fliplr(data[40])), angle=metadata['PA_V3']-360+8.2, reshape=False)
-
-    # for i in range(data.shape[0]):
-    #     data[i] = rotate(np.flipud(np.fliplr(data[i])), angle=metadata['PA_V3']-360-8.2, reshape=False)
-
 
     # --- Métadonnées générales ---
     header['AUTHOR']   = 'Nicolas Monnier'
@@ -143,13 +92,13 @@ def save_numpy_to_fits(data, metadata, filename, masks):
     header['NAXIS1']   = data.shape[2]   # taille en alpha
     header['NAXIS2']   = data.shape[1]   # taille en beta
 
-    header['PA_V3']    = metadata['PA_V3']    # Position Angle (V3) in degrees
-    header['TARG_RA']  = metadata['TARG_RA']   # Target Right Ascension (in degrees)
-    header['TARG_DEC'] = metadata['TARG_DEC']  # Target Declination (in degrees)
-    header['RA_V1']    = metadata['RA_V1']   # Target RA in V1 frame (in degrees)
-    header['DEC_V1']   = metadata['DEC_V1']  # Target DEC in V1 frame (in degrees)
-    header['RA_REF']   = metadata['RA_REF']   # Reference RA (in degrees)
-    header['DEC_REF']  = metadata['DEC_REF']  # Reference DEC (in degrees)
+    header['PA_V3']    = metadata.get('PA_V3', 0)    # Position Angle (V3) in degrees
+    header['TARG_RA']  = metadata.get('TARG_RA', 0)   # Target Right Ascension (in degrees)
+    header['TARG_DEC'] = metadata.get('TARG_DEC', 0)  # Target Declination (in degrees)
+    header['RA_V1']    = metadata.get('RA_V1', 0)   # Target RA in V1 frame (in degrees)
+    header['DEC_V1']   = metadata.get('DEC_V1', 0)  # Target DEC in V1 frame (in degrees)
+    header['RA_REF']   = metadata.get('RA_REF', 0)   # Reference RA (in degrees)
+    header['DEC_REF']  = metadata.get('DEC_REF', 0)  # Reference DEC (in degrees)
 
     # --- Axe spatial X (alpha) ---
     da = np.mean(np.diff(alpha_axis))

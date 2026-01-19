@@ -162,23 +162,43 @@ with Progress() as progress:
 end = time.time()
 print(f"Chunk size: {CHUNK_SIZE}, Time taken: {end - start:.2f} seconds")
 
-# --- Visualization of results --- #
-_, axs = plt.subplots(3, 1, figsize=(20, 12), sharex=True)
+_, axs = plt.subplots(2, 1, figsize=(20, 12), sharex=True)
 
 # Top panel: continuum vs. baseline
-axs[0].plot(wavel, np.nanmean(continuum_cube, axis=(1, 2)) + np.nanmean(spectral_line_cube, axis=(1, 2)), label='Separated Continuum', color='red', alpha = 0.75)
-axs[0].plot(wavel, np.nanmean(continuum_cube, axis=(1, 2)), label='Input Spectrum', color='black', alpha=0.75)
+axs[0].plot(wavel, np.nanmean(continuum_cube, axis=(1, 2)) + np.nanmean(spectral_line_cube, axis=(1, 2)), label='Separated Continuum', color='teal', alpha = 0.75)
+axs[0].plot(wavel, np.nanmean(continuum_cube, axis=(1, 2)), label='Input Spectrum', color='black', linestyle='dashed',alpha=0.75)
+axs[1].set_ylabel(r"Flux (MJy sr$^{-1}$)")
 axs[0].legend()
 
 # --- Bottom panel: Gaussian fits over extracted lines ---
-axs[1].plot(wavel, np.nanmean(raw_data_cube, axis=(1, 2)) - baseline, color='black', label='Separated lines', alpha=0.75)
+axs[1].plot(wavel, np.nanmean(raw_data_cube, axis=(1, 2)) - baseline, color='black', linestyle='dashed', label='Separated lines', alpha=0.75)
 axs[1].plot(wavel, np.nanmean(spectral_line_cube, axis=(1, 2)), color='teal', label='Gaussians (best fit)', alpha=0.75)
-axs[1].plot(wavel, np.nanmean(raw_data_cube, axis=(1, 2)) - baseline - np.nanmean(spectral_line_cube, axis=(1, 2)) - 5e2, color='crimson', label='Residuals (shifted)', alpha=0.75)
+axs[1].plot(wavel, np.nanmean(raw_data_cube, axis=(1, 2)) - baseline - np.nanmean(spectral_line_cube, axis=(1, 2)) - 5e2, color='crimson', linestyle='dotted', label='Residuals (shifted)', alpha=0.75)
 axs[1].set_xlabel("Wavelength (microns)")
+axs[1].set_ylabel(r"Flux (MJy sr$^{-1}$)")
 axs[1].legend()
 
 plt.tight_layout()
-# plt.show()
+
+
+
+# # --- Visualization of results --- #
+# _, axs = plt.subplots(3, 1, figsize=(20, 12), sharex=True)
+
+# # Top panel: continuum vs. baseline
+# axs[0].plot(wavel, np.nanmean(continuum_cube, axis=(1, 2)) + np.nanmean(spectral_line_cube, axis=(1, 2)), label='Separated Continuum', color='red', alpha = 0.75)
+# axs[0].plot(wavel, np.nanmean(continuum_cube, axis=(1, 2)), label='Input Spectrum', color='black', alpha=0.75)
+# axs[0].legend()
+
+# # --- Bottom panel: Gaussian fits over extracted lines ---
+# axs[1].plot(wavel, np.nanmean(raw_data_cube, axis=(1, 2)) - baseline, color='black', label='Separated lines', alpha=0.75)
+# axs[1].plot(wavel, np.nanmean(spectral_line_cube, axis=(1, 2)), color='teal', label='Gaussians (best fit)', alpha=0.75)
+# axs[1].plot(wavel, np.nanmean(raw_data_cube, axis=(1, 2)) - baseline - np.nanmean(spectral_line_cube, axis=(1, 2)) - 5e2, color='crimson', label='Residuals (shifted)', alpha=0.75)
+# axs[1].set_xlabel("Wavelength (microns)")
+# axs[1].legend()
+
+# plt.tight_layout()
+plt.show()
 
 continuum_data_cube = continuum_cube
 # --- Negative values processing --- #
