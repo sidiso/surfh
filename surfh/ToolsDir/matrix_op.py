@@ -22,7 +22,7 @@ from numpy import ndarray as array
 from numba import njit, prange
 
 from surfh.Models import instru
-from surfh.ToolsDir import cythons_files
+# from surfh.ToolsDir import cythons_files
 from surfh.Others.AsyncProcessPoolLight import APPL
 
 
@@ -86,49 +86,49 @@ def fov_weight(
 
     return weights
 
-def wblur(arr: array, wpsf: array, num_threads: int) -> array:
-    """Apply blurring in λ axis
+# def wblur(arr: array, wpsf: array, num_threads: int) -> array:
+#     """Apply blurring in λ axis
 
-    Parameters
-    ----------
-    arr: array-like
-      Input of shape [λ, α, β].
-    wpsf: array-like
-      Wavelength PSF of shape [λ', λ, β]
+#     Parameters
+#     ----------
+#     arr: array-like
+#       Input of shape [λ, α, β].
+#     wpsf: array-like
+#       Wavelength PSF of shape [λ', λ, β]
 
-    Returns
-    -------
-    out: array-like
-      A wavelength blurred array in [λ', α, β].
-    """
-    # [λ', α, β] = ∑_λ arr[λ, α, β] wpsf[λ', λ, β]
-    # Σ_λ
-    #arr = np.moveaxis(arr, 0, -1)
-    result_array = cythons_files.c_wblur(np.ascontiguousarray(arr), 
-                                         np.ascontiguousarray(wpsf), 
-                                         wpsf.shape[1], arr.shape[1], 
-                                         arr.shape[2], wpsf.shape[0],
-                                         num_threads)
-    return result_array
+#     Returns
+#     -------
+#     out: array-like
+#       A wavelength blurred array in [λ', α, β].
+#     """
+#     # [λ', α, β] = ∑_λ arr[λ, α, β] wpsf[λ', λ, β]
+#     # Σ_λ
+#     #arr = np.moveaxis(arr, 0, -1)
+#     result_array = cythons_files.c_wblur(np.ascontiguousarray(arr), 
+#                                          np.ascontiguousarray(wpsf), 
+#                                          wpsf.shape[1], arr.shape[1], 
+#                                          arr.shape[2], wpsf.shape[0],
+#                                          num_threads)
+#     return result_array
 
-def cubeToSlice(arr: array, dirac: array, num_threads: int) -> array:
-    """Apply transpose of blurring in λ axis
+# def cubeToSlice(arr: array, dirac: array, num_threads: int) -> array:
+#     """Apply transpose of blurring in λ axis
 
-    Parameters
-    ----------
-    arr: array-like
-      Input of shape [λ', α, β].
-    Returns
-    -------
-    out: array-like
-      A wavelength blurred array in [λ, α, β].
-    """
-    # [λ, α, β] = ∑_λ' arr[λ', α, β]
-    # Σ_λ'
-    result_array = cythons_files.c_cubeToSlice(arr, dirac, dirac.shape[1],
-                                         arr.shape[1], arr.shape[2], 
-                                         dirac.shape[0], num_threads)
-    return result_array
+#     Parameters
+#     ----------
+#     arr: array-like
+#       Input of shape [λ', α, β].
+#     Returns
+#     -------
+#     out: array-like
+#       A wavelength blurred array in [λ, α, β].
+#     """
+#     # [λ, α, β] = ∑_λ' arr[λ', α, β]
+#     # Σ_λ'
+#     result_array = cythons_files.c_cubeToSlice(arr, dirac, dirac.shape[1],
+#                                          arr.shape[1], arr.shape[2], 
+#                                          dirac.shape[0], num_threads)
+#     return result_array
 
 # def wblur_t(arr: array, wpsf: array, num_threads: int) -> array:
 #     """Apply transpose of blurring in λ axis
@@ -154,24 +154,24 @@ def cubeToSlice(arr: array, dirac: array, num_threads: int) -> array:
 
 
 
-def sliceToCube_t(arr: array, dirac: array, num_threads: int) -> array:
-    """Apply transpose of blurring in λ axis
+# def sliceToCube_t(arr: array, dirac: array, num_threads: int) -> array:
+#     """Apply transpose of blurring in λ axis
 
-    Parameters
-    ----------
-    arr: array-like
-      Input of shape [λ', α, β].
-    Returns
-    -------
-    out: array-like
-      A wavelength blurred array in [λ, α, β].
-    """
-    # [λ, α, β] = ∑_λ' arr[λ', α, β]
-    # Σ_λ'
-    result_array = cythons_files.c_sliceToCube_t(arr, dirac, dirac.shape[1], 
-                                           arr.shape[1], arr.shape[2], 
-                                           dirac.shape[0], num_threads)
-    return result_array
+#     Parameters
+#     ----------
+#     arr: array-like
+#       Input of shape [λ', α, β].
+#     Returns
+#     -------
+#     out: array-like
+#       A wavelength blurred array in [λ, α, β].
+#     """
+#     # [λ, α, β] = ∑_λ' arr[λ', α, β]
+#     # Σ_λ'
+#     result_array = cythons_files.c_sliceToCube_t(arr, dirac, dirac.shape[1], 
+#                                            arr.shape[1], arr.shape[2], 
+#                                            dirac.shape[0], num_threads)
+#     return result_array
 
 
 def diffracted_psf(template, spsf, wpsf) -> List[array]:
@@ -195,11 +195,18 @@ def diffracted_psf(template, spsf, wpsf) -> List[array]:
     return wblur(weighted_psf, wpsf)
 
 
-def linearMixingModel_maps2cube(maps, NLambda, ishape, tpls):
-    cube = cythons_files.c_fast_LMM_maps2cube(NLambda,ishape[0], 
-                                              ishape[1], ishape[2],
-                                              tpls.astype(np.float32), maps.astype(np.float32))
-    return np.array(cube)
+# def linearMixingModel_maps2cube(maps, NLambda, ishape, tpls):
+#     cube = cythons_files.c_fast_LMM_maps2cube(NLambda,ishape[0], 
+#                                               ishape[1], ishape[2],
+#                                               tpls.astype(np.float32), maps.astype(np.float32))
+#     return np.array(cube)
+
+def lmm_maps2cube(maps, tpls):
+    cube = np.sum(
+            np.expand_dims(maps, 1) * tpls[..., np.newaxis, np.newaxis], axis=0
+        )
+    return cube
+
 
 @njit(parallel=True)
 def linearMixingModel_cube2maps(cube, NLambda, ishape, tpls):
