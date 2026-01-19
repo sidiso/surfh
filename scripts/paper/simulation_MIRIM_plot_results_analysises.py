@@ -3,61 +3,35 @@ import astropy.io.fits as fits
 import matplotlib.pyplot as plt
 
 
-def apply_mask(data, masks, wavelengths):
-    """Apply a mask to the data cube.
-
-    Parameters
-    ----------
-    mask : np.ndarray
-        A boolean array with the same spatial dimensions as the data cube.
-        True values indicate valid data points, while False values indicate masked points.
-    """
-    ch_limit = [5.66, 6.53, 7.51, 8.67, 10.02, 11.55, 13.34, 15.41, 17.70, 20.69, 24.19]
-    # Apply the mask to each wavelength slice
-    w_start = w_stop = 0
-    for i in range(masks.shape[0]):
-        w_stop = np.where(wavelengths < ch_limit[i])[0][-1] +1
-        slice_mask = slice(w_start, w_stop)
-        data[slice_mask,:,:] = data[slice_mask,:,:]*masks[i]
-        data = np.where(data == 0, np.nan, data)
-
-
-
-        w_start = w_stop
-
-    return data
-
 
 # Load data
 ref_cube = np.load('/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/Templates/fusion_mrs_simulated_cube.npy')
 templates = np.load('/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/Templates/simulation_templates.npy')
+wavelength = np.load('/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/Templates/wavel_axis_NGC7023_1ABC_2ABC_3ABC_4AB.npy')
 
 # for i in range(templates.shape[0]):
 #     print(f'Wavelength where template is not zero for template {i}: {np.where(templates[i,:]!=0)[0]}')
 spectral_line_idx = [937, 1740, 2678, 3778, 5077, 6619, 7537, 8435]
 
 # Load results data
-res_dir = '/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/Results/lcg_MC_11_MO_4_Temp_13_nit_500_mu_1.00e+05_SD_True/res_cube.fits'
-res_dir = '/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/Results/MIRIM_MRS_lcg_MC_11_MO_4_Temp_13_nit_500_mu_1.00e+05_SD_True/res_cube.fits'
+res_dir = '/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/Results/MIRIM_lcg_Temp_13_nit_500_mu_0.00e+00_SD_True/res_cube.fits'
 
 with fits.open(res_dir) as hdul:
     res_cube = hdul[0].data
-    mask = hdul['MASKS'].data
-    wavelength = hdul['WCS-TABLE'].data['wavelength'][0]
-    wavelength = wavelength.squeeze() # Because shape can be (N,1) or (1,N)
 
-masked_res_cube = apply_mask(res_cube, mask, wavelength)
-masked_ref_cube = apply_mask(ref_cube, mask, wavelength)
+print("SHape cube = ", res_cube.shape)
+print("SHape wavel = ", wavelength.shape)
+print("Template shape = ", templates.shape)
 
+continum_masked_res_cube = res_cube.copy()
+continum_masked_ref_cube = ref_cube.copy()
 
-continum_masked_res_cube = np.copy(masked_res_cube)
-continum_masked_ref_cube = np.copy(masked_ref_cube)
 for sline_idx in spectral_line_idx:
     continum_masked_res_cube[sline_idx,:,:] = (continum_masked_res_cube[sline_idx-1,:,:] + continum_masked_res_cube[sline_idx+1,:,:])/2
     continum_masked_ref_cube[sline_idx,:,:] = (continum_masked_ref_cube[sline_idx-1,:,:] + continum_masked_ref_cube[sline_idx+1,:,:])/2
 
-mean_masked_res_cube = np.nanmean(masked_res_cube, axis=(1,2))
-mean_masked_ref_cube = np.nanmean(masked_ref_cube, axis=(1,2))
+mean_masked_res_cube = np.nanmean(res_cube, axis=(1,2))
+mean_masked_ref_cube = np.nanmean(ref_cube, axis=(1,2))
 
 mean_continuum_masked_res_cube = np.nanmean(continum_masked_res_cube, axis=(1,2))
 mean_continuum_masked_ref_cube = np.nanmean(continum_masked_ref_cube, axis=(1,2))

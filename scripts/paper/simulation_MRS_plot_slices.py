@@ -48,7 +48,7 @@ def parse_options(config_file):
     log.info('Create simulation data')
     maps = np.load('/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/Templates/simulation_maps.npy')
     cube = np.load('/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/Templates/fusion_mrs_simulated_cube.npy')
-    MRSModel.project_FOV()
+    # MRSModel.project_FOV()
     # plt.show()
     # raise SystemExit
 

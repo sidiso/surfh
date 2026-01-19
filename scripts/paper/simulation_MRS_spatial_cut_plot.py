@@ -34,7 +34,7 @@ def apply_mask(data, masks, wavelengths):
 #  MAIN CODE
 # ------------------------------------------------------
 @click.command()
-@click.option('-c', '--config_file', default='/home/nmonnier/Projects/JWST/MRS/surfh/config/config_MRS_Simulation_Fusion_nmf.yaml')
+@click.option('-c', '--config_file', default='/home/nmonnier/Projects/JWST/MRS/surfh/config/config_MRS_MIRI_Simulation_Fusion_nmf.yaml')
 def parse_options(config_file):
 
     # ----------------------------
@@ -63,7 +63,10 @@ def parse_options(config_file):
     cube = np.load('/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/Templates/fusion_mrs_simulated_cube.npy')
     ndata = np.load('/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/Templates/simulation_mrs_1a4b.npy')
 
-    with fits.open('/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/Results/lcg_MC_11_MO_4_Temp_13_nit_500_mu_1.00e+05_SD_True/res_cube.fits') as hdul:
+    # res_dir = '/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/Results/lcg_MC_11_MO_4_Temp_13_nit_500_mu_1.00e+05_SD_True/res_cube.fits'
+    res_dir = '/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/Results/MIRIM_MRS_lcg_MC_11_MO_4_Temp_13_nit_500_mu_1.00e+05_SD_True/res_cube.fits'
+
+    with fits.open(res_dir) as hdul:
         res_cube = hdul[0].data
         mask = hdul['MASKS'].data
         wavelength = hdul['WCS-TABLE'].data['wavelength'][0].squeeze()
@@ -92,7 +95,7 @@ def parse_options(config_file):
     # What to plot ?
     # ----------------------------
 
-    y_cut = 60
+    y_cut = 28
 
     plt.rcParams.update({
         "font.family": "serif",

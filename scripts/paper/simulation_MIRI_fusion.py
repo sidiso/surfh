@@ -45,8 +45,6 @@ def parse_options(config_file):
 
     y_mirim= MIRIModel.forward(maps)
 
-    # Make masks
-
     log.info(f'Start {config.reconstruction.method} algorithm')
     x_maps, x_cube = reconstruction.reconstruction_MIRIM_fusion(MIRIModel, y_mirim, templates, config, True)
     xy_mirim = MIRIModel.forward(x_maps)
