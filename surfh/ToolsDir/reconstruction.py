@@ -7,7 +7,7 @@ from surfh.Algorithm.criterion_spectroImageur import QuadCriterion_spectroImageu
 from surfh.Vizualisation import cube_vizualisation
 from surfh.ToolsDir.fits_toolbox import save_numpy_to_fits, save_mirim_to_fits
 
-
+import astropy.io.fits as fits
 
 
 # Main function to execute the reconstruction method
@@ -181,6 +181,59 @@ def reconstruction_MIRIM_fusion(MIRIMModel, y_mirim, templates, config, scale_da
     res_fusion = quadCrit_fusion.run_method(config.reconstruction.method, config.reconstruction.max_iter, perf_crit=1, calc_crit=True, value_init=value_init)
 
 
+
+    def save_fits_cube(output_path, data, header):
+        hdu = fits.PrimaryHDU(data=data)
+        header = hdu.header
+
+        header['NAXIS']  = 3
+        header['NAXIS1'] = data.shape[2]  # X
+        header['NAXIS2'] = data.shape[1]  # Y
+        header['NAXIS3'] = data.shape[0]  # lambda
+        header['NWAVEL']   = data.shape[0]
+
+        # header['CUNIT3'] = 'um'
+
+        # dw = np.mean(np.diff(MIRIMModel.lamb_cube))
+        # # header['CTYPE3'] = 'WAVE'
+        # header['CRVAL3'] = MIRIMModel.lamb_cube[0]
+        # header['CDELT3'] = dw
+        # header['CRPIX3'] = 1
+        # header['CTYPE3'] = 'WAVE-TAB'
+        # header['PS3_0']  = 'WCS-TABLE'
+        # header['PS3_1']  = 'wavelength'
+        # hdu = fits.ImageHDU(data=data, header=header)
+        # # hdul_out = fits.HDUList([fits.PrimaryHDU(), hdu])
+  
+        # # --- Table WCS-TABLE contenant le vecteur des longueurs d’onde ---
+        # col = fits.Column(name='wavelength', format=f'{len(MIRIMModel.lamb_cube)}E', dim=f'({len(MIRIMModel.lamb_cube)})', array=[MIRIMModel.lamb_cube])
+        # wcstable_hdu = fits.BinTableHDU.from_columns([col])
+        # wcstable_hdu.header['EXTNAME'] = 'WCS-TABLE'
+        
+        # primary = fits.PrimaryHDU()
+        # primary.header['EXTEND'] = True
+
+        # --- Axe spectral (approx linéaire) ---
+        dw = np.mean(np.diff(MIRIMModel.lamb_cube))
+        header['CTYPE3'] = 'WAVE'
+        header['CUNIT3'] = 'um'
+        header['CRVAL3'] = MIRIMModel.lamb_cube[0]
+        header['CDELT3'] = dw
+        header['CRPIX3'] = 1
+
+        # --- Table WCS-TABLE contenant le vecteur des longueurs d’onde ---
+        col = fits.Column(name='wavelength', format=f'{len(MIRIMModel.lamb_cube)}E', dim=f'({len(MIRIMModel.lamb_cube)})', array=[MIRIMModel.lamb_cube])
+        wcstable_hdu = fits.BinTableHDU.from_columns([col])
+        wcstable_hdu.header['EXTNAME'] = 'WCS-TABLE'
+
+
+
+        hdul = fits.HDUList([hdu, wcstable_hdu])
+        hdul.writeto(output_path, overwrite=True)
+
+
+
+
     if templates is None:
         print("No templates")
         print(f"Results save in {path}")
@@ -188,13 +241,20 @@ def reconstruction_MIRIM_fusion(MIRIMModel, y_mirim, templates, config, scale_da
         np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
     else:
         # Convert maps to cube
-        y_cube = MIRIMModel.mapsToCube(res_fusion.x)
+        # y_cube = MIRIMModel.mapsToCube(res_fusion.x)
+        y_cube = np.zeros((templates.shape[1], MIRIMModel.shape_target[0], MIRIMModel.shape_target[1]))
+        for i in range(templates.shape[1]):
+            y_cube[i] = np.tensordot(MIRIMModel.L_specs[:, i], res_fusion.x, axes=(0, 0))
+
         # Save results
         print(f"Results save in {path}")
         np.save(path / 'res_x.npy', res_fusion.x)
-        save_mirim_to_fits(np.array(y_cube), path/'res_cube.fits')
+        # save_mirim_to_fits(np.array(y_cube), path/'res_cube.fits')
+        with fits.open('/home/nmonnier/Data/JWST/NGC_7023/Fusion/Corrected_MIRIM/large_FoV/Level3_F1000W_i2d_aligned.fits') as hdul:
+            header = hdul[1].header
+        save_fits_cube(path/'res_cube.fits', y_cube, header)
         np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
-        return res_fusion.x, y_cube
+        return res_fusion.x, None#y_cube
 
 
 def reconstruction_MIRIM_MRS_method(MRSModel, y_mrs, MIRIMModel, y_mirim, templates, config, scale_data, data_dict, masks=None):
@@ -231,10 +291,10 @@ def reconstruction_MIRIM_MRS_method(MRSModel, y_mrs, MIRIMModel, y_mirim, templa
 
     # QuadCriterion initialization
     quadCrit_fusion = QuadCriterion_spectroImageur(
-        mu_imager=1,
+        mu_imager=0.99,
         y_imager=y_mirim,
         model_imager=MIRIMModel,
-        mu_spectro=1,
+        mu_spectro=0.01,
         y_spectro=np.copy(y_mrs),
         model_spectro=MRSModel,
         mu_reg=config.reconstruction.mu,
@@ -265,3 +325,7 @@ def reconstruction_MIRIM_MRS_method(MRSModel, y_mrs, MIRIMModel, y_mirim, templa
         save_numpy_to_fits(np.array(y_cube), metadata, path/'res_cube.fits', masks)
         np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
         np.save(path / 'wavel.npy', MRSModel.wavelength_axis)
+
+
+
+
