@@ -9,9 +9,10 @@ from surfh.Signalprocessing.utilities import mad_std
 # =========================================================
 # --- Peak Detection & Fitting ---
 # =========================================================
-def detect_and_fit_peaks(baseline_subtrated, mad, sigma=5, distance=5):
+def detect_and_fit_peaks(baseline_subtrated, mad, sigma=5, distance=5, wavelength=None):
     """Detect peaks and fit Gaussians."""
-    peaks, _ = find_peaks(baseline_subtrated, height=sigma * mad, distance=distance)
+    peaks, properties = find_peaks(baseline_subtrated, height=sigma * mad, distance=distance)
+    print(f"Properties of detected peaks: {properties}")
     fitted_peaks = []
     remaining_peaks = peaks.copy()
 
@@ -28,8 +29,16 @@ def detect_and_fit_peaks(baseline_subtrated, mad, sigma=5, distance=5):
         p0 = [y_window.max() - y_window.min(), pk, 1]
         try:
             popt, _ = curve_fit(gaussian, x_window, y_window, p0=p0)
-            fitted_peaks.append({'peak_index': pk, 'amplitude': popt[0],
-                                 'center': popt[1], 'sigma': popt[2]})
+            if wavelength is None:
+                fitted_peaks.append({'peak_index': pk, 'amplitude': popt[0],
+                                     'center': popt[1], 'sigma': popt[2]})
+            else:
+                i0 = int(np.floor(popt[1]))
+                i1 = int(np.ceil(popt[1]))
+                frac = popt[1] - i0
+                wavelength_center = wavelength[i0] * (1 - frac) + wavelength[i1] * frac
+                fitted_peaks.append({'peak_index': pk, 'amplitude': popt[0],
+                                     'center': popt[1], 'wavel_center': wavelength_center, 'sigma': popt[2]})
         except RuntimeError:
             pass
 
@@ -56,12 +65,6 @@ def fit_peaks_only(baseline_subtracted, input_spectrum, peak_indices, mean_sigma
                 bounds=([0, 0.9999 * pk, 0],
                         [np.inf, 1.0001 * pk, mean_sigma + 3 * std_sigma])
             )
-            fitted_peaks.append({
-                'peak_index': pk,
-                'amplitude': popt[0],
-                'center': popt[1],
-                'sigma': popt[2]
-            })
 
             # --- Build line spectrum from data around fitted peak ---
             mu = int(round(popt[1]))
@@ -71,10 +74,15 @@ def fit_peaks_only(baseline_subtracted, input_spectrum, peak_indices, mean_sigma
 
             # --- Mirror neighboring values for continuum replacement ---
             masked_len = l_end - l_start
+            if masked_len <= 0:
+                continue
 
             # Left and right neighbors (extend if near edges)
             left_vals = continuum[max(0, l_start - masked_len):l_start]
             right_vals = continuum[l_end:min(len(continuum), l_end + masked_len)]
+
+            if len(left_vals) == 0 or len(right_vals) == 0:
+                continue
 
             # If not enough points, pad by repeating edge values
             if len(left_vals) < masked_len:
@@ -84,6 +92,13 @@ def fit_peaks_only(baseline_subtracted, input_spectrum, peak_indices, mean_sigma
 
             # Mirror and average
             continuum[l_start:l_end] = (left_vals[::-1] + right_vals) / 2
+
+            fitted_peaks.append({
+                'peak_index': pk,
+                'amplitude': popt[0],
+                'center': popt[1],
+                'sigma': popt[2]
+            })
 
         except RuntimeError:
             continue
