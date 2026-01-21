@@ -5,7 +5,14 @@ from surfh.Signalprocessing.baseline import iterative_baseline_removal
 from surfh.Signalprocessing import fitting
 
 def interpolate_negatives(cube):
-    """Interpolate negative values using local positive neighborhood."""
+    """
+    Interpolate negative values using local positive neighborhood.
+    
+    Args:
+        cube (np.ndarray): Input 3D array (wl, H, W).
+    Returns:
+        np.ndarray: Cube with negative values interpolated.
+    """
     cube = cube.copy()
 
     def _interp(values):
@@ -19,7 +26,14 @@ def interpolate_negatives(cube):
 
 
 def process_pixel_chunk(chunk):
-    """Fit spectral lines pixel-by-pixel (parallelized)."""
+    """
+    Fit spectral lines pixel-by-pixel (parallelized).
+    
+    Args:
+        chunk (list): List of tuples (i, j, cube, peak_indices, mean_sigma, std_sigma).
+    Returns:
+        list: List of results with fitted continuum and spectral lines for each pixel.
+    """
     results = []
 
     for i, j, cube, peak_indices, mean_sigma, std_sigma in chunk:

@@ -10,7 +10,18 @@ from surfh.Signalprocessing.utilities import mad_std
 # --- Peak Detection & Fitting ---
 # =========================================================
 def detect_and_fit_peaks(baseline_subtrated, mad, sigma=5, distance=5, wavelength=None):
-    """Detect peaks and fit Gaussians."""
+    """
+    Detect peaks and fit Gaussians.
+    
+    Args:
+        baseline_subtrated (np.ndarray): Baseline subtracted spectrum (1D array).
+        mad (float): Median Absolute Deviation of the spectrum.
+        sigma (float): Threshold in terms of MAD for peak detection.
+        distance (int): Minimum distance between peaks.
+        wavelength (np.ndarray, optional): Wavelength array corresponding to the spectrum.
+    Returns:
+        np.ndarray: Array of fitted peak parameters.
+    """
     peaks, properties = find_peaks(baseline_subtrated, height=sigma * mad, distance=distance)
     print(f"Properties of detected peaks: {properties}")
     fitted_peaks = []
@@ -48,6 +59,18 @@ def fit_peaks_only(baseline_subtracted, input_spectrum, peak_indices, mean_sigma
     """
     Fit Gaussians to specified peak positions and build continuum axis
     using mirrored neighboring values for continuum replacement.
+
+    Args:
+        baseline_subtracted (np.ndarray): Baseline subtracted spectrum (1D array).
+        input_spectrum (np.ndarray): Original input spectrum (1D array).
+        peak_indices (list): List of peak indices to fit.
+        mean_sigma (float): Mean sigma value for fitting bounds.
+        std_sigma (float): Standard deviation of sigma for fitting bounds.
+        window (int): Window size around peak for fitting.
+        scale (float): Scale factor for determining continuum replacement region.
+    Returns:
+        list: List of fitted peak parameters.
+        np.ndarray: Continuum spectrum with peaks replaced.
     """
     baseline_subtracted = np.asarray(baseline_subtracted, dtype=float)
     fitted_peaks = []
@@ -107,7 +130,16 @@ def fit_peaks_only(baseline_subtracted, input_spectrum, peak_indices, mean_sigma
 
 
 def filter_clean_peaks(fitted_peaks):
-    """Keep only peaks with reasonable sigma based on bright subset."""
+    """
+    Keep only peaks with reasonable sigma based on bright subset.
+    
+    Args:
+        fitted_peaks (list): List of fitted peak parameters.
+    Returns:
+        list: Filtered list of fitted peak parameters.
+        float: Mean sigma of bright peaks.
+        float: Standard deviation of sigma of bright peaks.
+    """
     amplitudes = np.array([p['amplitude'] for p in fitted_peaks])
     sigmas = np.array([p['sigma'] for p in fitted_peaks])
     n_keep = max(1, len(amplitudes) // 5)

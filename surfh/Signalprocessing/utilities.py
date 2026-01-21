@@ -3,11 +3,27 @@ from einops import einsum, rearrange
 
 
 def mad_std(x):
-    """Robust standard deviation from Median Absolute Deviation (MAD)."""
+    """
+    Robust standard deviation from Median Absolute Deviation (MAD).
+    Follows the relation: std ≈ 1.4826 * MAD for normal distributions.
+
+    Args:
+        x (np.ndarray): Input array.
+    Returns:
+        float: Estimated standard deviation.
+    """
     return 1.4826 * np.nanmedian(np.abs(x - np.nanmedian(x)))
 
 def sliding_mad(x):
-    """Compute sliding MAD-based std over a 1D array."""
+    """
+    Compute sliding MAD-based std over a 1D array.
+
+
+    Args:
+        x (np.ndarray): Input array.
+    Returns:
+        np.ndarray: Computed sliding MAD-based std values.
+    """
     x = np.asarray(x, dtype=float)
     n = len(x)
     window = max(3, n // 10)
@@ -22,6 +38,16 @@ def sliding_mad(x):
 
 
 def partitioning_einops2(cube, di, dj):
+    """
+    Partition a cube into smaller blocks using einops. 
+
+    Args:
+        cube (np.ndarray): Input cube of shape (wl, H, W).
+        di (int): Decimation factor in the first spatial dimension.
+        dj (int): Decimation factor in the second spatial dimension.
+    Returns:
+        np.ndarray: Partitioned cube of shape (wl, dx, dy, h_block, w_block).
+    """
     new_cube = rearrange(
         cube, "wl (dx bx) (dy by) -> wl (dx dy) bx by", dx=di, dy=dj
     )

@@ -7,7 +7,16 @@ from surfh.Signalprocessing.model import gaussian
 # --- Line Extraction (1) ---
 # =========================================================
 def build_line_spectrum(baseline_subtrated, clean_peaks, scale=15):
-    """Extract line spectrum using real data around fitted peaks."""
+    """
+    Extract line spectrum using real data around fitted peaks.
+    
+    Args:
+        baseline_subtrated (np.ndarray): Baseline subtracted spectrum (1D array).
+        clean_peaks (list): List of fitted peak parameters.
+        scale (float): Scale factor for determining extraction window size.
+    Returns:
+        np.ndarray: Extracted line spectrum.
+    """
     line_spectrum = np.zeros_like(baseline_subtrated)
     for peak in clean_peaks:
         mu = int(round(peak['center']))

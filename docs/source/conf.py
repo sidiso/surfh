@@ -23,11 +23,14 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
+    "sphinx.ext.mathjax",
 ]
 
 templates_path = ['_templates']
-exclude_patterns = []
-
+exclude_patterns = [
+    "**/tests/*",
+    "**/scripts/*",
+]
 
 
 # -- Options for HTML output -------------------------------------------------

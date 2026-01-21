@@ -13,6 +13,19 @@ documentation for details.
 
 .. toctree::
    :maxdepth: 2
+   :caption: Documentation utilisateur
+
+   tutorials/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: API
+
+   modules
+
+
+.. toctree::
+   :maxdepth: 2
    :caption: Contents:
 
    modules

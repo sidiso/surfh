@@ -2,11 +2,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 
-def plot_cube(cube, wavelength_cube=None, title=None):
-    import numpy as np
-    import matplotlib.pyplot as plt
-    from matplotlib.widgets import Slider
+def plot_cube(cube, wavelength_cube=None, title=None, show=True):
+    """
+    Interactive visualization of a spectral cube with a slider to navigate through wavelength slices.
 
+    Args:
+        cube (np.ndarray): 3D array where each slice along the first axis is an image at a specific wavelength.
+        wavelength_cube (np.ndarray, optional): 1D array of wavelength values corresponding to each slice in the cube.
+        title (str, optional): Title for the plot.
+        show (bool, optional): Whether to display the plot immediately.
+    """
     if wavelength_cube is None:
         wavelength_cube = np.arange(cube.shape[0])
 
@@ -64,8 +69,9 @@ def plot_cube(cube, wavelength_cube=None, title=None):
 
     # Attach the update function to the slider
     slider.on_changed(update)
-
-    plt.show()
+    
+    if show:
+        plt.show()
 
 
 
@@ -74,9 +80,14 @@ def plot_cube(cube, wavelength_cube=None, title=None):
 def plot_two_cubes(cube_fusion, wavelength_fusion, cube_pipeline, wavelength_pipeline):
     
     """
-    Cube1 is the fusion cube.
-    Cube2 is the pipeline cube.
-    We took nearest slice of pipeline cube to match fusion cube.
+    Interactive visualization comparing two spectral cubes side by side with a slider to navigate through wavelength slices.
+
+    Args:
+        cube_fusion (np.ndarray): 3D array for the first cube where each slice along the first axis is an image at a specific wavelength.
+        wavelength_fusion (np.ndarray): 1D array of wavelength values corresponding to each slice in cube_fusion.
+        cube_pipeline (np.ndarray): 3D array for the second cube where each slice along the first axis is an image at a specific wavelength.
+        wavelength_pipeline (np.ndarray): 1D array of wavelength values corresponding to each slice in cube_pipeline.
+
     """
 
     # viz_pipeline_cube = np.empty_like(cube_fusion)
@@ -209,6 +220,14 @@ def plot_concatenated_cubes(cubes_list, wavelength_cubes_list):
 
 
 def plot_maps(estimated_maps):
+    """
+    Plot estimated Aboncancy maps.
+    
+    Args:
+        estimated_maps (np.ndarray): Array of shape (n_maps, H, W) containing the estimated maps.
+    """
+
+
     nrow = 2#estimated_maps.shape[0] // 2
     ncols = estimated_maps.shape[0] // 2
     plt.rcParams.update({
@@ -244,9 +263,10 @@ def plot_on_the_fly_cube_from_maps(maps, L_specs, wavelength_cube=None):
     """
     Visualisation interactive d'un cube spectral sans le construire en mémoire.
 
-    maps: np.array, shape (n_spec, H, W)
-    L_specs: np.array, shape (n_spec, n_lambda)
-    wavelength_cube: np.array, shape (n_lambda), optionnel
+    Args:
+        maps: np.array, shape (n_spec, H, W)
+        L_specs: np.array, shape (n_spec, n_lambda)
+        wavelength_cube: np.array, shape (n_lambda), optionnel
     """
     import numpy as np
     import matplotlib.pyplot as plt
