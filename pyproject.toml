@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "surfh"
-version = "1.0.0"
+version = "1.1.0"
 description = "SUper Resolution and Fusion for Hyperspectral images"
 authors = ["François Orieux <francois.orieux@universite-paris-saclay.fr>", "Ralph Abirizk  <ralph.abirizk@universite-paris-saclay.fr>", "Nicolas Monnier <nicolas.monnier@universite-paris-saclay.fr>"]
 maintainers = ["François Orieux <francois.orieux@universite-paris-saclay.fr>", "Nicolas Monnier <nicolas.monnier@universite-paris-saclay.fr>"]
@@ -21,7 +21,7 @@ include = ["LICENSE"]
 
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.12"
+python = ">=3.10,<4.0"
 numpy = ">=2.0,<3.0"
 aljabr = {git = "https://github.com/NicolasMonnier/aljabr.git", rev="update-numpy-version"}
 qmm = {git = "https://github.com/forieux/qmm.git"}
