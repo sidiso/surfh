@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import webbpsf
 from surfh.Simulation import simulation_data
 from surfh.Models import wavelength_mrs
+from astropy.io import fits
 
 
 
@@ -22,7 +23,7 @@ def compute_monochromatic_psfs2(wave_filter, oversample=4, pixelscale=0.11, fov_
     """
     miri = webbpsf.MIRI()
     miri.mode = 'IFU'
-    miri.band= '1C'
+    # miri.band= '1C'
     miri.pixelscale = pixelscale
     if date is not None:
         miri.load_wss_opd_by_date(date, plot=False, choice="closest")
@@ -50,23 +51,28 @@ def compute_monochromatic_psfs2(wave_filter, oversample=4, pixelscale=0.11, fov_
     return psfs_monoch
 
 
-sim_dir_path='/home/nmonnier/Projects/JWST/MRS/surfh/cube_orion/'
-# _, _, wavel_axis, _, _, _ = simulation_data.get_simulation_data(4, 0, sim_dir_path)
 
-wavel_axis = np.load('/home/nmonnier/Data/JWST/Orion_bar/Fusion/Templates/wavel_axis_orion_1ABC_2ABC_3ABC_4ABC_4_templates_SS4.npy') #wavelength_mrs.get_mrs_wavelength('1c')
+# array of wavelength 
+wavel_axis = np.load('/home/nmonnier/Data/JWST/NGC_7023/Fusion/Templates/wavel_axis_NGC7023_1ABC_2ABC_3ABC_4ABC.npy') #wavelength_mrs.get_mrs_wavelength('1c')
+# spectrums = fits.open("/home/nmonnier/Data/JWST/Simulation/Orion/Templates/spectra_mir_orion.fits")[1].data
+# wavel_axis = spectrums.wavelength
+# wavel_axis = wavel_axis[::4] # SS 
 
 oversample = 1
-pixelscale = 0.025 # valeur choisie pour le cas de test
-nb_pixels=501
+# Pixel scale
+pixelscale = 0.1 # valeur choisie pour le cas de test
+# Size of PSF in pixel (here 501x501)
+nb_pixels=212
 fov_arcsec = pixelscale * nb_pixels
 
 norm = 'last'
-date = "2023-01-30T01:16:11"
+# Time code of observation
+date = "2023-09-25T20:16:14"
 
 psfs_monoch = compute_monochromatic_psfs2(wavel_axis, oversample=oversample, pixelscale=pixelscale, fov_arcsec=fov_arcsec, norm=norm, date=date)
 
 psfs_monoch_array = np.array(psfs_monoch)
 
-file_path = "/home/nmonnier/Data/JWST/Orion_bar/Fusion/PSF/"
-file_name = f"psfs_pixscale{pixelscale}_npix_{nb_pixels}_fov{fov_arcsec}_chan_1ABC_2ABC_3ABC_4ABC_SS4.npy"
+file_path = "/home/nmonnier/Data/JWST/NGC_7023/Fusion/PSF/"
+file_name = f"psfs_pixscale{pixelscale}_npix_{nb_pixels}_chan_1ABC_2ABC_3ABC_4ABC.npy"
 np.save(file_path + file_name, psfs_monoch_array)

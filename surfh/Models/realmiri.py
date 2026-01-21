@@ -43,6 +43,9 @@ def get_IFU(filename, chan_name=None, wavel_from_file=False):
     """
     Return Instrumental IFU regarding metadata of the fits file.
     """
+    # DELETE This print statement
+    print("HEYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYy - In get_IFU. I don't want to be here")
+
     hdul = fits.open(filename)
     hdr = hdul[0].header
     targ_ra  = hdul[1].header['RA_V1']
@@ -138,6 +141,108 @@ def get_IFU(filename, chan_name=None, wavel_from_file=False):
                         wavel,
                         str(channel) + chr(65 + band),
                     ), targ_ra, targ_dec
+
+
+
+# def get_IFU(filename, chan_name=None, wavel_from_file=False):
+#     """
+#     Return Instrumental IFU regarding metadata of the fits file.
+#     """
+#     hdul = fits.open(filename)
+#     hdr = hdul[0].header
+#     # targ_ra  = hdul[0].header['RA_V1']
+#     # targ_dec = hdul[0].header['DEC_V1']
+
+
+#     rotation_ref = hdul[0].header['PA_V3']
+
+#     channel = chan_name
+
+#     if channel is None: # We can force a specific channel if mandatory
+#         channel = int(hdr['CHANNEL'])
+#     elif '1' in channel:
+#         channel = 1
+#     elif '2' in channel:
+#         channel = 2
+#     elif '3' in channel:
+#         channel = 3
+#     elif '4' in channel:
+#         channel = 4
+#     else:
+#         raise NameError(f"Wrong channel name : {channel}")
+
+#     chan_str = ''
+#     if channel == 1:
+#         slices = 21
+#         pix_size = 0.196
+#         alpha_width = 3.2/ARCSEC_TO_DEGREE
+#         beta_width = 3.7/ARCSEC_TO_DEGREE
+#         rotation = 8.4 + rotation_ref
+#         chan_str += '1'
+#     elif channel == 2:
+#         slices = 17
+#         pix_size = 0.196
+#         alpha_width = 4.0/ARCSEC_TO_DEGREE
+#         beta_width = 4.8/ARCSEC_TO_DEGREE
+#         rotation = 8.2 + rotation_ref
+#         chan_str += '2'
+#     elif channel == 3:
+#         slices = 16
+#         pix_size = 0.245
+#         alpha_width = 5.2/ARCSEC_TO_DEGREE
+#         beta_width = 6.2/ARCSEC_TO_DEGREE
+#         rotation = 7.5 + rotation_ref
+#         chan_str += '3'
+#     else:
+#         slices = 12
+#         pix_size = 0.273
+#         alpha_width = 6.6/ARCSEC_TO_DEGREE
+#         beta_width = 7.7/ARCSEC_TO_DEGREE
+#         rotation = 8.3 + rotation_ref
+#         chan_str += '4'
+
+#     if 'a' in chan_name:
+#         band = 0
+#         chan_str += 'a'
+#     elif 'b' in chan_name:
+#         band = 1
+#         chan_str += 'b'
+#     elif 'c' in chan_name:
+#         band = 2 
+#         chan_str += 'c'
+#     else:
+#         raise NameError(f"Wrong channel name : {channel}. No band specified.")
+
+#     spec_blur = instru.SpectralBlur(res[(channel-1)*3 + band])
+    
+
+#     hdr = hdul[0].header
+#     # targ_ra  = hdr['RA_V1'] 
+#     # targ_dec = hdr['DEC_V1']
+
+#     if wavel_from_file:
+#         wavel = (np.arange(hdr['NAXIS3']) +hdr['CRPIX3'] - 1) * hdr['CDELT3'] + hdr['CRVAL3']
+#     else:
+#         wavel = wavelength_mrs.get_mrs_wavelength(chan_str)
+
+#     if (str(channel) + chr(65 + band)) not in pce:
+#         pce[str(channel) + chr(65 + band)] = np.random.rand(wavel.size)/10 + 0.5
+#         #value_pce = np.ones_like(np.load(PCE_PATH + Path(filename).stem + '.pce.npy')) # As PCE is corrected in the pipeline (?), set to 1
+#         #pce[str(channel) + chr(65 + band)] = value_pce
+        
+
+#     hdul.close()
+#     return instru.IFU(
+#                         # ToChange
+#                         instru.FOV(alpha_width, beta_width, origin=instru.Coord(0, 0), angle=rotation),
+#                         # instru.FOV(alpha_width, beta_width, origin=instru.Coord(0,0), angle=rotation),
+#                         pix_size,#*3600,
+#                         slices,
+#                         spec_blur,
+#                         pce[str(channel) + chr(65 + band)],
+#                         wavel,
+#                         str(channel) + chr(65 + band),
+#                     ), 0, 0
  
 
 def get_IFU_from_corrected_data(filename, channel=None, wavel_from_file=False):

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "surfh"
-version = "1.0.0"
+version = "1.1.0"
 description = "SUper Resolution and Fusion for Hyperspectral images"
 authors = ["François Orieux <francois.orieux@universite-paris-saclay.fr>", "Ralph Abirizk  <ralph.abirizk@universite-paris-saclay.fr>", "Nicolas Monnier <nicolas.monnier@universite-paris-saclay.fr>"]
 maintainers = ["François Orieux <francois.orieux@universite-paris-saclay.fr>", "Nicolas Monnier <nicolas.monnier@universite-paris-saclay.fr>"]
@@ -21,26 +21,27 @@ include = ["LICENSE"]
 
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.12"
-aljabr = {git = "https://github.com/forieux/aljabr.git"}
-numpy = "^1.22.2"
+python = ">=3.10,<4.0"
+numpy = ">=2.0,<3.0"
+aljabr = {git = "https://github.com/NicolasMonnier/aljabr.git", rev="update-numpy-version"}
 qmm = {git = "https://github.com/forieux/qmm.git"}
-udft = "^3.4.0"
+udft = {git = "https://github.com/NicolasMonnier/udft.git", rev="update-numpy-version"}
 astropy = "6.1.3"
 loguru = "^0.6.0"
 matplotlib = "^3.5.1"
-xarray = "^0.21.1"
+xarray = "^2025.12.0"
 progressbar2 = "^4.2.0"
 cython = "^3.0.5"
 scipy = "^1.14.1"
-jax = "^0.4.32"
-jaxlib = "^0.4.32"
+jax = "^0.8.2"
+jaxlib = "^0.8.2"
 numba = "^0.60.0"
 asdf = "^3.4.0"
 scikit-learn = "^1.5.2"
 einops = "^0.8.0"
 pysptools = "^0.15.0"
 webbpsf = "^1.4.0"
+scikit-image = "^0.26.0"
 
 [tool.poetry.dev-dependencies]
 ipython = "^8.0.1"

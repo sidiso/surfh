@@ -5,15 +5,16 @@ import matplotlib.pyplot as plt
 
 import scipy as sp
 from scipy import misc
-from surfh.Models import slicer_new as slicer
+from surfh.Models import slicer
 from surfh.ToolsDir import jax_utils, python_utils, matrix_op ,cython_utils, utils, nearest_neighbor_interpolation
 from astropy import units as u
 from astropy.coordinates import Angle
 from numpy.random import standard_normal as randn 
 
 from surfh.Models import instru
-from surfh.DottestModels import MCMO_SigRLSCT_Channel_Model
+from surfh.Models import spectroModelChannel
 from math import ceil
+from scipy.ndimage import rotate
 
 
 from typing import List, Tuple
@@ -21,6 +22,8 @@ from numpy import ndarray as array
 
 import jax
 from functools import partial
+
+from line_profiler import profile
 
 """
 Multi-Observation Multi Channel for the spectro model :
@@ -122,7 +125,7 @@ class spectroSigRLSCT(LinOp):
                                             for idx, _ in enumerate(self.instrs)]
         
         self.channels = [
-            MCMO_SigRLSCT_Channel_Model.Channel(
+            spectroModelChannel.Channel(
                 instr,
                 alpha_axis,
                 beta_axis,
@@ -155,6 +158,7 @@ class spectroSigRLSCT(LinOp):
                     )  
         return wpsf
 
+    @profile
     def forward(self, maps):
         # T
         if self.lmm:
@@ -169,7 +173,7 @@ class spectroSigRLSCT(LinOp):
             out[self._idx[ch_idx] : self._idx[ch_idx + 1]] = chan.forward(blurred_cube)
         return out
    
-
+    @profile
     def adjoint(self, inarray: np.ndarray) -> np.ndarray:
         global_cube = np.zeros(self.cube_shape)
         for ch_idx, chan in enumerate(self.channels):
@@ -181,21 +185,17 @@ class spectroSigRLSCT(LinOp):
             maps = jax_utils.lmm_cube2maps(blurred_t_cube, self.templates).reshape(self.ishape)
         else:
             maps = blurred_t_cube
-
         return maps
+    
+    def fwadj(self, point: array) -> array:
+        """Apply `Aᴴ·A` operator."""
+        return self.adjoint(self.forward(point))
     
     def cubeTomaps(self, cube):
         return jax_utils.lmm_cube2maps(cube, self.templates)
     
     def mapsToCube(self, maps):
-        if True:
-            return matrix_op.linearMixingModel_maps2cube(maps, self.templates.shape[1], maps.shape, self.templates)
-            # return np.sum(
-            #                 np.expand_dims(maps, 1) * self.templates[..., np.newaxis, np.newaxis], axis=0
-            #             )
-
-        else:
-            return jax_utils.lmm_maps2cube(maps, self.templates)
+        return jax_utils.lmm_maps2cube(maps, self.templates)
 
 
     def project_FOV(self):
@@ -208,7 +208,6 @@ class spectroSigRLSCT(LinOp):
             plt.plot(alpha, beta, 'o', label='Reference')
 
             plt.legend()
-        plt.show()
         return
 
     def test_vizual_projection(self, data):
@@ -239,10 +238,12 @@ class spectroSigRLSCT(LinOp):
         return normalized_data
         
 
-    def plot_slice(self, all_data, n_chan, nslice):
+    def plot_slice(self, all_data, n_chan, nslice, dither=[0,1,2,3]):
 
         # Get shape of specific IFU band
         chan = self.channels[n_chan]
+        print(f"chan alpha axis : {chan.alpha_axis}")
+        print(f"chan beta axis : {chan.beta_axis}")
         # Get shape of output image
         global_img = np.zeros(self.imshape)
         cum_grid = np.zeros((len(self.pointings[n_chan]), self.imshape[0], self.imshape[1]))
@@ -252,6 +253,8 @@ class spectroSigRLSCT(LinOp):
         data = chan_data.reshape(chan.oshape)[:,:,nslice,:].ravel()
 
         for p_idx, pointing in enumerate(self.pointings[n_chan]):
+            if p_idx not in dither:
+                break
             local_img = np.zeros(chan.local_im_shape)
             for slit_idx in range(chan.instr.n_slit):
                 oversampled_sliced = np.repeat(
@@ -278,12 +281,136 @@ class spectroSigRLSCT(LinOp):
             degridded = chan.gridding_t(np.array(sum_t_img, dtype=np.float64), pointing)[0]
             global_img += degridded
             cum_grid[p_idx] = degridded
-        valid_counts = np.sum(cum_grid > 100, axis=0)
+        valid_counts = np.sum(cum_grid > 1, axis=0)
         sum_of_values = np.sum(cum_grid, axis=0)
         weighted_mean = np.divide(sum_of_values, valid_counts, where=valid_counts != 0)
-        
 
         return weighted_mean, global_img
+
+
+    def test_project_mrs_slice(self, all_data, n_chan, nslice, ndith=[0]):
+
+        # Get shape of specific IFU band
+        chan = self.channels[n_chan]
+        # Get shape of output image
+        global_img = np.zeros(self.imshape)
+        global_img2 = np.zeros(self.imshape)
+        cum_grid = np.zeros((len(self.pointings[n_chan]), self.imshape[0], self.imshape[1]))
+
+        # Select data for specific wavelength
+        chan_data = all_data[self._idx[n_chan] : self._idx[n_chan + 1]]
+        data = chan_data.reshape(chan.oshape)[:,:,nslice,:].ravel()
+        # fig, axes = plt.subplots(2, 2, figsize=(8, 8))
+        # axes = axes.flatten()  
+
+        Nx = Ny = 125
+        # Grille RA/DEC globale
+        print("spectroModel pointing is : ", self.pointings)
+        print(f'self.pointings[0].alpha = {self.pointings[0][0]}')
+        # RA_axis = self.pointings[0][0].alpha + (np.arange(Nx) - Nx // 2) * -self.step_degree
+        # DEC_axis = self.pointings[0][0].beta + (np.arange(Ny) - Ny // 2) * self.step_degree
+        # RA_axis = np.flip(self.alpha_axis)
+        RA_axis = self.alpha_axis
+        DEC_axis = self.beta_axis
+
+        RA_grid, DEC_grid = np.meshgrid(RA_axis, DEC_axis, indexing='xy')
+
+
+        cg = []
+        cg2 = []
+        # for p_idx, pointing in enumerate([self.pointings[n_chan][0]]):
+        # p_idx = 0
+        # pointing = self.pointings[n_chan][p_idx]
+        
+        for dith in ndith:
+            p_idx = dith
+            print(f"p_idx : {p_idx}")
+            pointing = self.pointings[n_chan][p_idx]
+            print(f"pointing alpha : {pointing.alpha}, beta : {pointing.beta}")
+            print("!!!!!!!!!!!!!!!!!!!!!!")
+            local_img = np.zeros(chan.local_im_shape)
+            for slit_idx in range(chan.instr.n_slit):
+                oversampled_sliced = np.repeat(
+                        np.expand_dims(
+                            np.reshape(data, 
+                                       chan.slices_shape)[p_idx, slit_idx],
+                            axis=1,
+                        ),
+                        chan.slicer.npix_slit_beta_width,
+                        axis=1,
+                    )/(chan.slicer.npix_slit_beta_width * chan.srf)
+                blurred_t_sliced = np.zeros((1, chan.slicer.get_slit_shape_t()[1], chan.slicer.get_slit_shape_t()[2]))
+                blurred_t_sliced[0,: chan.slices_shape[2] * chan.srf : chan.srf,:] = oversampled_sliced
+                local_img += chan.slicer.slicing_t(blurred_t_sliced, slit_idx, (1, chan.local_im_shape[0],chan.local_im_shape[1]))[0]
+                
+            sum_t_img = jax_utils.idft(jax_utils.dft(local_img) * chan._otf_sr.conj()*chan.decalf.conj(), 
+                                        chan.local_im_shape)
+
+            sum_t_img = np.array(sum_t_img)
+            sum_t_img[sum_t_img<1] = 0
+            # TODEL 
+            print("sum_t_img shape : ", sum_t_img.shape)
+            # sum_t_img[0] = np.rot90(sum_t_img[0], 2)
+
+            # plt.figure()  
+            # plt.imshow(sum_t_img[0], cmap='viridis')
+            # plt.colorbar()
+
+            # sum_t_img[:,5] = sum_t_img[:,6]
+            # sum_t_img[:,153] = sum_t_img[:,152]
+
+            # degridded = chan.gridding_t(np.array(sum_t_img, dtype=np.float64), pointing)[0]
+            
+            # axes[p_idx].imshow(np.rot90(rotate(np.array(sum_t_img[0], dtype=np.float64), chan.instr.fov.angle, reshape=True, order=1), -1), cmap='viridis')
+            # axes[p_idx].imshow(np.array(sum_t_img[0], dtype=np.float64), cmap='viridis')
+            # degridded = chan.test_project_mrsFov_to_specroFoV(np.array(sum_t_img, dtype=np.float64), pointing)
+            degridded = chan.project_MRS_on_global(
+                        MRSdata=np.array(((sum_t_img[0])), dtype=np.float64),
+                        RA0=pointing.alpha,
+                        DEC0=pointing.beta,
+                        angle_deg=chan.instr.fov.angle,
+                        RA_grid=RA_grid,
+                        DEC_grid=DEC_grid)   
+
+            degridded2 = chan.gridding_t(np.array(sum_t_img, dtype=np.float64), pointing)
+            
+            # plt.figure(figsize=(10, 10))
+            # plt.imshow(sum_t_img[0], cmap='viridis')
+            # plt.colorbar()
+            # plt.show()
+            # axes[p_idx].imshow(degridded, cmap='viridis', aspect='auto')
+            global_img += degridded
+            global_img2 += degridded2[0]
+
+            cum_grid[p_idx] = degridded
+            cg.append(np.ma.masked_less(degridded, 1))
+            cg2.append(np.ma.masked_less(degridded2[0], 1))
+
+        #     im = axes[p_idx].imshow(degridded, origin='lower', extent=[
+        #     ], cmap='viridis')
+        #     # Inverser l'axe RA pour correspondre à la convention astronomique
+        # # plt.gca().invert_xaxis()
+
+        # # Ajouter des labels et une barre de couleur
+
+        # plt.tight_layout()
+        # plt.show()
+        # valid_counts = np.sum(cum_grid > 2, axis=0)
+        # sum_of_values = np.sum(cum_grid, axis=0)
+        # weighted_mean = np.divide(sum_of_values, valid_counts, where=valid_counts != 0)
+        # weighted_mean = np.nan_to_num(weighted_mean, nan=0)
+
+
+
+        return np.ma.mean(cg, axis=0), global_img, np.ma.mean(cg2, axis=0)
+
+
+    def all_slice_to_cube(self, all_data, ndith=[0]):
+        list_cube = list()
+        for ch_idx, chan in enumerate(self.channels):
+            list_cube.append(chan.multi_dith_sliceToCube(all_data[self._idx[ch_idx] : self._idx[ch_idx + 1]],))
+
+        return np.vstack(list_cube), list_cube
 
 
     def make_mask(self, all_data):
@@ -292,17 +419,15 @@ class spectroSigRLSCT(LinOp):
         """
         nslice = 50
         masks = list()
-        for i in range(4): # Considering 4 channels
-            ch = i*3
-            chan = self.channels[ch]
+        for ch_idx, chan in enumerate(self.channels): # Considering 4 channels
             global_img = np.zeros(self.imshape)
-            cum_grid = np.zeros((len(self.pointings[ch]), self.imshape[0], self.imshape[1]))
+            cum_grid = np.zeros((len(self.pointings[ch_idx]), self.imshape[0], self.imshape[1]))
 
             # Select data for specific wavelength
-            chan_data = all_data[self._idx[ch] : self._idx[ch + 1]]
+            chan_data = all_data[self._idx[ch_idx] : self._idx[ch_idx + 1]]
             data = chan_data.reshape(chan.oshape)[:,:,nslice,:].ravel()
 
-            for p_idx, pointing in enumerate(self.pointings[ch]):
+            for p_idx, pointing in enumerate(self.pointings[ch_idx]):
                 local_img = np.zeros(chan.local_im_shape)
                 for slit_idx in range(chan.instr.n_slit):
                     oversampled_sliced = np.repeat(
@@ -326,13 +451,23 @@ class spectroSigRLSCT(LinOp):
                 # sum_t_img[:,5] = sum_t_img[:,6]
                 # sum_t_img[:,153] = sum_t_img[:,152]
 
-                degridded = chan.gridding_t(np.array(sum_t_img, dtype=np.float64), pointing)[0]
+                degridded = chan.old_gridding_t(np.array(sum_t_img, dtype=np.float64), pointing)[0]
                 global_img += degridded
                 cum_grid[p_idx] = degridded
-            valid_counts = np.sum(cum_grid > 100, axis=0)
-            sum_of_values = np.sum(cum_grid, axis=0)
-            weighted_mean = np.divide(sum_of_values, valid_counts, where=valid_counts != 0)
 
-            binary_mask = global_img > 50
+            binary_mask = global_img > 5
             masks.append(binary_mask)
         return masks
+    
+
+    def get_list_of_data(self, all_data):
+        list_data = list()
+        for ch_idx, chan in enumerate(self.channels):
+            chan_data = all_data[self._idx[ch_idx] : self._idx[ch_idx + 1]]
+            data = chan_data.reshape(chan.oshape)
+            list_data.append(data)
+        return list_data
+    
+
+    def print_MRS_Model_info(self):
+        print(f"Bands for MRS Model : {[instr for it, (srf, instr) in enumerate(zip(self.srfs, self.instrs))]}")

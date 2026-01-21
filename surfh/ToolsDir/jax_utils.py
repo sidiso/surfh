@@ -79,6 +79,10 @@ def wblur_subSampling(arr, wpsf):
             axis=1,
         ), axis=2)
 
+@jax.jit
+def batched_wblur(sliced_batch, wpsf):
+    # vmapping the jax_utils.wblur_subSampling across axis 0
+    return jax.vmap(lambda s: wblur_subSampling(s, wpsf), in_axes=0, out_axes=0)(sliced_batch)
 
 @jit
 def wblur_t(arr, wpsf):

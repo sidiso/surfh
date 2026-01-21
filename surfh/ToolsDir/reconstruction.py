@@ -1,0 +1,331 @@
+import pathlib
+import numpy as np
+import matplotlib.pyplot as plt
+
+from surfh.Simulation.fusion_CT import QuadCriterion_MRS
+from surfh.Algorithm.criterion_spectroImageur import QuadCriterion_spectroImageur
+from surfh.Vizualisation import cube_vizualisation
+from surfh.ToolsDir.fits_toolbox import save_numpy_to_fits, save_mirim_to_fits
+
+import astropy.io.fits as fits
+
+
+# Main function to execute the reconstruction method
+def reconstruction_method(MRSModel, ndata, templates, result_path, hyperParameter, niter, method, scale_data, data_dict):
+    """
+    Perform the reconstruction method and save results.
+
+    Parameters:
+        spectroModel: Spectro model object
+        ndata: Data array
+        templates: Templates array
+        pointings: Pointings data
+        result_path: Path to save results
+        wavel_axis: Wavelength axis array
+    """
+    # Hyperparameters
+    # hyperParameter = 5e3
+    # method = "lcg"
+    # niter = 50
+    value_init = 0
+
+    # Create result directory
+    if templates is None:
+        shape_templates = 'None'
+    else:
+        shape_templates = templates.shape[0]
+    result_dir = f'{method}_MC_{len(MRSModel.instrs)}_MO_4_Temp_{shape_templates}_nit_{str(niter)}_mu_{str("{:.2e}".format(hyperParameter))}_SD_{scale_data}/'
+    path = pathlib.Path(result_path + result_dir)
+    path.mkdir(parents=True, exist_ok=True)
+
+    # QuadCriterion initialization
+    quadCrit_fusion = QuadCriterion_MRS(
+        mu_spectro=1,
+        y_spectro=np.copy(ndata),
+        model_spectro=MRSModel,
+        mu_reg=hyperParameter,
+        printing=True,
+        gradient="separated"
+    )
+
+    # Run the method
+    res_fusion = quadCrit_fusion.run_method(method, niter, perf_crit=1, calc_crit=True, value_init=value_init)
+
+    metadata = {'PA_V3': data_dict['PA_V3']['1c'], 
+                'TARG_RA': data_dict['target']['1c'][0], 'TARG_DEC':data_dict['target']['1c'][1], 
+                'RA_V1': data_dict['targetV1']['1c'][0], 'DEC_V1': data_dict['targetV1']['1c'][1], 
+                'RA_REF': data_dict['targetREF']['1c'][0], 'DEC_REF': data_dict['targetREF']['1c'][1],
+                'ALPHA_AXIS':MRSModel.alpha_axis, 'BETA_AXIS':MRSModel.beta_axis, 'WAVELENGTH': MRSModel.wavelength_axis}
+    for key in metadata.keys():
+        print(f"{key}: {metadata[key]}")
+
+    if templates is None:
+        print("No templates")
+        print(f"Results save in {path}")
+        # np.save(path / 'res_cube.npy', res_fusion.x)
+        save_numpy_to_fits(np.array(res_fusion.x), metadata, path /'res_cube.fits')
+        np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
+    else:
+        # Convert maps to cube
+        y_cube = MRSModel.mapsToCube(res_fusion.x)
+
+        # Save results
+        print(f"Results save in {path}")
+        np.save(path / 'res_x.npy', res_fusion.x)
+        # np.save(path / 'res_cube.npy', y_cube)
+        save_numpy_to_fits(np.array(y_cube), metadata, path/'res_cube.fits')
+        np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
+        np.save(path / 'wavel.npy', MRSModel.wavelength_axis)
+
+def reconstruction_MRS_fusion(MRSModel, ndata, templates, config, scale_data, data_dict, masks=None):
+    """
+    Perform the reconstruction method and save results.
+
+    Parameters:
+        MRSModel: Spectro model object
+        y_mrs: MRS Data array
+        templates: Templates array
+        config: Configuration object
+        scale_data: Scale data parameter
+        data_dict: Data dictionary
+        masks: Optional masks for saving results
+    """
+    value_init = 0
+    print(f"Mu = {config.reconstruction.mu}")
+    print(f"Type of Mu = {type(config.reconstruction.mu)}")
+    # Create result directory
+    if templates is None:
+        shape_templates = 'None'
+    else:
+        shape_templates = templates.shape[0]
+    result_dir = f'{config.reconstruction.method}_MC_{len(MRSModel.instrs)}_MO_4_Temp_{shape_templates}_nit_{str(config.reconstruction.max_iter)}_mu_{float(config.reconstruction.mu):.2e}_SD_{scale_data}/'
+    print(f"Result path = {config.configuration.result_dir }")
+    print(f"Result dir = {result_dir }")
+
+    path = pathlib.Path(config.configuration.result_dir / result_dir)
+    path.mkdir(parents=True, exist_ok=True)
+
+    # QuadCriterion initialization
+    quadCrit_fusion = QuadCriterion_MRS(
+        mu_spectro=1,
+        y_spectro=np.copy(ndata),
+        model_spectro=MRSModel,
+        mu_reg=config.reconstruction.mu,
+        printing=True,
+        gradient="separated"
+    )
+
+    # Run the method
+    res_fusion = quadCrit_fusion.run_method(config.reconstruction.method, config.reconstruction.max_iter, perf_crit=1, calc_crit=True, value_init=value_init)
+
+    metadata = {'PA_V3': data_dict['PA_V3']['1c'], 
+                'TARG_RA': data_dict['target']['1c'][0], 'TARG_DEC':data_dict['target']['1c'][1], 
+                'RA_V1': data_dict['targetV1']['1c'][0], 'DEC_V1': data_dict['targetV1']['1c'][1], 
+                'RA_REF': data_dict['targetREF']['1c'][0], 'DEC_REF': data_dict['targetREF']['1c'][1],
+                'ALPHA_AXIS':MRSModel.alpha_axis, 'BETA_AXIS':MRSModel.beta_axis, 'WAVELENGTH': MRSModel.wavelength_axis}
+
+    if templates is None:
+        print("No templates")
+        print(f"Results save in {path}")
+        save_numpy_to_fits(np.array(res_fusion.x), metadata, path /'res_cube.fits', masks)
+        np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
+    else:
+        # Convert maps to cube
+        y_cube = MRSModel.mapsToCube(res_fusion.x)
+        # Save results
+        print(f"Results save in {path}")
+        np.save(path / 'res_x.npy', res_fusion.x)
+        save_numpy_to_fits(np.array(y_cube), metadata, path/'res_cube.fits', masks)
+        np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
+        np.save(path / 'wavel.npy', MRSModel.wavelength_axis)
+
+def reconstruction_MIRIM_fusion(MIRIMModel, y_mirim, templates, config, scale_data):
+    """
+    Perform the reconstruction method and save results.
+
+    Parameters:
+        MRSModel: Spectro model object
+        y_mrs: MRS Data array
+        templates: Templates array
+        config: Configuration object
+        scale_data: Scale data parameter
+        data_dict: Data dictionary
+        masks: Optional masks for saving results
+    """
+    value_init = 0
+    print(f"Mu = {config.reconstruction.mu}")
+    print(f"Type of Mu = {type(config.reconstruction.mu)}")
+    # Create result directory
+    if templates is None:
+        shape_templates = 'None'
+    else:
+        shape_templates = templates.shape[0]
+    result_dir = f'MIRIM_{config.reconstruction.method}_Temp_{shape_templates}_nit_{str(config.reconstruction.max_iter)}_mu_{float(config.reconstruction.mu):.2e}_SD_{scale_data}/'
+    print(f"Result path = {config.configuration.result_dir }")
+    print(f"Result dir = {result_dir }")
+
+    path = pathlib.Path(config.configuration.result_dir / result_dir)
+    path.mkdir(parents=True, exist_ok=True)
+
+    # QuadCriterion initialization
+    quadCrit_fusion = QuadCriterion_MRS(
+        mu_spectro=1,
+        y_spectro=np.copy(y_mirim),
+        model_spectro=MIRIMModel,
+        mu_reg=config.reconstruction.mu,
+        printing=True,
+        gradient="separated"
+    )
+
+    # Run the method
+    res_fusion = quadCrit_fusion.run_method(config.reconstruction.method, config.reconstruction.max_iter, perf_crit=1, calc_crit=True, value_init=value_init)
+
+
+
+    def save_fits_cube(output_path, data, header):
+        hdu = fits.PrimaryHDU(data=data)
+        header = hdu.header
+
+        header['NAXIS']  = 3
+        header['NAXIS1'] = data.shape[2]  # X
+        header['NAXIS2'] = data.shape[1]  # Y
+        header['NAXIS3'] = data.shape[0]  # lambda
+        header['NWAVEL']   = data.shape[0]
+
+        # header['CUNIT3'] = 'um'
+
+        # dw = np.mean(np.diff(MIRIMModel.lamb_cube))
+        # # header['CTYPE3'] = 'WAVE'
+        # header['CRVAL3'] = MIRIMModel.lamb_cube[0]
+        # header['CDELT3'] = dw
+        # header['CRPIX3'] = 1
+        # header['CTYPE3'] = 'WAVE-TAB'
+        # header['PS3_0']  = 'WCS-TABLE'
+        # header['PS3_1']  = 'wavelength'
+        # hdu = fits.ImageHDU(data=data, header=header)
+        # # hdul_out = fits.HDUList([fits.PrimaryHDU(), hdu])
+  
+        # # --- Table WCS-TABLE contenant le vecteur des longueurs d’onde ---
+        # col = fits.Column(name='wavelength', format=f'{len(MIRIMModel.lamb_cube)}E', dim=f'({len(MIRIMModel.lamb_cube)})', array=[MIRIMModel.lamb_cube])
+        # wcstable_hdu = fits.BinTableHDU.from_columns([col])
+        # wcstable_hdu.header['EXTNAME'] = 'WCS-TABLE'
+        
+        # primary = fits.PrimaryHDU()
+        # primary.header['EXTEND'] = True
+
+        # --- Axe spectral (approx linéaire) ---
+        dw = np.mean(np.diff(MIRIMModel.lamb_cube))
+        header['CTYPE3'] = 'WAVE'
+        header['CUNIT3'] = 'um'
+        header['CRVAL3'] = MIRIMModel.lamb_cube[0]
+        header['CDELT3'] = dw
+        header['CRPIX3'] = 1
+
+        # --- Table WCS-TABLE contenant le vecteur des longueurs d’onde ---
+        col = fits.Column(name='wavelength', format=f'{len(MIRIMModel.lamb_cube)}E', dim=f'({len(MIRIMModel.lamb_cube)})', array=[MIRIMModel.lamb_cube])
+        wcstable_hdu = fits.BinTableHDU.from_columns([col])
+        wcstable_hdu.header['EXTNAME'] = 'WCS-TABLE'
+
+
+
+        hdul = fits.HDUList([hdu, wcstable_hdu])
+        hdul.writeto(output_path, overwrite=True)
+
+
+
+
+    if templates is None:
+        print("No templates")
+        print(f"Results save in {path}")
+        save_mirim_to_fits(np.array(res_fusion.x), path /'res_cube.fits')
+        np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
+    else:
+        # Convert maps to cube
+        # y_cube = MIRIMModel.mapsToCube(res_fusion.x)
+        y_cube = np.zeros((templates.shape[1], MIRIMModel.shape_target[0], MIRIMModel.shape_target[1]))
+        for i in range(templates.shape[1]):
+            y_cube[i] = np.tensordot(MIRIMModel.L_specs[:, i], res_fusion.x, axes=(0, 0))
+
+        # Save results
+        print(f"Results save in {path}")
+        np.save(path / 'res_x.npy', res_fusion.x)
+        # save_mirim_to_fits(np.array(y_cube), path/'res_cube.fits')
+        with fits.open('/home/nmonnier/Data/JWST/NGC_7023/Fusion/Corrected_MIRIM/large_FoV/Level3_F1000W_i2d_aligned.fits') as hdul:
+            header = hdul[1].header
+        save_fits_cube(path/'res_cube.fits', y_cube, header)
+        np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
+        return res_fusion.x, None#y_cube
+
+
+def reconstruction_MIRIM_MRS_method(MRSModel, y_mrs, MIRIMModel, y_mirim, templates, config, scale_data, data_dict, masks=None):
+    """
+    Perform the reconstruction method and save results.
+
+    Parameters:
+        MRSModel: Spectro model object
+        y_mrs: MRS Data array
+        MIRIMModel: Imager model object
+        y_mirim: Imager data array
+        templates: Templates array
+        config: Configuration object
+        scale_data: Scale data parameter
+        data_dict: Data dictionary
+        masks: Optional masks for saving results
+    """
+    value_init = 0
+    print(f"Mu = {config.reconstruction.mu}")
+    print(f"Type of Mu = {type(config.reconstruction.mu)}")
+
+    # Create result directory
+    if templates is None:
+        shape_templates = 'None'
+    else:
+        shape_templates = templates.shape[0]
+        
+    result_dir = f'MIRIM_MRS_{config.reconstruction.method}_MC_{len(MRSModel.instrs)}_MO_4_Temp_{shape_templates}_nit_{str(config.reconstruction.max_iter)}_mu_{float(config.reconstruction.mu):.2e}_SD_{scale_data}/'
+    print(f"Result path = {config.configuration.result_dir }")
+    print(f"Result dir = {result_dir }")
+
+    path = pathlib.Path(config.configuration.result_dir / result_dir)
+    path.mkdir(parents=True, exist_ok=True)
+
+    # QuadCriterion initialization
+    quadCrit_fusion = QuadCriterion_spectroImageur(
+        mu_imager=0.99,
+        y_imager=y_mirim,
+        model_imager=MIRIMModel,
+        mu_spectro=0.01,
+        y_spectro=np.copy(y_mrs),
+        model_spectro=MRSModel,
+        mu_reg=config.reconstruction.mu,
+        printing=True,
+        gradient="separated"
+    )
+
+    # Run the method
+    res_fusion = quadCrit_fusion.run_lcg(config.reconstruction.max_iter, perf_crit=1, calc_crit=True, value_init=value_init)
+
+    metadata = {'PA_V3': data_dict['PA_V3']['1c'], 
+                'TARG_RA': data_dict['target']['1c'][0], 'TARG_DEC':data_dict['target']['1c'][1], 
+                'RA_V1': data_dict['targetV1']['1c'][0], 'DEC_V1': data_dict['targetV1']['1c'][1], 
+                'RA_REF': data_dict['targetREF']['1c'][0], 'DEC_REF': data_dict['targetREF']['1c'][1],
+                'ALPHA_AXIS':MRSModel.alpha_axis, 'BETA_AXIS':MRSModel.beta_axis, 'WAVELENGTH': MRSModel.wavelength_axis}
+    
+    if templates is None:
+        print("No templates")
+        print(f"Results save in {path}")
+        save_numpy_to_fits(np.array(res_fusion.x), metadata, path /'res_cube.fits', masks)
+        np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
+    else:
+        # Convert maps to cube
+        y_cube = MRSModel.mapsToCube(res_fusion.x)
+        # Save results
+        print(f"Results save in {path}")
+        np.save(path / 'res_x.npy', res_fusion.x)
+        save_numpy_to_fits(np.array(y_cube), metadata, path/'res_cube.fits', masks)
+        np.save(path / 'criterion.npy', quadCrit_fusion.L_crit_val)
+        np.save(path / 'wavel.npy', MRSModel.wavelength_axis)
+
+
+
+

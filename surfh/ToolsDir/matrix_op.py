@@ -22,7 +22,7 @@ from numpy import ndarray as array
 from numba import njit, prange
 
 from surfh.Models import instru
-from surfh.ToolsDir import cythons_files
+# from surfh.ToolsDir import cythons_files
 from surfh.Others.AsyncProcessPoolLight import APPL
 
 
@@ -86,49 +86,49 @@ def fov_weight(
 
     return weights
 
-def wblur(arr: array, wpsf: array, num_threads: int) -> array:
-    """Apply blurring in λ axis
+# def wblur(arr: array, wpsf: array, num_threads: int) -> array:
+#     """Apply blurring in λ axis
 
-    Parameters
-    ----------
-    arr: array-like
-      Input of shape [λ, α, β].
-    wpsf: array-like
-      Wavelength PSF of shape [λ', λ, β]
+#     Parameters
+#     ----------
+#     arr: array-like
+#       Input of shape [λ, α, β].
+#     wpsf: array-like
+#       Wavelength PSF of shape [λ', λ, β]
 
-    Returns
-    -------
-    out: array-like
-      A wavelength blurred array in [λ', α, β].
-    """
-    # [λ', α, β] = ∑_λ arr[λ, α, β] wpsf[λ', λ, β]
-    # Σ_λ
-    #arr = np.moveaxis(arr, 0, -1)
-    result_array = cythons_files.c_wblur(np.ascontiguousarray(arr), 
-                                         np.ascontiguousarray(wpsf), 
-                                         wpsf.shape[1], arr.shape[1], 
-                                         arr.shape[2], wpsf.shape[0],
-                                         num_threads)
-    return result_array
+#     Returns
+#     -------
+#     out: array-like
+#       A wavelength blurred array in [λ', α, β].
+#     """
+#     # [λ', α, β] = ∑_λ arr[λ, α, β] wpsf[λ', λ, β]
+#     # Σ_λ
+#     #arr = np.moveaxis(arr, 0, -1)
+#     result_array = cythons_files.c_wblur(np.ascontiguousarray(arr), 
+#                                          np.ascontiguousarray(wpsf), 
+#                                          wpsf.shape[1], arr.shape[1], 
+#                                          arr.shape[2], wpsf.shape[0],
+#                                          num_threads)
+#     return result_array
 
-def cubeToSlice(arr: array, dirac: array, num_threads: int) -> array:
-    """Apply transpose of blurring in λ axis
+# def cubeToSlice(arr: array, dirac: array, num_threads: int) -> array:
+#     """Apply transpose of blurring in λ axis
 
-    Parameters
-    ----------
-    arr: array-like
-      Input of shape [λ', α, β].
-    Returns
-    -------
-    out: array-like
-      A wavelength blurred array in [λ, α, β].
-    """
-    # [λ, α, β] = ∑_λ' arr[λ', α, β]
-    # Σ_λ'
-    result_array = cythons_files.c_cubeToSlice(arr, dirac, dirac.shape[1],
-                                         arr.shape[1], arr.shape[2], 
-                                         dirac.shape[0], num_threads)
-    return result_array
+#     Parameters
+#     ----------
+#     arr: array-like
+#       Input of shape [λ', α, β].
+#     Returns
+#     -------
+#     out: array-like
+#       A wavelength blurred array in [λ, α, β].
+#     """
+#     # [λ, α, β] = ∑_λ' arr[λ', α, β]
+#     # Σ_λ'
+#     result_array = cythons_files.c_cubeToSlice(arr, dirac, dirac.shape[1],
+#                                          arr.shape[1], arr.shape[2], 
+#                                          dirac.shape[0], num_threads)
+#     return result_array
 
 # def wblur_t(arr: array, wpsf: array, num_threads: int) -> array:
 #     """Apply transpose of blurring in λ axis
@@ -154,24 +154,24 @@ def cubeToSlice(arr: array, dirac: array, num_threads: int) -> array:
 
 
 
-def sliceToCube_t(arr: array, dirac: array, num_threads: int) -> array:
-    """Apply transpose of blurring in λ axis
+# def sliceToCube_t(arr: array, dirac: array, num_threads: int) -> array:
+#     """Apply transpose of blurring in λ axis
 
-    Parameters
-    ----------
-    arr: array-like
-      Input of shape [λ', α, β].
-    Returns
-    -------
-    out: array-like
-      A wavelength blurred array in [λ, α, β].
-    """
-    # [λ, α, β] = ∑_λ' arr[λ', α, β]
-    # Σ_λ'
-    result_array = cythons_files.c_sliceToCube_t(arr, dirac, dirac.shape[1], 
-                                           arr.shape[1], arr.shape[2], 
-                                           dirac.shape[0], num_threads)
-    return result_array
+#     Parameters
+#     ----------
+#     arr: array-like
+#       Input of shape [λ', α, β].
+#     Returns
+#     -------
+#     out: array-like
+#       A wavelength blurred array in [λ, α, β].
+#     """
+#     # [λ, α, β] = ∑_λ' arr[λ', α, β]
+#     # Σ_λ'
+#     result_array = cythons_files.c_sliceToCube_t(arr, dirac, dirac.shape[1], 
+#                                            arr.shape[1], arr.shape[2], 
+#                                            dirac.shape[0], num_threads)
+#     return result_array
 
 
 def diffracted_psf(template, spsf, wpsf) -> List[array]:
@@ -195,11 +195,18 @@ def diffracted_psf(template, spsf, wpsf) -> List[array]:
     return wblur(weighted_psf, wpsf)
 
 
-def linearMixingModel_maps2cube(maps, NLambda, ishape, tpls):
-    cube = cythons_files.c_fast_LMM_maps2cube(NLambda,ishape[0], 
-                                              ishape[1], ishape[2],
-                                              tpls.astype(np.float32), maps.astype(np.float32))
-    return np.array(cube)
+# def linearMixingModel_maps2cube(maps, NLambda, ishape, tpls):
+#     cube = cythons_files.c_fast_LMM_maps2cube(NLambda,ishape[0], 
+#                                               ishape[1], ishape[2],
+#                                               tpls.astype(np.float32), maps.astype(np.float32))
+#     return np.array(cube)
+
+def lmm_maps2cube(maps, tpls):
+    cube = np.sum(
+            np.expand_dims(maps, 1) * tpls[..., np.newaxis, np.newaxis], axis=0
+        )
+    return cube
+
 
 @njit(parallel=True)
 def linearMixingModel_cube2maps(cube, NLambda, ishape, tpls):
@@ -266,3 +273,103 @@ def wblur_t(arr, wpsf):
                     result[l, a, b] += arr[l_p, a, b] * wpsf[l_p, l, b]
     
     return result
+
+
+import numpy as np
+from numba import njit, prange
+@njit(parallel=True)
+def wblur_t_numba(arr, wpsf):
+    Lp, alpha, beta = arr.shape
+    L = wpsf.shape[1]
+    out = np.zeros((L, alpha, beta), dtype=np.float64)
+
+    for l in prange(L):           # boucle sur lambda
+        for lp in range(Lp):      # boucle sur lambda'
+            for i in range(alpha):
+                for j in range(beta):
+                    out[l, i, j] += arr[lp, i, j] * wpsf[lp, l, j]
+    return out
+
+@njit(parallel=True, fastmath=True)
+def wblur_t_numba_opti(arr, wpsf):
+    """
+    arr : [λ', α, β]
+    wpsf: [λ', λ, β]
+    output: [λ, α, β]
+    """
+    Lp, alpha, beta = arr.shape
+    L = wpsf.shape[1]
+    out = np.zeros((L, alpha, beta), dtype=np.float64)
+
+    # boucle sur la longueur de sortie λ
+    for l in prange(L):
+        for lp in range(Lp):
+            for i in range(alpha):
+                for j in range(beta):
+                    out[l, i, j] += arr[lp, i, j] * wpsf[lp, l, j]
+
+    return out
+
+
+@njit(parallel=True, fastmath=True)
+def wblur_t_numba_super_opti(arr, wpsf, out):
+    Lp, alpha, beta = arr.shape
+    L = wpsf.shape[1]
+
+    for l in prange(L):
+        for lp in range(Lp):
+            a = arr[lp]        # (alpha, beta)
+            w = wpsf[lp, l]    # (beta,)
+            for i in range(alpha):
+                ai = a[i]
+                for j in range(beta):
+                    out[l, i, j] += ai[j] * w[j]
+
+def wblur_blas(arr, wpsf, out=None):
+    """
+    arr  : (Lp, alpha, beta)
+    wpsf : (Lp, L,     beta)
+    out  : (L,  alpha, beta)
+    """
+    Lp, alpha, beta = arr.shape
+    L = wpsf.shape[1]
+
+    if out is None:
+        out = np.empty((L, alpha, beta), dtype=arr.dtype)
+
+    # vue matricielle pour BLAS
+    for j in range(beta):
+        # A = (L, Lp) ; B = (Lp, alpha)
+        A = wpsf[:, :, j].T     # BLAS sees (L, Lp)
+        B = arr[:, :, j]        # (Lp, alpha)
+
+        # BLAS GEMM : C = A @ B
+        out[:, :, j] = A @ B    # calls DGEMM
+
+    return out
+
+
+def wblur_blas_opt(arr, wpsf, out=None):
+    """
+    arr  : (Lp, alpha, beta)
+    wpsf : (Lp, L,     beta)
+    out  : (L,  alpha, beta)
+    beta  = 2
+    """
+    # ⚠ Forcer contigu
+    Lp, alpha, beta = arr.shape
+    L = wpsf.shape[1]
+
+    # On fait un GEMM pour chaque valeur de beta
+    for j in range(beta):
+        # A = (L, Lp), B = (Lp, alpha) → C = (L, alpha)
+        out[:, :, j] = wpsf[:, :, j].T @ arr[:, :, j]
+
+
+@njit(parallel=True, fastmath=True)
+def add_cube(inter_cube, degridded):
+    L, A, B = inter_cube.shape
+    for l in prange(L):
+        for i in range(A):
+            for j in range(B):
+                inter_cube[l, i, j] += degridded[l, i, j]
