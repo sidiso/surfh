@@ -292,7 +292,7 @@ def load_miri_simulation_data(config: Config):
 
     # Select PSF regarding list_filter
     indexes = [i for i, val in enumerate(ref_list_filter) if val in config.MIRIM.list_filters]
-    otf = otf[:len(wavelength)]
+    # otf = otf[:len(wavelength)]
     # sotf = udft.ir2fr(otf, imshape)
 
     # Load PCE -- Don't deal with other multiple wavel now
@@ -301,7 +301,7 @@ def load_miri_simulation_data(config: Config):
         print(f'Load PCE file for from file {file} ')
         list_pce.append(np.load(config.configuration.pce_dir/file)[0])
     pce = np.array(list_pce)
-    pce = pce[indexes, :len(wavelength)]
+    # pce = pce[indexes, :len(wavelength)]
 
     try:
         H_freq = np.load(config.configuration.template_dir/config.MIRIM.H_freq)

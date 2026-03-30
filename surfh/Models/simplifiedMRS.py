@@ -126,11 +126,28 @@ class Spectro_Model_3(LinOp):
         # print("2 x H_spec_freq enlevés !!")
         
         start = time.time()
-        self.H_spec_freq = self.make_H_spec_freq_sum2(
+        print(f'Shape for things needed for H_spec_freq: psfs_monoch {psfs_monoch.shape}, L_pce {L_pce.shape}, lamb_cube {lamb_cube.shape}, L_specs {L_specs.shape}, shape_target {shape_target}, di {di}, dj {dj}')
+        self.H_spec_freq = self.make_H_spec_freq_sum2_safe(
             psfs_monoch, L_pce, lamb_cube, L_specs, shape_target, di, dj
-        ) * rdft2(decal)[np.newaxis, np.newaxis, :, :]
-        end = time.time()
+        ) 
+        print("Step 4")
+        kernel = rdft2(decal)[np.newaxis, np.newaxis, :, :]
+        self.H_spec_freq *= kernel
+
+        # self.H_spec_freq = self.H_spec_freq* rdft2(decal)[np.newaxis, np.newaxis, :, :]
+        print("Step 5")
+
+        # self.H_spec_freq = self.make_H_spec_freq_sum2(
+        #     psfs_monoch, L_pce, lamb_cube, L_specs, shape_target, di, dj
+        # ) * rdft2(decal)[np.newaxis, np.newaxis, :, :]
+        # end = time.time()
         print(f"Time to create H_spec_freq: {end - start} seconds")
+        # print(f"Are H_spec_freq and H_spec_freq2 close? {np.allclose(self.H_spec_freq, self.H_spec_freq2)}")
+        # diff = np.max(np.abs(self.H_spec_freq - self.H_spec_freq2))
+        # ref  = np.max(np.abs(self.H_spec_freq))
+
+        # print("max abs diff :", diff)
+        # print("relative err :", diff / ref)
 
         # # utile pour forward_freq_to_freq et forward_freq_to_real
         # start = time.time()
@@ -211,9 +228,16 @@ class Spectro_Model_3(LinOp):
         # H_spec_x_freq = np.sum(
         #     np.conj(self.H_spec_freq) * original_cube_freq, axis=1
         # )  # (5, 300, 250, 251) * (1, 300, 250, 251)
-        H_spec_x_freq = einsum(
-            np.conj(self.H_spec_freq) * original_cube_freq, "t l i j -> t i j"
-        )  # (5, 300, 250, 251) * (1, 300, 250, 251)
+        # H_spec_x_freq = einsum(
+        #     np.conj(self.H_spec_freq) * original_cube_freq, "t l i j -> t i j"
+        # )  # (5, 300, 250, 251) * (1, 300, 250, 251)
+        H_spec_x_freq = np.einsum(
+            "tlij,blij->tij",
+            self.H_spec_freq.conj(),
+            original_cube_freq,
+            optimize=True
+        )
+
         maps = irdftn(H_spec_x_freq, self.shape_target)  # (5, 250, 500)
         
         return maps  # shape = 5, 250, 500
@@ -357,3 +381,51 @@ class Spectro_Model_3(LinOp):
 
 
 
+    def make_H_spec_freq_sum2_safe(
+        self,
+        array_psfs,
+        L_pce,
+        L_lamb,
+        L_spec,
+        shape_target,
+        di,
+        dj,
+        chunk_size=256
+    ):
+
+        n_spec = L_spec.shape[0]
+        n_lambda = array_psfs.shape[0]
+
+        H, W = shape_target
+        Wf = W//2 + 1
+        print('Step 1')
+        H_spec_freq = np.empty(
+            (n_spec, n_lambda, H, Wf),
+            dtype=np.complex64
+        )
+        print('Step 2')
+        # kernel FFT UNE SEULE FOIS
+        kernel = np.ones((di, dj), dtype=np.float32)
+        kernel_freq = ir2fr(kernel, shape_target)[None, None]
+
+        for start in range(0, n_lambda, chunk_size):
+            print(f'Processing chunk from {start} to {min(start + chunk_size, n_lambda)}')
+            end = min(start + chunk_size, n_lambda)
+
+            # ----- PSF -----
+            psf_chunk = array_psfs[start:end].astype(np.float32)
+
+            psf_freq = ir2fr(psf_chunk, shape_target).astype(np.complex64)
+
+            # pondération PCE
+            weights = L_spec[:, start:end] * L_pce[start:end]
+
+            H_spec_freq[:, start:end] = np.einsum(
+                "lhw,tl->tlhw",
+                psf_freq,
+                weights,
+                optimize=True
+            )* kernel_freq
+        print('Step 3')
+        # H_spec_freq *= kernel_freq
+        return H_spec_freq 

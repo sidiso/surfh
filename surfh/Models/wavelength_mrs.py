@@ -4,7 +4,6 @@ import numpy as np
 from astropy.io import fits
 from loguru import logger
 
-from surfh.Models import instru
 from surfh.Others import global_variables
 
 

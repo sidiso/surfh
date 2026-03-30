@@ -78,8 +78,6 @@ def split_M(M, split_shape):
 
 def make_iHtH_spectro(HtH_freq_spectro):
     inv_hess_freq = np.zeros_like(HtH_freq_spectro, dtype=complex)
-    print("HtH_freq_spectro.shape =", HtH_freq_spectro.shape)
-    print(HtH_freq_spectro[..., 0, 0].shape)
 
 
     H, W = inv_hess_freq.shape[-2:]
@@ -101,7 +99,6 @@ def make_iHtH_spectro_fast(HtH_freq_spectro, eps=1e-8):
     Returns inv_hess_freq with same shape.
     eps: small Tikhonov regularization added to diagonal to avoid singulars.
     """
-    print("HtH_freq_spectro.shape =", HtH_freq_spectro.shape)
     f1, f2, c1, c2, H, W = HtH_freq_spectro.shape
     assert f1 == f2, "expected f1==f2"
     assert c1 == c2, "expected c1==c2"
@@ -139,33 +136,6 @@ def make_iHtH_spectro_fast(HtH_freq_spectro, eps=1e-8):
     inv_hess_freq = inv_batch.transpose(2, 4, 3, 5, 0, 1)  # (f1, f2, c1, c2, H, W)
 
     return inv_hess_freq
-
-
-import torch
-import numpy as np
-
-def make_iHtH_spectro_gpu_torch(HtH_freq_spectro, eps=1e-8, device="cuda"):
-    X = torch.from_numpy(HtH_freq_spectro).to(device)
-
-    f1, f2, c1, c2, H, W = X.shape
-
-    X = torch.movedim(X, (-2, -1), (0, 1))
-    X = X.permute(0, 1, 2, 4, 3, 5)
-
-    batch = H * W
-    n = f1 * c1
-
-    X = X.reshape(batch, n, n)
-
-    I = torch.eye(n, device=device, dtype=X.dtype).unsqueeze(0)
-    X_reg = X + eps * I
-
-    inv_batch = torch.linalg.solve(X_reg, I)
-
-    inv_batch = inv_batch.reshape(H, W, f1, c1, f2, c2)
-    inv_hess_freq = inv_batch.permute(2, 4, 3, 5, 0, 1)
-
-    return inv_hess_freq.cpu().numpy()
 
 
 # diff with concatenating: now works with decim different for both dimensions
