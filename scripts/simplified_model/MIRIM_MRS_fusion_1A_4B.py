@@ -126,6 +126,8 @@ mu_spectro = 1 * (weight_mirim / weight_spectro)
 list_mu_reg = [1, 1e1, 5e1, 1e2, 5e2, 1e3, 5e3, 1e4]
 list_mu_spectro = [mu_spectro * factor for factor in [0.01, 0.05, 0.1, 0.5, 1, 5, 10, 50]]
 
+mu_spectro = list_mu_spectro[2]
+
 print(f"mu_spectro = {mu_spectro}")
 mu_reg = 1e1
 
@@ -135,7 +137,7 @@ quadcriterion = QuadCriterion2(
     mu_imager,
     y_mirim,
     mirim_model_for_fusion,
-    list_mu_spectro[3],
+    mu_spectro,
     y_spectro,
     spectro_model,
     list_mu_reg[2],
@@ -164,7 +166,6 @@ metadata = {"WAVELENGTH": wavel_axis_SS}
 save_numpy_to_fits(res_cube, metadata, path/'Reconstructed_cube.fits', masks=None)
 
 # true_cube = LinearMixingModel.mapsToCube(quadcrit_rec_maps, templates_SS)
-plot_cube(res_cube, wavel_axis_SS, title='Reconstructed Cube')
 # plot_cube(true_cube, wavel_axis_SS, title='Reconstructed Cube')
 
 y_mrs_mean_spectrum = np.mean(raw_y_spectro, axis=(1,2))
@@ -245,13 +246,14 @@ for filter in range(y_mirim.shape[0]):
 
 
 # Coupe vericale du cube à une lingueur d'onde donnée  et comparaison avec les données MRS brutes et le filtre MIRIM correspondant
+pixel_cut = 36-12
 wavelength_cut = 7.7
 idx_wavelength_cut = np.argmin(np.abs(wavel_axis_SS - wavelength_cut))
 cube_cut = res_cube[idx_wavelength_cut, :, :]
 plt.figure()
-plt.plot(cube_cut[:, 18], label='Reconstructed Cube Cut at 7.7 um')
-plt.plot(raw_y_spectro[idx_wavelength_cut, :, 18], label='Raw MRS Data Cut at 7.7 um')
-plt.plot(y_mirim[1][:, 18], label='MIRIM Data Filter F770W Cut at 7.7 um')
+plt.plot(cube_cut[:, pixel_cut], label='Reconstructed Cube Cut at 7.7 um', drawstyle='steps-mid')
+plt.plot(raw_y_spectro[idx_wavelength_cut, :, pixel_cut], label='Raw MRS Data Cut at 7.7 um', drawstyle='steps-mid')
+plt.plot(y_mirim[1][:, pixel_cut], label='MIRIM Data Filter F770W Cut at 7.7 um', drawstyle='steps-mid')
 plt.xlabel('Pixel Y')
 plt.ylabel('Intensity')
 plt.title('Vertical Cut at X=18')
@@ -262,19 +264,54 @@ wavelength_cut = 21.0
 idx_wavelength_cut = np.argmin(np.abs(wavel_axis_SS - wavelength_cut))
 cube_cut = res_cube[idx_wavelength_cut, :, :]
 plt.figure()
-plt.plot(cube_cut[:, 18], label='Reconstructed Cube Cut at 21.0 um')
-plt.plot(raw_y_spectro[idx_wavelength_cut, :, 18], label='Raw MRS Data Cut at 21.0 um')
-plt.plot(y_mirim[-1][:, 18], label='MIRIM Data Filter F2100W Cut at 21.0 um')
+plt.plot(cube_cut[:, pixel_cut], label='Reconstructed Cube Cut at 21.0 um', drawstyle='steps-mid')
+plt.plot(raw_y_spectro[idx_wavelength_cut, :, pixel_cut], label='Raw MRS Data Cut at 21.0 um', drawstyle='steps-mid')
+plt.plot(y_mirim[-1][:, pixel_cut], label='MIRIM Data Filter F2100W Cut at 21.0 um', drawstyle='steps-mid')
 plt.xlabel('Pixel Y')
 plt.ylabel('Intensity')
 plt.title('Vertical Cut at X=18')
 plt.legend()
 
+
+# Coupe à 18.0 um
+wavelength_cut = 18.0
+idx_wavelength_cut = np.argmin(np.abs(wavel_axis_SS - wavelength_cut))
+cube_cut = res_cube[idx_wavelength_cut, :, :]
+plt.figure()
+plt.plot(cube_cut[:, pixel_cut], label='Reconstructed Cube Cut at 18.0 um', drawstyle='steps-mid')
+plt.plot(raw_y_spectro[idx_wavelength_cut, :, pixel_cut], label='Raw MRS Data Cut at 18.0 um', drawstyle='steps-mid')
+plt.plot(y_mirim[-1][:, pixel_cut], label='MIRIM Data Filter F2100W Cut at 18.0 um', drawstyle='steps-mid')
+plt.xlabel('Pixel Y')
+plt.ylabel('Intensity')
+plt.title('Vertical Cut at X=18')
+plt.legend()
+
+
+
+# Coupe à 15.0 um
+wavelength_cut = 15.0
+idx_wavelength_cut = np.argmin(np.abs(wavel_axis_SS - wavelength_cut))
+cube_cut = res_cube[idx_wavelength_cut, :, :]
+plt.figure()
+plt.plot(np.flip(cube_cut[:, pixel_cut]), label='Reconstructed Cube Cut at 15.0 um', drawstyle='steps-mid')
+plt.plot(np.flip(raw_y_spectro[idx_wavelength_cut, :, pixel_cut]), label='Raw MRS Data Cut at 15.0 um', drawstyle='steps-mid')
+# plt.plot(y_mirim[-1][:, pixel_cut], label='MIRIM Data Filter F2100W Cut at 15.0 um', drawstyle='steps-mid')
+plt.xlabel('Pixel Y')
+plt.ylabel('Intensity')
+plt.title('Vertical Cut at X=18')
+plt.legend()
+
+
+
 # Show cut in the images
 plt.figure()
-plt.imshow(cube_cut, origin='lower', cmap='viridis')
-plt.axvline(x=18, color='r', linestyle='--', label='Cut Position X=18')
+plt.imshow(np.fliplr(cube_cut), origin='lower', cmap='viridis')
+plt.axvline(x=12, color='r', linestyle='--', label='Cut Position X=18')
 plt.title(f'Reconstructed Cube at {wavel_axis_SS[idx_wavelength_cut]:.2f} um')
 plt.colorbar(label='Intensity') 
+
+plot_cube(res_cube, wavel_axis_SS, title='Reconstructed Cube', show=False)
+plot_cube(raw_y_spectro, wavel_axis_SS, title='Raw MRS Cube', show=False)
+
 
 plt.show()
