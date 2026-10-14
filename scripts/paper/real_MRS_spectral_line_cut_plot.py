@@ -20,7 +20,8 @@ def apply_mask(data, masks, wavelengths):
 # ------------------------------------------------------
 #  PARAMÈTRES
 # ------------------------------------------------------
-fusion_fits = '/home/nmonnier/Data/JWST/NGC_7023/Fusion/Resultslcg_MC_11_MO_4_Temp_16_nit_800_mu_5.00e+06_SD_True/res_cube.fits' 
+# fusion_fits = '/home/nmonnier/Data/JWST/NGC_7023/Fusion/Resultslcg_MC_11_MO_4_Temp_16_nit_800_mu_5.00e+06_SD_True/res_cube.fits' 
+fusion_fits = '/home/nmonnier/Data/JWST/NGC_7023/Fusion/Results/lcg_MC_11_MO_4_Temp_20_nit_201_mu_5.00e+06_SD_True/res_cube.fits' 
 spectral_line_idx = [935, 3773, 5070, 6611, 8426]
 vertical_cut_x = 80  # colonne pour la coupe verticale
 
@@ -29,10 +30,11 @@ vertical_cut_x = 80  # colonne pour la coupe verticale
 # ------------------------------------------------------
 with fits.open(fusion_fits) as hdul:
     res_cube = hdul[0].data
-    mask = hdul['MASKS'].data
+    # mask = hdul['MASKS'].data
     wavelength = hdul['WCS-TABLE'].data['wavelength'][0].squeeze()
 
-masked_res_cube = apply_mask(res_cube.copy(), mask, wavelength)
+# masked_res_cube = apply_mask(res_cube.copy(), mask, wavelength)
+masked_res_cube = res_cube  # Temporaire, à remplacer par la version masquée
 
 # ------------------------------------------------------
 #  BOUCLE SUR LES LIGNES SPECTRALES
@@ -86,8 +88,8 @@ for idx_line in spectral_line_idx:
     ax2.legend(loc='upper left', fontsize=10)
 
     fig.subplots_adjust(top=0.95, bottom=0.08)
-    plt.savefig(f'/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/Plots/real_MRS_cut_spectral_line_lambda_{wavelength[idx_line]:.1f}.png', dpi=300)
-    plt.savefig(f'/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/Plots/real_MRS_cut_spectral_line_lambda_{wavelength[idx_line]:.1f}.pdf')
+    # plt.savefig(f'/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/Plots/real_MRS_cut_spectral_line_lambda_{wavelength[idx_line]:.1f}.png', dpi=300)
+    # plt.savefig(f'/home/nmonnier/Data/JWST/Simulation/Paper/Fusion/Plots/real_MRS_cut_spectral_line_lambda_{wavelength[idx_line]:.1f}.pdf')
 
 
     plt.show()

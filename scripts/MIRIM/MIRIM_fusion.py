@@ -11,6 +11,8 @@ from surfh.Preprocessing import model_creation
 from surfh.ToolsDir import reconstruction
 from surfh.Others import context
 from surfh.Vizualisation import cube_vizualisation
+from surfh.Models import wavelength_mrs
+
 
 import click
 import logging as log
@@ -20,7 +22,7 @@ from astropy.io import fits
 
 
 @click.command()
-@click.option('-c', '--config_file', default='/home/nmonnier/Projects/JWST/MRS/surfh/config/config_MIRIM_Fusion_nmf.yaml', type=str, help='Configuration file.')
+@click.option('-c', '--config_file', default='/home/nmonnier/Projects/JWST/MRS/surfh/config/config_MIRIM_Fusion_nmf_1B_4C.yaml', type=str, help='Configuration file.')
 def parse_options(config_file):
 
     verbose =True
@@ -38,8 +40,18 @@ def parse_options(config_file):
 
     log.info('Load simulation data')
     miri_soft, miri_pce, H_freq, wavel_axis, templates = model_creation.load_miri_simulation_data(config)
+    miri_pce = np.load('/home/nmonnier/Data/JWST/NGC_7023/Fusion/Templates/pce_interpolated_mirim_fusion.npy')
+    miri_pce = miri_pce[1:]
+
+    log.info('Rescale wavelength, psf, pce to match selected band ans spectral subsampling')
+
+    print("Wavelength axis shape = ", wavel_axis.shape)
+    print("PCE shape = ", miri_pce.shape)
+    print("PSF shape = ", miri_soft.shape)
+    print("Templates shape = ", templates.shape)
 
     log.info('Create intruments and spectro models')
+    H_freq = None
     MIRIModel = model_creation.create_miri_model(miri_soft, miri_pce, wavel_axis, templates, imshape, step, H_freq)
 
     data_mirim = model_creation.load_data_mirim(config)
@@ -48,23 +60,182 @@ def parse_options(config_file):
         list_y_mirim.append(np.array(data_mirim['data'][filt]))
     y_mirim = np.concatenate(list_y_mirim)
 
-    print(f"Shape Hfreq = {H_freq.shape}")
     print(f"Shape y_mirim = {y_mirim.shape}")
-    print(f"Mirim PCE = {miri_pce.shape}")
+
+
+    # raise SystemExit
+
+    # Plot figures to save 
+    # coordonnées en arcsec, centrées
+    x = (np.arange(imshape[0]) - imshape[0] / 2) * step
+    y = (np.arange(imshape[1]) - imshape[1] / 2) * step
+
+    extent = [x[0], x[-1], y[0], y[-1]]
+
+    plt.figure(figsize=(6, 5))
+    plt.imshow(y_mirim[0], origin="lower", extent=extent, cmap="viridis", aspect="equal")
+
+    plt.xlabel("ΔRA (arcsec)")
+    plt.ylabel("ΔDec (arcsec)")
+    plt.title(f"MIRIM Raw Data — Filter {config.MIRIM.list_filters[0]}")
+
+    cbar = plt.colorbar()
+    cbar.set_label("Flux MJy/sr")  # adapte selon tes unités
+
+    plt.tight_layout()
+    # plt.savefig(f'/home/nmonnier/Presentations/20260123_INCLASS/MIRIM_Filter_{config.MIRIM.list_filters[0]}_Data.png', dpi=200)
+    plt.show()
+
+
+
 
     log.info(f'Start {config.reconstruction.method} algorithm')
-    x_maps, x_cube = reconstruction.reconstruction_MIRIM_fusion(MIRIModel, y_mirim, templates, config, True)
+    x_maps, x_cube = reconstruction.reconstruction_MIRIM_fusion(MIRIModel, y_mirim, templates, config, True, config_file)
+    # x_maps = np.load('/home/nmonnier/Data/JWST/NGC_7023/Fusion/Results/MIRIM_lcg_Temp_12_nit_300_mu_1.00e+01_SD_True/res_x.npy')
+    # hdul = fits.open('/home/nmonnier/Data/JWST/NGC_7023/Fusion/Results/MIRIM_lcg_Temp_12_nit_300_mu_1.00e+01_SD_True/res_cube.fits')
+    # x_cube = hdul[0].data   
+    # hdul.close()
     xy_mirim = MIRIModel.forward(x_maps)
-    plt.figure()
-    plt.imshow(xy_mirim[0])
-    plt.colorbar()
-    plt.figure()
-    plt.imshow(y_mirim[0])
-    plt.colorbar()
-    plt.figure()
-    plt.imshow(xy_mirim[0]-y_mirim[0])
-    plt.colorbar()
-    plt.show()
+
+
+    def crop_border(img, ny=10, nx=10):
+        return img[ny:-ny, nx:-nx]
+
+    cropx = 20
+    cropy = 60
+    for i, filt in enumerate(config.MIRIM.list_filters):
+
+        img_fusion = crop_border(xy_mirim[i], cropy, cropx)
+        img_orig   = crop_border(y_mirim[i], cropy, cropx)
+        img_diff   = np.abs(img_orig - img_fusion)
+
+        ny, nx = img_fusion.shape
+
+        # axes centrés en arcsec
+        x = (np.arange(nx) - nx / 2) * step
+        y = (np.arange(ny) - ny / 2) * step
+        extent = [x[0], x[-1], y[0], y[-1]]
+
+        fig, axes = plt.subplots(1, 3, figsize=(16, 5), constrained_layout=True)
+
+        # mêmes limites pour fusion & original
+        vmin = min(img_fusion.min(), img_orig.min())
+        vmax = max(img_fusion.max(), img_orig.max())
+
+        im0 = axes[0].imshow(img_orig, origin="lower", extent=extent,
+                            cmap="viridis", vmin=vmin, vmax=vmax)
+        axes[0].set_title("Raw Data")
+        plt.colorbar(im0, ax=axes[0], fraction=0.046, pad=0.04)
+
+        im1 = axes[1].imshow(img_fusion, origin="lower", extent=extent,
+                            cmap="viridis", vmin=vmin, vmax=vmax)
+        axes[1].set_title("Fusion (Forward Model)")
+        plt.colorbar(im1, ax=axes[1], fraction=0.046, pad=0.04)
+
+        absmax = np.max(np.abs(img_diff))
+        im2 = axes[2].imshow(img_diff, origin="lower", extent=extent,
+                            cmap="coolwarm", vmin=-absmax, vmax=absmax)
+        axes[2].set_title("Absolute Difference (Raw − Fusion)")
+        plt.colorbar(im2, ax=axes[2], fraction=0.046, pad=0.04)
+
+        for ax in axes:
+            ax.set_xlabel("ΔRA (arcsec)")
+            ax.set_ylabel("ΔDec (arcsec)")
+            ax.set_aspect("equal")
+
+        plt.suptitle(f"MIRIM — Filter {filt}", fontsize=14)
+        # plt.savefig(f"/home/nmonnier/Presentations/20260123_INCLASS/comparison_MIRIM_{filt}.png", dpi=200, bbox_inches="tight")
+
+        plt.show()
+
+
+
+    for i, filt in enumerate(config.MIRIM.list_filters):
+
+        # --- intégration PCE ---
+        w = miri_pce[i]
+        w = w / np.sum(w)
+        deconv_filter = np.sum(w[:, None, None] * x_cube, axis=0)
+
+        # --- crop ---
+        img_fusion = crop_border(deconv_filter, cropy, cropx)
+        img_orig   = crop_border(y_mirim[i], cropy, cropx)
+
+        ny, nx = img_fusion.shape
+
+        # --- axes en arcsec ---
+        x = (np.arange(nx) - nx / 2) * step
+        y = (np.arange(ny) - ny / 2) * step
+        extent = [x[0], x[-1], y[0], y[-1]]
+
+        # --- coupe verticale centrale ---
+        xmid = nx // 2
+        profile_orig   = img_orig[:, xmid]
+        profile_fusion = img_fusion[:, xmid]
+
+        # masque pour ±15 arcsec
+        ymin, ymax = -11, 8
+        mask_cut = (y >= ymin) & (y <= ymax)
+
+        # --- figure : 2 lignes ---
+        fig = plt.figure(figsize=(16, 8), constrained_layout=True)
+        gs = fig.add_gridspec(1, 2)
+
+        ax_img1 = fig.add_subplot(gs[0])
+        ax_img2 = fig.add_subplot(gs[1])
+        # ax_prof = fig.add_subplot(gs[1, :])
+
+        # mêmes limites pour images
+        vmin = min(img_fusion.min(), img_orig.min())
+        vmax = max(img_fusion.max(), img_orig.max())
+
+        # ---- Raw ----
+        im0 = ax_img1.imshow(img_orig, origin="lower", extent=extent,
+                            cmap="viridis", vmin=vmin, vmax=vmax)
+        # ax_img1.axvline(x=0, color="w", ls="--", lw=1.5)
+        ax_img1.set_title("Raw Filter")
+        plt.colorbar(im0, ax=ax_img1, fraction=0.046, pad=0.04)
+
+        # ---- Deconv ----
+        im1 = ax_img2.imshow(img_fusion, origin="lower", extent=extent,
+                            cmap="viridis", vmin=vmin, vmax=vmax)
+        # ax_img2.axvline(x=0, color="w", ls="--", lw=1.5)
+        ax_img2.set_title("Deconv Filter (PCE integrated)")
+        plt.colorbar(im1, ax=ax_img2, fraction=0.046, pad=0.04)
+
+        
+
+        # ax_img1.plot([0], [ymin, ymax], color="w", ls="--", lw=1.5)
+        # ax_img2.plot([0], [ymin, ymax], color="w", ls="--", lw=1.5)
+
+
+        # # ---- Profils ----
+        # ax_prof.plot(y[mask_cut], profile_orig[mask_cut], label="Raw", lw=2, drawstyle='steps-mid')
+        # ax_prof.plot(y[mask_cut], profile_fusion[mask_cut], label="Deconv", lw=2, drawstyle='steps-mid')
+        # ax_prof.set_xlim(ymin, ymax)
+        # ax_prof.set_xlabel("ΔDec (arcsec)")
+        # ax_prof.set_ylabel("Intensity")
+        # ax_prof.set_title("Vertical cut at x = 0 arcsec (±15\")")
+        # ax_prof.legend()
+        # ax_prof.grid(alpha=0.3)
+
+        # labels images
+        for ax in [ax_img1, ax_img2]:
+            ax.set_xlabel("ΔRA (arcsec)")
+            ax.set_ylabel("ΔDec (arcsec)")
+            ax.set_aspect("equal")
+
+        plt.suptitle(f"MIRIM — Filter {filt}", fontsize=14)
+
+        # plt.savefig(
+        #     f"/home/nmonnier/Presentations/20260123_INCLASS/Comparison_MIRIM_{filt}.png",
+        #     dpi=200, bbox_inches="tight"
+        # )
+        plt.show()
+
+
+
+
 
     # cube_vizualisation.plot_cube(x_cube)
     cube_vizualisation.plot_on_the_fly_cube_from_maps(x_maps, templates, wavel_axis)

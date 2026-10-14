@@ -12,8 +12,6 @@ from scipy.signal import medfilt
 from sklearn.decomposition import NMF
 from einops import rearrange
 
-from rich.progress import Progress
-
 from surfh.Signalprocessing import fitting, utilities, utils
 from surfh.Signalprocessing.baseline import iterative_baseline_removal
 from surfh.Models import wavelength_mrs

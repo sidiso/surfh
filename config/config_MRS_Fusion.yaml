@@ -1,6 +1,6 @@
 configuration: 
   fusion_dir: '/home/nmonnier/Data/JWST/NGC_7023/Fusion'  # Main Fusion directory, containt all sub-directories
-  data_dir: 'Corrected_slices/'  # directory containing the corrected/Filtered slice data
+  mrs_data_dir: 'Corrected_slices/'  # directory containing the corrected/Filtered slice data
   result_dir: 'Results/'  # directory to save the results
   psf_dir: 'PSF/'  # directory containing the PSF data
   mrs_psf_file : 'psfs_pixscale0.1_npix_125_chan_1ABC_2ABC_3ABC_4ABC.npy'
@@ -17,6 +17,7 @@ reconstruction:
   mu : 5e6  # regularization parameter
 MRS:
   list_channels: ['1a', '1b', '1c', '2a', '2b', '2c', '3a', '3b', '3c', '4a', '4b']  # list of channels to use
+  inverse_rotation : True
   scale_data: True  # Convert data from Jy to Jy/str
   spectral_lines: True  # Enable spectral line processing
 MIRIM:

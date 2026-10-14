@@ -53,12 +53,8 @@ def compute_monochromatic_psfs2(wave_filter, oversample=4, pixelscale=0.11, fov_
 
 
 # array of wavelength 
-# wavel_axis = np.load('/home/nmonnier/Data/JWST/Orion_bar/Observation_1/Fusion/Templates/wavel_axis_orion_1ABC_2ABC_3ABC_4ABC_4_templates_SS4.npy') #wavelength_mrs.get_mrs_wavelength('1c')
-# spectrums = fits.open("/home/nmonnier/Data/JWST/Simulation/Orion/Templates/spectra_mir_orion.fits")[1].data
-# wavel_axis = spectrums.wavelength
-# wavel_axis = wavel_axis[::4] # SS 
-wavel_axis = np.load('/home/nmonnier/Data/JWST/NGC_7023/Fusion/Templates/wavel_axis_NGC7023_1ABC_2ABC_3ABC_4ABC.npy')
-wavel_axis = wavel_axis[::4]
+wavel_axis = np.load('/home/nmonnier/Data/JWST/NGC_7023/Fusion/Templates/wavelength/ch1b_to_ch4c_wavel_axis_SS4_mirim_fusion.npy')
+print(f"Wavelength axis shape: {wavel_axis.shape}")
 
 oversample = 1
 # Pixel scale
@@ -100,5 +96,5 @@ psfs_monoch_array = np.array(PSF)
 
 
 file_path = "/home/nmonnier/Data/JWST/NGC_7023/Fusion/PSF/"
-file_name = f"mirim_psfs_pixscale{pixelscale}_npix_{nb_pixels}_{len(wavel_axis)}_slices.npy"
+file_name = f"simplified_mirim_psfs_pixscale{pixelscale}_npix_{nb_pixels}_{len(wavel_axis)}_slices.npy"
 np.save(file_path + file_name, psfs_monoch_array)

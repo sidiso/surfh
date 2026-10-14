@@ -31,6 +31,11 @@ def parse_options(config_file):
 
     log.info('Load simulation data')
     wavel_axis, templates, sotf = model_creation.load_mrs_simulation_data(config)
+    # Log of shape of loaded data
+    log.info(f"Loaded data shapes:")
+    log.info(f"wavel_axis: {wavel_axis.shape}")
+    log.info(f"psfs: {sotf.shape}")
+    log.info(f"templates: {templates.shape}")
 
     log.info('Load MRS data')
     data_dict = model_creation.load_mrs_data(config)

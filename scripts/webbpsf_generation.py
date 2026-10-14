@@ -53,7 +53,7 @@ def compute_monochromatic_psfs2(wave_filter, oversample=4, pixelscale=0.11, fov_
 
 
 # array of wavelength 
-wavel_axis = np.load('/home/nmonnier/Data/JWST/NGC_7023/Fusion/Templates/wavel_axis_NGC7023_1ABC_2ABC_3ABC_4ABC.npy') #wavelength_mrs.get_mrs_wavelength('1c')
+wavel_axis = np.load('/home/nmonnier/Data/JWST/NGC_7023/Fusion/Templates/simplified_model_wavel_axis_NGC7023_1ABC_2ABC_3ABC_4ABC.npy') #wavelength_mrs.get_mrs_wavelength('1c')
 # spectrums = fits.open("/home/nmonnier/Data/JWST/Simulation/Orion/Templates/spectra_mir_orion.fits")[1].data
 # wavel_axis = spectrums.wavelength
 # wavel_axis = wavel_axis[::4] # SS 
@@ -74,5 +74,5 @@ psfs_monoch = compute_monochromatic_psfs2(wavel_axis, oversample=oversample, pix
 psfs_monoch_array = np.array(psfs_monoch)
 
 file_path = "/home/nmonnier/Data/JWST/NGC_7023/Fusion/PSF/"
-file_name = f"psfs_pixscale{pixelscale}_npix_{nb_pixels}_chan_1ABC_2ABC_3ABC_4ABC.npy"
+file_name = f"simplified_model_wavel_psfs_pixscale{pixelscale}_npix_{nb_pixels}_chan_1ABC_2ABC_3ABC_4ABC.npy"
 np.save(file_path + file_name, psfs_monoch_array)
